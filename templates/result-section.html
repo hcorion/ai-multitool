@@ -1,0 +1,13 @@
+{% if image_url %}
+    <h2>Generated Image for Prompt: "{{ prompt }}"</h2>
+    <img width="512" height="512" src="{{ url_for('static', filename='images/' + image_name) }}" alt="Click for fullscreen." onclick="openModal(this.src)"><br>
+    <p>Local Image Path: {{ url_for('static', filename='images/' + image_name) }}</p>
+    {% if revised_prompt %}
+        <p><strong>Revised Prompt:</strong> {{ revised_prompt }}</p>
+    {% endif %}
+
+    <div id="image-modal" style="display:none" class="modal" onclick="closeModal()">
+        <span class="close">&times;</span>
+        <img class="modal-content" id="modal-image">
+    </div>
+{% endif %}

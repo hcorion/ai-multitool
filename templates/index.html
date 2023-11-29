@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <script src="{{ url_for('static', filename='js/jquery.min.js') }}"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <title>DALL-E Image Generator</title>
+</head>
+
+<body>
+    <div class="tab">
+        <button id="defaultOpen" class="tablinks" onclick="openTab(event, 'Generation')">Generation</button>
+        <button class="tablinks" onclick="openTab(event, 'GridView')">Grid View</button>
+    </div>
+    
+    <div id="Generation" class="tabcontent">
+        <form id="prompt-form">
+            <label for="size">Select Size:</label>
+            <select name="size" id="size">
+                <option value="1024x1024">1024x1024 (Square)</option>
+                <option value="1792x1024">1792x1024 (Landscape)</option>
+                <option value="1024x1792">1024x1792 (Portrait)</option>
+            </select><br><br>
+    
+            <label for="quality">Select Quality:</label>
+            <select name="quality" id="quality">
+                <option value="standard">standard</option>
+                <option value="hd">HD</option>
+            </select><br><br>
+    
+            <label for="style">Select Style:</label>
+            <div id="styleDescription">(Vivid causes the model to lean towards generating hyper-real and dramatic images.)</div>
+            <select name="style" id="style" oninput="updateStyleDescription()">
+                <option value="vivid">Vivid</option>
+                <option value="natural">Natural</option>
+            </select>
+            <br><br>
+    
+            <label for="prompt">Enter Prompt:</label><br>
+            <textarea name="prompt" id="prompt" maxlength="4000" rows="4" cols="50"
+                oninput="updateCharacterCount()" spellcheck="true"></textarea>
+            <div id="charCount">0 / 4000</div><br>
+    
+            <input type="submit" value="Generate Image">
+        </form>
+    
+        <!--Filled in at runtime see result-section.html template-->
+        <div id="result-section"></div>
+    </div>
+    <div id="GridView" class="tabcontent">
+        <div class="image-grid">
+            <!-- Images will be loaded here -->
+        </div>
+        <button onclick="firstGrid()">&laquo;</button>
+        <button onclick="previousGrid()">&lsaquo;</button>
+        <button onclick="nextGrid()">&rsaquo;</button>
+        <button onclick="lastGrid()">&raquo;</button>
+        <div id="gridPageNum">Page 1/X</div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+
+</html>

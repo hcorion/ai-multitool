@@ -1,0 +1,144 @@
+// Define variables
+$background-color: #121212;
+$text-color: #fff;
+$modal-bg-color: rgba(0, 0, 0, 0.9);
+$tab-bg-color: rgb(18, 19, 36);
+$tab-hover-bg-color: rgb(36, 37, 59);
+$tab-active-bg-color: rgba(72, 73, 105, 0.6);
+$input-bg-color: #333;
+$submit-btn-color: #0a84ff;
+$submit-btn-hover-color: #006edc;
+$border-color: #666666;
+
+body {
+    font-family: 'Roboto', sans-serif;
+    background-color: $background-color;
+    color: $text-color;
+    margin: 0;
+    padding: 20px;
+}
+
+h1, h2, p {
+    margin: 0 0 20px;
+}
+
+form {
+    background-color: $input-bg-color;
+    padding: 20px;
+    border-radius: 8px;
+}
+
+label, select, textarea, input {
+    display: block;
+    width: 100%;
+    margin-bottom: 10px;
+
+    &::selection {
+        padding: 10px;
+        border-radius: 4px;
+        border: none;
+        background-color: $input-bg-color;
+        color: $text-color;
+    }
+}
+
+input[type="submit"] {
+    background-color: $submit-btn-color;
+    color: $text-color;
+    cursor: pointer;
+
+    &:hover {
+        background-color: $submit-btn-hover-color;
+    }
+}
+
+#result-section {
+    margin-top: 20px;
+}
+
+img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
+}
+
+.modal {
+    display: flex;
+    position: fixed;
+    z-index: 1;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: $modal-bg-color;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+
+    .modal-content {
+        margin: auto;
+        display: block;
+        width: 80%;
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+        transition: transform 0.25s ease; // Smooth zoom transition
+    }
+
+    .close {
+        position: absolute;
+        top: 20px;
+        right: 35px;
+        color: $text-color;
+        font-size: 40px;
+        font-weight: bold;
+        cursor: pointer;
+    }
+}
+
+.tab {
+    overflow: hidden;
+    border: 1px solid $border-color;
+    background-color: $tab-bg-color;
+
+    button {
+        background-color: inherit;
+        float: left;
+        border: none;
+        outline: none;
+        cursor: pointer;
+        padding: 14px 16px;
+        transition: 0.3s;
+        font-size: 17px;
+        color: $text-color;
+
+        &:hover {
+            background-color: $tab-hover-bg-color;
+        }
+
+        &.active {
+            background-color: $tab-active-bg-color;
+        }
+    }
+}
+
+.tabcontent {
+    display: none;
+    padding: 6px 12px;
+    border: 1px solid $border-color;
+    border-top: none;
+}
+
+.image-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr); // 6 images wide
+    grid-auto-rows: minmax(100px, auto); // Adjust row height as needed
+    gap: 10px;
+
+    img {
+        width: 100%;
+        height: auto;
+        object-fit: cover; // Adjusts for different aspect ratios
+    }
+}
