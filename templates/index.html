@@ -4,14 +4,16 @@
 <head>
     <script src="{{ url_for('static', filename='js/jquery.min.js') }}"></script>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script type="module" src="{{ url_for('static', filename='js/script.js') }}"></script>
     <title>DALL-E Image Generator</title>
 </head>
 
 <body>
     <div class="tab">
-        <button id="defaultOpen" class="tablinks" onclick="openTab(event, 'Generation')">Generation</button>
-        <button class="tablinks" onclick="openTab(event, 'GridView')">Grid View</button>
+        <button id="generationTab" class="tablinks">Generation</button>
+        <button id="gridViewTab" class="tablinks">Grid View</button>
     </div>
     
     <div id="Generation" class="tabcontent">
@@ -30,18 +32,21 @@
             </select><br><br>
     
             <label for="style">Select Style:</label>
-            <div id="styleDescription">(Vivid causes the model to lean towards generating hyper-real and dramatic images.)</div>
-            <select name="style" id="style" oninput="updateStyleDescription()">
+            <div id="styleDescription" style="font-size: medium;">(Vivid causes the model to lean towards generating hyper-real and dramatic images.)</div>
+            <select name="style" id="style">
                 <option value="vivid">Vivid</option>
                 <option value="natural">Natural</option>
             </select>
             <br><br>
     
-            <label for="prompt">Enter Prompt:</label><br>
-            <textarea name="prompt" id="prompt" maxlength="4000" rows="4" cols="50"
-                oninput="updateCharacterCount()" spellcheck="true"></textarea>
-            <div id="charCount">0 / 4000</div><br>
-    
+            <div>Enter Prompt:</div>
+            <textarea name="prompt" id="prompt" maxlength="4000" rows="4" cols="50" spellcheck="true"></textarea>
+            <div id="charCount">0 / 4000</div>
+            <div class="prompt-checkbox-group">
+                <input type="checkbox" id="add-follow-prompt" class="prompt-checkbox" name="add-follow-prompt">
+                <label class="prompt-checkbox-label" id="add-follow-prompt">Strictly follow prompt</label>
+            </div>
+            <br><br>
             <input type="submit" value="Generate Image">
         </form>
     
@@ -52,14 +57,21 @@
         <div class="image-grid">
             <!-- Images will be loaded here -->
         </div>
-        <button onclick="firstGrid()">&laquo;</button>
-        <button onclick="previousGrid()">&lsaquo;</button>
-        <button onclick="nextGrid()">&rsaquo;</button>
-        <button onclick="lastGrid()">&raquo;</button>
+        <div id="grid-image-modal" style="display:none" class="modal grid-modal">
+            <span id="grid-image-close" class="close">&times;</span>
+            <div class="modal-content-wrapper">
+                <img class="modal-content" id="grid-modal-image">
+                <div class="info-panel" id="grid-info-panel">
+                    <!--Populated in TypeScript at runtime-->
+                </div>
+            </div>
+        </div>
+        <button id="firstGrid">&laquo;</button>
+        <button id="previousGrid">&lsaquo;</button>
+        <button id="nextGrid">&rsaquo;</button>
+        <button id="lastGrid">&raquo;</button>
         <div id="gridPageNum">Page 1/X</div>
     </div>
-
-    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
 </body>
 
 </html>

@@ -1,10 +1,9 @@
-// Define variables
 $background-color: #121212;
 $text-color: #fff;
 $modal-bg-color: rgba(0, 0, 0, 0.9);
 $tab-bg-color: rgb(18, 19, 36);
 $tab-hover-bg-color: rgb(36, 37, 59);
-$tab-active-bg-color: rgba(72, 73, 105, 0.6);
+$tab-active-bg-color: rgba(72, 73, 105);
 $input-bg-color: #333;
 $submit-btn-color: #0a84ff;
 $submit-btn-hover-color: #006edc;
@@ -42,6 +41,27 @@ label, select, textarea, input {
     }
 }
 
+select {
+    width: auto;
+    background-color: $input-bg-color; // Use your theme's input background color
+    color: $text-color; // Use your theme's text color
+    padding: 10px 15px;
+    border-radius: 8px;
+    border: 1px solid $border-color; // Use your theme's border color
+    font-family: 'Roboto', sans-serif; // Match the font to your theme
+    font-size: 16px;
+    cursor: pointer;
+    background-size: 15px;
+
+    &:hover {
+        background-color: darken($input-bg-color, 10%); // Darken on hover
+    }
+
+    &:focus {
+        border-color: $submit-btn-color; // Highlight color on focus
+    }
+}
+
 input[type="submit"] {
     background-color: $submit-btn-color;
     color: $text-color;
@@ -52,8 +72,44 @@ input[type="submit"] {
     }
 }
 
+.prompt-checkbox-group {
+    width: auto;
+    display: flex;
+    margin-bottom: 0px;
+    margin-top: 0px;
+    clear: both;
+    float: left;
+}
+
+.prompt-checkbox {
+    width: auto;
+    display: flex;
+    margin-bottom: 0px;
+    margin-top: 0px;
+    clear: both;
+}
+
+.prompt-checkbox-label {
+    clear: both;
+    width: auto;
+    display: flex;
+    margin-bottom: 0px;
+    margin-top: 0px;
+}
+
+#charCount {
+    font-family: 'Inter', sans-serif;
+    margin-top: 0px;
+    margin-bottom: 0px;
+    font-size: small;
+}
+
 #result-section {
     margin-top: 20px;
+}
+
+.gen-image {
+    cursor: pointer;
 }
 
 img {
@@ -140,5 +196,70 @@ img {
         width: 100%;
         height: auto;
         object-fit: cover; // Adjusts for different aspect ratios
+        cursor: pointer;
+    }
+}
+
+// Info list
+
+.grid-modal {
+    .modal-content-wrapper {
+        display: flex;
+        justify-content: space-between;
+        width: 100%;
+        height: 100%; // Ensure the wrapper takes full height of the modal
+
+        .modal-content {
+            width: 70%; // Adjust as per your layout needs
+            max-height: 100%; // Max height to prevent overflow
+            object-fit: contain; // Ensure the image is scaled properly
+            margin: auto 0; // Center the image vertically within the wrapper
+        }
+
+        .info-panel {
+            width: 30%; // Adjust as per your layout needs
+            background-color: $tab-bg-color;
+            padding: 15px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            overflow-y: auto; // For scrollable content
+
+            .prompt-value {
+                font-family: 'Inter', sans-serif;
+                text-align: left;
+                justify-content: space-between;
+                width: 100%;
+                border: 2px solid #4b4b4b; // Add a border, change color as needed
+                background-color: rgba($color: #fff, $alpha: 0.1);
+                padding: 5px; // Add some padding for visual spacing
+                border-radius: 4px; // Optional, for rounded corners
+                display: inline-block;
+            }
+
+            .info-item {
+                width: 100%; // Ensure items take full width of the panel
+                display: flex;
+                justify-content: space-between;
+                margin-bottom: 10px;
+                padding: 10px;
+                border-bottom: 1px solid $border-color;
+
+                &:last-child {
+                    border-bottom: none;
+                }
+
+                span {
+                    color: $text-color;
+                    font-size: 16px;
+
+                    &:first-child {
+                        font-weight: bold;
+                    }
+                }
+            }
+        }
     }
 }

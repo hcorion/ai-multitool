@@ -1,23 +1,55 @@
 "use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-const jquery_1 = __importDefault(require("jquery"));
 document.addEventListener('DOMContentLoaded', () => {
-    (0, jquery_1.default)('#prompt-form').on('submit', (event) => {
+    $('#prompt-form').on('submit', (event) => {
         event.preventDefault();
-        const formData = (0, jquery_1.default)('#prompt-form').serialize();
-        jquery_1.default.ajax({
+        const formData = $('#prompt-form').serialize();
+        $.ajax({
             type: 'POST',
             url: '/',
             data: formData,
             success: (response) => {
-                (0, jquery_1.default)('#result-section').html(response);
+                $('#result-section').html(response);
+                addEventListenerToElement("generatedImage", "click", openGenModal);
+                addEventListenerToElement("generatedImageClose", "click", closeGenModal);
             }
         });
     });
+    // Assigning event listeners
+    addEventListenerToElement("generationTab", "click", handleTabClick);
+    addEventListenerToElement("gridViewTab", "click", handleTabClick);
+    addEventListenerToElement("style", "input", updateStyleDescription);
+    addEventListenerToElement("prompt", "input", updateCharacterCount);
+    // Grid buttons
+    addEventListenerToElement("firstGrid", "click", firstGrid);
+    addEventListenerToElement("previousGrid", "click", previousGrid);
+    addEventListenerToElement("nextGrid", "click", nextGrid);
+    addEventListenerToElement("lastGrid", "click", lastGrid);
+    // Grid Modal Buttons
+    addEventListenerToElement("grid-image-close", "click", closeGridModal);
+    document.getElementById("generationTab").click();
 });
+// Function to add an event listener to an element
+function addEventListenerToElement(elementId, eventType, handler) {
+    const element = document.getElementById(elementId);
+    if (element) {
+        element.addEventListener(eventType, handler);
+    }
+    else {
+        console.warn(`Element with ID '${elementId}' not found.`);
+    }
+}
+// Event Handlers
+function handleTabClick(evt) {
+    const element = evt.target;
+    const elementId = element.id;
+    const tabMap = {
+        "generationTab": "Generation",
+        "gridViewTab": "GridView"
+    };
+    if (tabMap[elementId]) {
+        openTab(evt, tabMap[elementId]);
+    }
+}
 function updateCharacterCount() {
     const promptInput = document.getElementById("prompt");
     const charCount = promptInput.value.length;
@@ -47,30 +79,36 @@ function openTab(evt, tabName) {
         gridTabLoaded();
     }
 }
-// Set the default open tab (Generation tab)
-document.getElementById("defaultOpen").click();
 let currentPage = 0;
 let totalPages = -1;
 function gridTabLoaded() {
-    jquery_1.default.get('/get-total-pages', (data) => {
+    $.get('/get-total-pages', (data) => {
         totalPages = parseInt(data, 10);
         loadImages(currentPage);
     });
 }
 function loadImages(page) {
-    jquery_1.default.getJSON(`/get-images/${page}`, (data) => {
-        const grid = (0, jquery_1.default)('.image-grid');
+    $.getJSON(`/get-images/${page}`, (data) => {
+        const grid = $('.image-grid');
         grid.empty(); // Clear existing images
         data.forEach((image) => {
-            const imgElement = (0, jquery_1.default)('<img>').attr('src', image);
+            const imgElement = $('<img>').attr('src', image).attr('id', "gridImage");
+            imgElement.on("click", openGridModal);
             grid.append(imgElement);
         });
+        document.getElementsByTagName;
         document.getElementById("gridPageNum").textContent = `Page ${page + 1}/${totalPages + 1}`;
     });
 }
-function nextGrid() {
-    currentPage += 1;
+function firstGrid() {
+    currentPage = 0;
     loadImages(currentPage);
+}
+function nextGrid() {
+    if (currentPage < totalPages) {
+        currentPage += 1;
+        loadImages(currentPage);
+    }
 }
 function previousGrid() {
     if (currentPage > 0) {
@@ -78,27 +116,56 @@ function previousGrid() {
         loadImages(currentPage);
     }
 }
-function openModal(src) {
+function lastGrid() {
+    currentPage = totalPages;
+    loadImages(currentPage);
+}
+function openGenModal(evt) {
+    const src = evt.currentTarget.src;
     document.getElementById('image-modal').style.display = "block";
     document.getElementById('modal-image').src = src;
+    document.getElementById('image-modal').addEventListener('wheel', (event) => {
+        event.preventDefault(); // Prevent background scrolling when the    modal is open
+    });
+    document.getElementById('modal-image').addEventListener('wheel', (event) => {
+        const img = event.target;
+        const scaleIncrement = 0.1;
+        const currentScale = img.style.transform.match(/scale\(([^)]+)\)/);
+        let scale = currentScale ? parseFloat(currentScale[1]) : 1;
+        if (event.deltaY < 0) {
+            scale += scaleIncrement; // Zoom in
+        }
+        else {
+            scale -= scaleIncrement; // Zoom out
+        }
+        scale = Math.max(1, Math.min(scale, 5)); // Adjust min and max scale as needed
+        img.style.transform = `scale(${scale})`;
+    });
 }
-function closeModal() {
+function openGridModal(evt) {
+    const filePath = evt.currentTarget.src;
+    document.getElementById('grid-image-modal').style.display = "block";
+    document.getElementById('grid-modal-image').src = filePath;
+    const fileName = filePath.split('/').pop();
+    $.getJSON('/get-image-metadata/' + fileName, function (metadata) {
+        var metadataDiv = document.getElementById('grid-info-panel');
+        metadataDiv.innerHTML = ''; // Clear previous metadata
+        for (var key in metadata) {
+            // <div class="info-item"><span>Prompt:</span><span id="prompt-value"></span></div>
+            var infoItem = document.createElement('div');
+            infoItem.className = "info-item";
+            infoItem.textContent = key + ":";
+            metadataDiv.appendChild(infoItem);
+            var infoValue = document.createElement('div');
+            infoValue.className = "prompt-value";
+            infoValue.textContent = metadata[key];
+            metadataDiv.appendChild(infoValue);
+        }
+    });
+}
+function closeGenModal() {
     document.getElementById('image-modal').style.display = "none";
 }
-document.getElementById('image-modal').addEventListener('wheel', (event) => {
-    event.preventDefault(); // Prevent background scrolling when the modal is open
-});
-document.getElementById('modal-image').addEventListener('wheel', (event) => {
-    const img = event.target;
-    const scaleIncrement = 0.1;
-    const currentScale = img.style.transform.match(/scale\(([^)]+)\)/);
-    let scale = currentScale ? parseFloat(currentScale[1]) : 1;
-    if (event.deltaY < 0) {
-        scale += scaleIncrement; // Zoom in
-    }
-    else {
-        scale -= scaleIncrement; // Zoom out
-    }
-    scale = Math.max(1, Math.min(scale, 5)); // Adjust min and max scale as needed
-    img.style.transform = `scale(${scale})`;
-});
+function closeGridModal() {
+    document.getElementById('grid-image-modal').style.display = "none";
+}

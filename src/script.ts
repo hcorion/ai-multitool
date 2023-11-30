@@ -1,9 +1,8 @@
-import $ from "jquery";
-
 document.addEventListener('DOMContentLoaded', () => {
     $('#prompt-form').on('submit', (event: JQuery.SubmitEvent) => {
         event.preventDefault();
         const formData: string = $('#prompt-form').serialize();
+        
     
         $.ajax({
             type: 'POST',
@@ -11,10 +10,58 @@ document.addEventListener('DOMContentLoaded', () => {
             data: formData,
             success: (response: string) => {
                 $('#result-section').html(response);
+
+                addEventListenerToElement("generatedImage", "click", openGenModal);
+                addEventListenerToElement("generatedImageClose", "click", closeGenModal);
             }
         });
     });
+
+    
+    // Assigning event listeners
+    addEventListenerToElement("generationTab", "click", handleTabClick);
+    addEventListenerToElement("gridViewTab", "click", handleTabClick);
+    addEventListenerToElement("style", "input", updateStyleDescription);
+    addEventListenerToElement("prompt", "input", updateCharacterCount);
+    
+    // Grid buttons
+    addEventListenerToElement("firstGrid", "click", firstGrid);
+    addEventListenerToElement("previousGrid", "click", previousGrid);
+    addEventListenerToElement("nextGrid", "click", nextGrid);
+    addEventListenerToElement("lastGrid", "click", lastGrid);
+
+    // Grid Modal Buttons
+    addEventListenerToElement("grid-image-close", "click", closeGridModal);
+
+    document.getElementById("generationTab")!.click();
 });
+
+// Function to add an event listener to an element
+function addEventListenerToElement(elementId: string, eventType: string, handler: (evt: Event) => void) {
+    const element = document.getElementById(elementId);
+    if (element) {
+        element.addEventListener(eventType, handler);
+    } else {
+        console.warn(`Element with ID '${elementId}' not found.`);
+    }
+}
+
+type TabId = 'generationTab' | 'gridViewTab';
+
+// Event Handlers
+function handleTabClick(evt: Event) {
+    const element = evt.target as HTMLElement;
+    const elementId = element.id as TabId;
+
+    const tabMap: Record<TabId, string> = {
+        "generationTab": "Generation",
+        "gridViewTab": "GridView"
+    };
+
+    if (tabMap[elementId]) {
+        openTab(evt as MouseEvent, tabMap[elementId]);
+    }
+}
 
 function updateCharacterCount(): void {
     const promptInput = document.getElementById("prompt") as HTMLInputElement;
@@ -51,9 +98,6 @@ function openTab(evt: MouseEvent, tabName: string): void {
     }
 }
 
-// Set the default open tab (Generation tab)
-(document.getElementById("defaultOpen") as HTMLElement).click();
-
 let currentPage: number = 0;
 let totalPages: number = -1;
 
@@ -70,16 +114,26 @@ function loadImages(page: number): void {
         grid.empty(); // Clear existing images
 
         data.forEach((image: string) => {
-            const imgElement = $('<img>').attr('src', image);
+            const imgElement = $('<img>').attr('src', image).attr('id', "gridImage");
+            imgElement.on("click", openGridModal)
             grid.append(imgElement);
         });
+        document.getElementsByTagName
         document.getElementById("gridPageNum")!.textContent = `Page ${page + 1}/${totalPages + 1}`;
     });
 }
 
-function nextGrid(): void {
-    currentPage += 1;
+function firstGrid(): void {
+    currentPage = 0;
     loadImages(currentPage);
+}
+
+function nextGrid(): void {
+    if (currentPage < totalPages)
+    {
+        currentPage += 1;
+        loadImages(currentPage);
+    }
 }
 
 function previousGrid(): void {
@@ -89,32 +143,66 @@ function previousGrid(): void {
     }
 }
 
-function openModal(src: string): void {
-    document.getElementById('image-modal')!.style.display = "block";
-    (document.getElementById('modal-image') as HTMLImageElement).src = src;
+function lastGrid(): void {
+    currentPage = totalPages;
+    loadImages(currentPage);
 }
 
-function closeModal(): void {
+function openGenModal(evt: Event): void {
+    const src = (evt.currentTarget as HTMLImageElement).src
+    document.getElementById('image-modal')!.style.display = "block";
+    (document.getElementById('modal-image') as HTMLImageElement).src = src;
+
+    document.getElementById('image-modal')!.addEventListener('wheel', (event: WheelEvent) => {
+        event.preventDefault(); // Prevent background scrolling when the    modal is open
+    });
+    
+    document.getElementById('modal-image')!.addEventListener('wheel', (event: WheelEvent) => {
+        const img = event.target as HTMLImageElement;
+        const scaleIncrement: number = 0.1;
+        const currentScale = img.style.transform.match(/scale\(([^)]+)\)/);
+    
+        let scale: number = currentScale ? parseFloat(currentScale[1]) : 1;
+    
+        if (event.deltaY < 0) {
+            scale += scaleIncrement; // Zoom in
+        } else {
+            scale -= scaleIncrement; // Zoom out
+        }
+    
+        scale = Math.max(1, Math.min(scale, 5)); // Adjust min and max scale as needed
+        img.style.transform = `scale(${scale})`;
+    });
+}
+
+function openGridModal(evt: Event): void {
+    const filePath = (evt.currentTarget as HTMLImageElement).src
+    document.getElementById('grid-image-modal')!.style.display = "block";
+    (document.getElementById('grid-modal-image') as HTMLImageElement).src = filePath;
+
+    const fileName = filePath.split('/').pop()
+
+    $.getJSON('/get-image-metadata/' + fileName, function(metadata) {
+        var metadataDiv = document.getElementById('grid-info-panel') as HTMLElement;
+        metadataDiv.innerHTML = ''; // Clear previous metadata
+        for (var key in metadata) {
+            // <div class="info-item"><span>Prompt:</span><span id="prompt-value"></span></div>
+            var infoItem = document.createElement('div');
+            infoItem.className = "info-item";
+            infoItem.textContent = key + ":";
+            metadataDiv.appendChild(infoItem);
+            var infoValue = document.createElement('div');
+            infoValue.className = "prompt-value";
+            infoValue.textContent = metadata[key];
+            metadataDiv.appendChild(infoValue);
+        }
+    });
+}
+
+function closeGenModal(): void {
     document.getElementById('image-modal')!.style.display = "none";
 }
 
-document.getElementById('image-modal')!.addEventListener('wheel', (event: WheelEvent) => {
-    event.preventDefault(); // Prevent background scrolling when the modal is open
-});
-
-document.getElementById('modal-image')!.addEventListener('wheel', (event: WheelEvent) => {
-    const img = event.target as HTMLImageElement;
-    const scaleIncrement: number = 0.1;
-    const currentScale = img.style.transform.match(/scale\(([^)]+)\)/);
-
-    let scale: number = currentScale ? parseFloat(currentScale[1]) : 1;
-
-    if (event.deltaY < 0) {
-        scale += scaleIncrement; // Zoom in
-    } else {
-        scale -= scaleIncrement; // Zoom out
-    }
-
-    scale = Math.max(1, Math.min(scale, 5)); // Adjust min and max scale as needed
-    img.style.transform = `scale(${scale})`;
-});
+function closeGridModal(): void {
+    document.getElementById('grid-image-modal')!.style.display = "none";
+}

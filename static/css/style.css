@@ -29,6 +29,25 @@ label::selection, select::selection, textarea::selection, input::selection {
   color: #fff;
 }
 
+select {
+  width: auto;
+  background-color: #333;
+  color: #fff;
+  padding: 10px 15px;
+  border-radius: 8px;
+  border: 1px solid #666666;
+  font-family: "Roboto", sans-serif;
+  font-size: 16px;
+  cursor: pointer;
+  background-size: 15px;
+}
+select:hover {
+  background-color: #1a1a1a;
+}
+select:focus {
+  border-color: #0a84ff;
+}
+
 input[type=submit] {
   background-color: #0a84ff;
   color: #fff;
@@ -38,8 +57,44 @@ input[type=submit]:hover {
   background-color: #006edc;
 }
 
+.prompt-checkbox-group {
+  width: auto;
+  display: flex;
+  margin-bottom: 0px;
+  margin-top: 0px;
+  clear: both;
+  float: left;
+}
+
+.prompt-checkbox {
+  width: auto;
+  display: flex;
+  margin-bottom: 0px;
+  margin-top: 0px;
+  clear: both;
+}
+
+.prompt-checkbox-label {
+  clear: both;
+  width: auto;
+  display: flex;
+  margin-bottom: 0px;
+  margin-top: 0px;
+}
+
+#charCount {
+  font-family: "Inter", sans-serif;
+  margin-top: 0px;
+  margin-bottom: 0px;
+  font-size: small;
+}
+
 #result-section {
   margin-top: 20px;
+}
+
+.gen-image {
+  cursor: pointer;
 }
 
 img {
@@ -101,7 +156,7 @@ img {
   background-color: rgb(36, 37, 59);
 }
 .tab button.active {
-  background-color: rgba(72, 73, 105, 0.6);
+  background-color: rgb(72, 73, 105);
 }
 
 .tabcontent {
@@ -121,6 +176,60 @@ img {
   width: 100%;
   height: auto;
   object-fit: cover;
+  cursor: pointer;
+}
+
+.grid-modal .modal-content-wrapper {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  height: 100%;
+}
+.grid-modal .modal-content-wrapper .modal-content {
+  width: 70%;
+  max-height: 100%;
+  object-fit: contain;
+  margin: auto 0;
+}
+.grid-modal .modal-content-wrapper .info-panel {
+  width: 30%;
+  background-color: rgb(18, 19, 36);
+  padding: 15px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  overflow-y: auto;
+}
+.grid-modal .modal-content-wrapper .info-panel .prompt-value {
+  font-family: "Inter", sans-serif;
+  text-align: left;
+  justify-content: space-between;
+  width: 100%;
+  border: 2px solid #4b4b4b;
+  background-color: rgba(255, 255, 255, 0.1);
+  padding: 5px;
+  border-radius: 4px;
+  display: inline-block;
+}
+.grid-modal .modal-content-wrapper .info-panel .info-item {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  padding: 10px;
+  border-bottom: 1px solid #666666;
+}
+.grid-modal .modal-content-wrapper .info-panel .info-item:last-child {
+  border-bottom: none;
+}
+.grid-modal .modal-content-wrapper .info-panel .info-item span {
+  color: #fff;
+  font-size: 16px;
+}
+.grid-modal .modal-content-wrapper .info-panel .info-item span:first-child {
+  font-weight: bold;
 }
 
 /*# sourceMappingURL=style.css.map */

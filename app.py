@@ -21,9 +21,14 @@ def index():
         quality = request.form.get('quality')
         style = request.form.get('style')
         prompt = request.form.get('prompt')
-        print(f"Size: {size}, Quality: {quality}, Style: {style}, Prompt: {prompt}")
-
+        strict_follow_prompt = request.form.get('add-follow-prompt')
+        print(f"Size: {size}, Quality: {quality}, Style: {style}, Prompt: {prompt}, strict_follow_prompt: {strict_follow_prompt}")
+        if not prompt.strip():
+            print("No prompt providing, not doing anything.")
+            return render_template('index.html')
         try:
+            if strict_follow_prompt:
+                prompt = "I NEED to test how the tool works with extremely simple prompts. DO NOT add any detail, just use it AS-IS:\n" + prompt
             # Call DALL-E 3 API
             response = client.images.generate(
                 model="dall-e-3",
@@ -102,13 +107,16 @@ def get_images(page):
 def get_image_metadata(filename):
     image_path = os.path.join(app.static_folder, "images", filename)
     image = Image.open(image_path)
-
+    image.load()
     # Extract metadata
-    metadata = image.info.get("pnginfo", None)
+    metadata = image.info
     if metadata:
         metadata_dict = {key: metadata[key] for key in metadata}
     else:
         metadata_dict = {"error": "No metadata found"}
+
+    width, height = image.size
+    metadata_dict["Resolution"] = f"{width}x{height}"
 
     return json.dumps(metadata_dict)
 
