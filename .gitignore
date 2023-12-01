@@ -1,4 +1,4 @@
-run.ps1
+run-user.ps1
 static/images/*
 !static/images/DONOTDELETE
 
