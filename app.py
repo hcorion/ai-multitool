@@ -15,6 +15,9 @@ client = openai.OpenAI()
 def index():
     image_url = None
     local_image_path = None
+    image_name = None
+    prompt = None
+    revised_prompt = None
 
     if request.method == 'POST':
         size = request.form.get('size')
@@ -70,6 +73,8 @@ def index():
                     image.save(f, "PNG", pnginfo=metadata)
 
                 local_image_path = image_filename
+
+                return render_template('result-section.html', image_url=image_url, local_image_path=local_image_path, revised_prompt=revised_prompt, prompt=prompt, image_name=image_name)
             else:
                 local_image_path = "Error downloading image"
                 print(local_image_path)
@@ -77,8 +82,6 @@ def index():
         except Exception as e:
             local_image_path = f"Error: {e}"
             print(local_image_path)
-
-        return render_template('result-section.html', image_url=image_url, local_image_path=local_image_path, revised_prompt=revised_prompt, prompt=prompt, image_name=image_name)
 
     return render_template('index.html')
 
