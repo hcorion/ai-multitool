@@ -2,6 +2,8 @@ run-user.ps1
 static/images/*
 !static/images/DONOTDELETE
 
+.vscode/
+
 # Created by https://www.toptal.com/developers/gitignore/api/node
 # Edit at https://www.toptal.com/developers/gitignore?templates=node
 

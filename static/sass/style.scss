@@ -263,3 +263,24 @@ img {
         }
     }
 }
+
+.error-dialog {
+    display: flex;
+    align-items: center; // Aligns icon and text vertically
+    background-color: #ff4d4f; // Stylish red background
+    color: white; // White text for better readability
+    padding: 10px 20px;
+    border-radius: 8px; // Modern rounded corners
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); // Subtle shadow for depth
+    margin: 10px 0; // Spacing from other elements
+
+    .error-icon {
+        margin-right: 10px; // Space between icon and text
+        font-size: 20px; // Larger icon size
+    }
+
+    .error-text {
+        font-size: 16px; // Readable text size
+        font-family: 'Roboto', sans-serif; // Consistent with the theme
+    }
+}

@@ -13,13 +13,13 @@ client = openai.OpenAI()
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
-    image_url = None
-    local_image_path = None
-    image_name = None
-    prompt = None
-    revised_prompt = None
-
     if request.method == 'POST':
+        image_url = None
+        local_image_path = None
+        image_name = None
+        prompt = None
+        revised_prompt = None
+        error_message = None
         size = request.form.get('size')
         quality = request.form.get('quality')
         style = request.form.get('style')
@@ -74,14 +74,23 @@ def index():
 
                 local_image_path = image_filename
 
-                return render_template('result-section.html', image_url=image_url, local_image_path=local_image_path, revised_prompt=revised_prompt, prompt=prompt, image_name=image_name)
+                return render_template('result-section.html', image_url=image_url, local_image_path=local_image_path, revised_prompt=revised_prompt, prompt=prompt, image_name=image_name, errmr_message=error_message)
             else:
                 local_image_path = "Error downloading image"
                 print(local_image_path)
 
+        except openai.BadRequestError as e:
+            error = json.loads(e.response.content)
+            error_message = error["error"]["message"]
+            error_code = error["error"]["code"]
+            if error_code == "content_policy_violation":
+                error_message = "Your prompt has been blocked by the OpenAI content filters. Try adjusting your prompt."
+            return render_template('result-section.html', image_url=image_url, local_image_path=local_image_path, revised_prompt=revised_prompt, prompt=prompt, image_name=image_name, error_message=error_message)
         except Exception as e:
             local_image_path = f"Error: {e}"
             print(local_image_path)
+        
+        return render_template('result-section.html', image_url=image_url, local_image_path=local_image_path, revised_prompt=revised_prompt, prompt=prompt, image_name=image_name, errmr_message=error_message)
 
     return render_template('index.html')
 
