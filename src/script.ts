@@ -1,8 +1,10 @@
 document.addEventListener('DOMContentLoaded', () => {
+    $('#loading-spinner').hide();
     $('#prompt-form').on('submit', (event: JQuery.SubmitEvent) => {
         event.preventDefault();
         const formData: string = $('#prompt-form').serialize();
         
+        $('#loading-spinner').show();
     
         $.ajax({
             type: 'POST',
@@ -13,6 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 addEventListenerToElement("generatedImage", "click", openGenModal);
                 addEventListenerToElement("generatedImageClose", "click", closeGenModal);
+                $('#loading-spinner').hide();
             }
         });
     });

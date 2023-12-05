@@ -14,6 +14,11 @@
     <div class="tab">
         <button id="generationTab" class="tablinks">Generation</button>
         <button id="gridViewTab" class="tablinks">Grid View</button>
+        {% if 'username' in session %}
+            <div class="user-info">
+                <p>Logged in as: {{ session['username'] }} <a href="{{ url_for('logout') }}">Logout</a></p>
+            </div>
+        {% endif %}
     </div>
     
     <div id="Generation" class="tabcontent">
@@ -40,14 +45,15 @@
             <br><br>
     
             <div>Enter Prompt:</div>
-            <textarea name="prompt" id="prompt" maxlength="4000" rows="4" cols="50" spellcheck="true"></textarea>
+            <textarea name="prompt" id="prompt" maxlength="4000" rows="8" cols="50" spellcheck="true"></textarea>
             <div id="charCount">0 / 4000</div>
             <div class="prompt-checkbox-group">
                 <input type="checkbox" id="add-follow-prompt" class="prompt-checkbox" name="add-follow-prompt">
-                <label class="prompt-checkbox-label" id="add-follow-prompt">Strictly follow prompt</label>
+                <label class="prompt-checkbox-label" for="add-follow-prompt" id="add-follow-prompt">Strictly follow prompt</label>
             </div>
             <br><br>
-            <input type="submit" value="Generate Image">
+            <input class="submit-button" type="submit" value="Generate Image">
+            <img id="loading-spinner" width="80" height="80" src="{{ url_for('static', filename='assets/Chunk-4s-200px.png') }}">
         </form>
     
         <!--Filled in at runtime see result-section.html template-->
@@ -72,6 +78,7 @@
         <button id="lastGrid">&raquo;</button>
         <div id="gridPageNum">Page 1/X</div>
     </div>
+    <a href="https://loading.io/icon/" target="_blank" rel="noopener noreferrer">Loading icon 'chunk' from loading.io</a>
 </body>
 
 </html>

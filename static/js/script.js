@@ -1,8 +1,10 @@
 "use strict";
 document.addEventListener('DOMContentLoaded', () => {
+    $('#loading-spinner').hide();
     $('#prompt-form').on('submit', (event) => {
         event.preventDefault();
         const formData = $('#prompt-form').serialize();
+        $('#loading-spinner').show();
         $.ajax({
             type: 'POST',
             url: '/',
@@ -11,6 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 $('#result-section').html(response);
                 addEventListenerToElement("generatedImage", "click", openGenModal);
                 addEventListenerToElement("generatedImageClose", "click", closeGenModal);
+                $('#loading-spinner').hide();
             }
         });
     });

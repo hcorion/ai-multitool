@@ -41,6 +41,12 @@ label, select, textarea, input {
     }
 }
 
+.submit-button {
+    width: 50%;
+    height: 40px;
+    font-size: medium;
+}
+
 select {
     width: auto;
     background-color: $input-bg-color; // Use your theme's input background color
@@ -157,6 +163,7 @@ img {
     overflow: hidden;
     border: 1px solid $border-color;
     background-color: $tab-bg-color;
+    position: relative;
 
     button {
         background-color: inherit;
@@ -175,6 +182,34 @@ img {
 
         &.active {
             background-color: $tab-active-bg-color;
+        }
+    }
+    .user-info {
+        position: absolute;
+        right: 20px; // Adjust this value as needed for spacing from the right edge
+        top: 50%;
+        transform: translateY(-50%); // Vertically center align
+        display: flex;
+        align-items: center;
+
+        p {
+            color: $text-color;
+            margin: 0;
+            display: flex;
+            align-items: center;
+
+            a {
+                color: $submit-btn-color;
+                text-decoration: none;
+                padding: 5px 10px;
+                border-radius: 4px;
+                background-color: rgba($color: $submit-btn-color, $alpha: 0.2);
+                margin-left: 10px; // Space between username and logout button
+
+                &:hover {
+                    background-color: rgba($color: $submit-btn-hover-color, $alpha: 0.2);
+                }
+            }
         }
     }
 }
@@ -282,5 +317,38 @@ img {
     .error-text {
         font-size: 16px; // Readable text size
         font-family: 'Roboto', sans-serif; // Consistent with the theme
+    }
+}
+
+.login-form {
+    max-width: 300px;
+    margin: 100px auto;
+    padding: 20px;
+    background-color: $input-bg-color;
+    border-radius: 8px;
+    text-align: center;
+
+    input[type="text"] {
+        width: 90%;
+        padding: 10px;
+        margin-bottom: 10px;
+        border: 1px solid $border-color;
+        border-radius: 4px;
+        background-color: rgba($color: $input-bg-color, $alpha: 0.5);
+        color: $text-color;
+    }
+
+    input[type="submit"] {
+        width: 90%;
+        padding: 10px;
+        border: none;
+        border-radius: 4px;
+        background-color: $submit-btn-color;
+        color: $text-color;
+        cursor: pointer;
+
+        &:hover {
+            background-color: $submit-btn-hover-color;
+        }
     }
 }
