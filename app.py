@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, session, redirect, url_for
 from PIL import Image
 from PIL.PngImagePlugin import PngInfo
+import pngquant
 import openai
 import requests
 import os, io, secrets
@@ -11,6 +12,9 @@ app = Flask(__name__)
 
 # Initialize the OpenAI client
 client = openai.OpenAI()
+
+# Configure the quality settings
+pngquant.config(min_quality=65, max_quality=80)
 
 secret_key_filename="secret-key.txt"
 if not os.path.isfile(secret_key_filename):
@@ -118,6 +122,7 @@ def index():
                 # Save the image with metadata directly to disk
                 with open(image_filename, 'wb') as f:
                     image.save(f, "PNG", pnginfo=metadata)
+                pngquant.quant_image(image=image_filename, override=True)
 
                 local_image_path = image_filename
 
