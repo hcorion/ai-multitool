@@ -14,7 +14,7 @@ app = Flask(__name__)
 client = openai.OpenAI()
 
 # Configure the quality settings
-pngquant.config(min_quality=65, max_quality=80)
+pngquant.config(min_quality=80, max_quality=85)
 
 secret_key_filename="secret-key.txt"
 if not os.path.isfile(secret_key_filename):
