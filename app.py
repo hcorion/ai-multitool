@@ -109,10 +109,15 @@ def index():
                 image_name = f"{str(file_count).zfill(10)}-{cleaned_prompt}.png"
                 image_filename = os.path.join(image_path, image_name)
 
-                # Create an in-memory image from the downloaded content
-                image = Image.open(io.BytesIO(image_response.content))
+                with open(image_filename, 'wb') as f:
+                    f.write(image_response.content)
                 
+                # Compress the image
+                pngquant.quant_image(image=image_filename, override=True)
                 # Create metadata
+
+                image = Image.open(image_filename)
+
                 metadata = PngInfo()
                 metadata.add_text("Prompt", prompt)
                 metadata.add_text("Quality", quality)
@@ -120,9 +125,7 @@ def index():
                 metadata.add_text("Revised Prompt", revised_prompt)
 
                 # Save the image with metadata directly to disk
-                with open(image_filename, 'wb') as f:
-                    image.save(f, "PNG", pnginfo=metadata)
-                pngquant.quant_image(image=image_filename, override=True)
+                image.save(image_filename, "PNG", pnginfo=metadata)
 
                 local_image_path = image_filename
 
