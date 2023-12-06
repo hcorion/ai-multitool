@@ -188,4 +188,4 @@ def get_image_metadata(filename):
     return json.dumps(metadata_dict)
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, host='0.0.0.0')
