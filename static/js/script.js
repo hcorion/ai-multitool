@@ -146,10 +146,13 @@ function openGenModal(evt) {
     });
 }
 function openGridModal(evt) {
+    var _a;
     const filePath = evt.currentTarget.src;
     document.getElementById('grid-image-modal').style.display = "block";
-    document.getElementById('grid-modal-image').src = filePath;
-    const fileName = filePath.split('/').pop();
+    const thumbFileName = filePath.split('/').pop();
+    const pathDir = filePath.slice(0, -((_a = thumbFileName === null || thumbFileName === void 0 ? void 0 : thumbFileName.length) !== null && _a !== void 0 ? _a : 0));
+    const fileName = thumbFileName === null || thumbFileName === void 0 ? void 0 : thumbFileName.slice(0, -(".thumb.jpg".length)).concat(".png");
+    document.getElementById('grid-modal-image').src = pathDir + fileName;
     $.getJSON('/get-image-metadata/' + fileName, function (metadata) {
         var metadataDiv = document.getElementById('grid-info-panel');
         metadataDiv.innerHTML = ''; // Clear previous metadata

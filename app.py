@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, session, redirect, url_for
+from flask import Flask, render_template, request, session, redirect, url_for, jsonify
 from PIL import Image
 from PIL.PngImagePlugin import PngInfo
 import pngquant
@@ -12,9 +12,6 @@ app = Flask(__name__)
 
 # Initialize the OpenAI client
 client = openai.OpenAI()
-
-# Configure the quality settings
-pngquant.config(min_quality=80, max_quality=85)
 
 secret_key_filename="secret-key.txt"
 if not os.path.isfile(secret_key_filename):
@@ -45,7 +42,7 @@ def remove_stop_words(input_string):
                       "down", "in", "out", "on", "off", "over", "under", "again", "further", "then", "once", "here", "there", "when",
                       "where", "why", "how", "all", "any", "both", "each", "few", "more", "most", "other", "some", "such", "no", "nor",
                       "not", "only", "own", "same", "so", "than", "too", "very", "s", "t", "can", "will", "just", "don", "should", "now",
-                      "photo", "artwork", "painting", "impressionist", "promotional", "full", "shot"])
+                      "photo", "artwork", "painting", "impressionist", "promotional", "marketing", "full", "shot"])
 
     # Splitting the input string into words
     words = input_string.lower().split()
@@ -107,25 +104,30 @@ def index():
                 cleaned_prompt = before_prompt.strip().lower()
                 cleaned_prompt = remove_stop_words(cleaned_prompt).replace('  ', ' ').replace(' ', '_').replace('.', '')[:30]
                 image_name = f"{str(file_count).zfill(10)}-{cleaned_prompt}.png"
+                image_thumb_name = f"{str(file_count).zfill(10)}-{cleaned_prompt}.thumb.jpg"
                 image_filename = os.path.join(image_path, image_name)
+                image_thumb_filename = os.path.join(image_path, image_thumb_name)
 
-                with open(image_filename, 'wb') as f:
-                    f.write(image_response.content)
+                # Create an in-memory image from the downloaded content
+                image = Image.open(io.BytesIO(image_response.content))
+
+                # Create a thumbnail
+                thumb_image = image.copy()
+                aspect_ratio = image.height / image.width
+                new_height = int(256 * aspect_ratio)
+                thumb_image.thumbnail((256, new_height))
                 
-                # Compress the image
-                pngquant.quant_image(image=image_filename, override=True)
                 # Create metadata
-
-                image = Image.open(image_filename)
-
                 metadata = PngInfo()
                 metadata.add_text("Prompt", prompt)
                 metadata.add_text("Quality", quality)
                 metadata.add_text("Style", style)
                 metadata.add_text("Revised Prompt", revised_prompt)
-
                 # Save the image with metadata directly to disk
-                image.save(image_filename, "PNG", pnginfo=metadata)
+                with open(image_filename, 'wb') as f:
+                    image.save(f, "PNG", pnginfo=metadata, optimize=True, compression_level=9)
+                with open(image_thumb_filename, 'wb') as f:
+                    thumb_image.save(f, "JPEG", quality=75)
 
                 local_image_path = image_filename
 
@@ -148,6 +150,25 @@ def index():
 
 images_per_page = 6 * 3 # (6 wide * 3 tall)
 
+@app.route('/converse', methods=['POST'])
+def converse():
+    if 'username' not in session:
+        return redirect(url_for('login'))
+    
+    user_input = request.json.get('user_input')
+    if not user_input:
+        return {'error': 'No input provided'}, 400
+
+    try:
+        response = client.conversations.create(
+            model="gpt-4.0-turbo", 
+            messages=[{"role": "system", "content": "You are a helpful assistant."}, {"role": "user", "content": user_input}]
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        return {'error': str(e)}, 500
+
+
 @app.route('/get-total-pages')
 def get_total_pages():
     if 'username' not in session:
@@ -163,7 +184,7 @@ def get_images(page):
     if 'username' not in session:
         return None
     image_directory = os.path.join(app.static_folder, "images", session["username"])
-    images = sorted([os.path.join("static/images/", session["username"], file) for file in os.listdir(image_directory) if file.endswith('.png')], reverse=True)
+    images = sorted([os.path.join("static/images/", session["username"], file) for file in os.listdir(image_directory) if file.endswith('.jpg')], reverse=True)
 
     start = (page) * images_per_page
     end = start + images_per_page

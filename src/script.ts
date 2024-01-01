@@ -181,9 +181,11 @@ function openGenModal(evt: Event): void {
 function openGridModal(evt: Event): void {
     const filePath = (evt.currentTarget as HTMLImageElement).src
     document.getElementById('grid-image-modal')!.style.display = "block";
-    (document.getElementById('grid-modal-image') as HTMLImageElement).src = filePath;
-
-    const fileName = filePath.split('/').pop()
+    
+    const thumbFileName = filePath.split('/').pop();
+    const pathDir = filePath.slice(0, -(thumbFileName?.length ?? 0))
+    const fileName = thumbFileName?.slice(0,-(".thumb.jpg".length)).concat(".png");
+    (document.getElementById('grid-modal-image') as HTMLImageElement).src = pathDir + fileName;
 
     $.getJSON('/get-image-metadata/' + fileName, function(metadata) {
         var metadataDiv = document.getElementById('grid-info-panel') as HTMLElement;
