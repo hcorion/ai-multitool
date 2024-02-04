@@ -107,7 +107,7 @@ function openTab(evt: MouseEvent, tabName: string): void {
     }
 }
 
-let currentPage: number = 0;
+let currentPage: number = 1;
 let totalPages: number = -1;
 
 function gridTabLoaded(): void {
@@ -123,12 +123,14 @@ function loadImages(page: number): void {
         grid.empty(); // Clear existing images
 
         data.forEach((image: string) => {
+            const aspectRatioBox = $('<div>').addClass('aspect-ratio-box');
             const imgElement = $('<img>').attr('src', image).attr('id', "gridImage");
             imgElement.on("click", openGridModal)
-            grid.append(imgElement);
+            aspectRatioBox.append(imgElement);
+            grid.append(aspectRatioBox);
         });
         document.getElementsByTagName
-        document.getElementById("gridPageNum")!.textContent = `Page ${page + 1}/${totalPages + 1}`;
+        document.getElementById("gridPageNum")!.textContent = `Page ${page}/${totalPages}`;
     });
 }
 

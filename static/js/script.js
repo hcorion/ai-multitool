@@ -99,9 +99,11 @@ function loadImages(page) {
         const grid = $('.image-grid');
         grid.empty(); // Clear existing images
         data.forEach((image) => {
+            const aspectRatioBox = $('<div>').addClass('aspect-ratio-box');
             const imgElement = $('<img>').attr('src', image).attr('id', "gridImage");
             imgElement.on("click", openGridModal);
-            grid.append(imgElement);
+            aspectRatioBox.append(imgElement);
+            grid.append(aspectRatioBox);
         });
         document.getElementsByTagName;
         document.getElementById("gridPageNum").textContent = `Page ${page}/${totalPages}`;
