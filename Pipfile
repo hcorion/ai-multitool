@@ -8,7 +8,8 @@ pillow = "*"
 openai = "*"
 requests = "*"
 flask = "*"
-pngquant = "*"
+pygments = "*"
+markdown = "*"
 
 [dev-packages]
 

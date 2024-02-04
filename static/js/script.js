@@ -20,6 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Assigning event listeners
     addEventListenerToElement("generationTab", "click", handleTabClick);
     addEventListenerToElement("gridViewTab", "click", handleTabClick);
+    addEventListenerToElement("chatTab", "click", handleTabClick);
     addEventListenerToElement("style", "input", updateStyleDescription);
     addEventListenerToElement("prompt", "input", updateCharacterCount);
     // Grid buttons
@@ -27,6 +28,8 @@ document.addEventListener('DOMContentLoaded', () => {
     addEventListenerToElement("previousGrid", "click", previousGrid);
     addEventListenerToElement("nextGrid", "click", nextGrid);
     addEventListenerToElement("lastGrid", "click", lastGrid);
+    // Chat buttons
+    addEventListenerToElement("send-chat", "click", sendChatMessage);
     // Grid Modal Buttons
     addEventListenerToElement("grid-image-close", "click", closeGridModal);
     document.getElementById("generationTab").click();
@@ -47,7 +50,8 @@ function handleTabClick(evt) {
     const elementId = element.id;
     const tabMap = {
         "generationTab": "Generation",
-        "gridViewTab": "GridView"
+        "gridViewTab": "GridView",
+        "chatTab": "Chat"
     };
     if (tabMap[elementId]) {
         openTab(evt, tabMap[elementId]);
@@ -82,7 +86,7 @@ function openTab(evt, tabName) {
         gridTabLoaded();
     }
 }
-let currentPage = 0;
+let currentPage = 1;
 let totalPages = -1;
 function gridTabLoaded() {
     $.get('/get-total-pages', (data) => {
@@ -100,7 +104,7 @@ function loadImages(page) {
             grid.append(imgElement);
         });
         document.getElementsByTagName;
-        document.getElementById("gridPageNum").textContent = `Page ${page + 1}/${totalPages + 1}`;
+        document.getElementById("gridPageNum").textContent = `Page ${page}/${totalPages}`;
     });
 }
 function firstGrid() {
@@ -174,4 +178,33 @@ function closeGenModal() {
 }
 function closeGridModal() {
     document.getElementById('grid-image-modal').style.display = "none";
+}
+//////////////////////
+////   Chat tab   ////
+//////////////////////
+function sendChatMessage() {
+    const chatName = "TEMP";
+    const chatInput = document.getElementById("chat-input");
+    const userMessage = chatInput.value.trim();
+    if (!userMessage)
+        return;
+    // Display user message in chat history
+    const chatHistory = document.getElementById("chat-history");
+    chatHistory.innerHTML += `<div class="user-message">${userMessage}</div>`;
+    // Send the message to the server
+    $.ajax({
+        type: 'POST',
+        url: '/chat',
+        contentType: 'application/json',
+        data: JSON.stringify({ user_input: userMessage, chat_name: chatName }),
+        success: (response) => {
+            // Display AI response in chat history
+            chatHistory.innerHTML += `<div class="ai-message">${response}</div>`;
+            chatInput.value = ''; // Clear input field
+            chatHistory.scrollTop = chatHistory.scrollHeight; // Scroll to bottom
+        },
+        error: (error) => {
+            console.error('Error:', error);
+        }
+    });
 }

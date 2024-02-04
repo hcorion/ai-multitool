@@ -6,6 +6,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/monokai.css') }}">
     <script type="module" src="{{ url_for('static', filename='js/script.js') }}"></script>
     <title>DALL-E Image Generator</title>
 </head>
@@ -14,6 +15,8 @@
     <div class="tab">
         <button id="generationTab" class="tablinks">Generation</button>
         <button id="gridViewTab" class="tablinks">Grid View</button>
+        <button id="chatTab" class="tablinks">Chat</button>
+
         {% if 'username' in session %}
             <div class="user-info">
                 <p>Logged in as: {{ session['username'] }} <a href="{{ url_for('logout') }}">Logout</a></p>
@@ -72,11 +75,18 @@
                 </div>
             </div>
         </div>
-        <button id="firstGrid">&laquo;</button>
-        <button id="previousGrid">&lsaquo;</button>
-        <button id="nextGrid">&rsaquo;</button>
-        <button id="lastGrid">&raquo;</button>
+        <button class="grid-nav-buttons" id="firstGrid">&laquo;</button>
+        <button class="grid-nav-buttons" id="previousGrid">&nbsp;&lsaquo;&nbsp;</button>
+        <button class="grid-nav-buttons" id="nextGrid">&nbsp;&rsaquo;&nbsp;</button>
+        <button class="grid-nav-buttons" id="lastGrid">&raquo;</button>
         <div id="gridPageNum">Page 1/X</div>
+    </div>
+    <div id="Chat" class="tabcontent">
+        <div class="chat-container">
+            <div id="chat-history"></div>
+            <textarea id="chat-input" placeholder="Type your message here..."></textarea>
+            <button id="send-chat">Send</button>
+        </div>
     </div>
     <a href="https://loading.io/icon/" target="_blank" rel="noopener noreferrer">Loading icon 'chunk' from loading.io</a>
 </body>

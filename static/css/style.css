@@ -264,6 +264,13 @@ img {
   font-weight: bold;
 }
 
+.grid-nav-buttons {
+  padding: 10px 10px;
+  border-radius: 4px;
+  margin-right: 20px;
+  font-size: x-large;
+}
+
 .error-dialog {
   display: flex;
   align-items: center;

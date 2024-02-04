@@ -24,6 +24,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Assigning event listeners
     addEventListenerToElement("generationTab", "click", handleTabClick);
     addEventListenerToElement("gridViewTab", "click", handleTabClick);
+    addEventListenerToElement("chatTab", "click", handleTabClick);
+
     addEventListenerToElement("style", "input", updateStyleDescription);
     addEventListenerToElement("prompt", "input", updateCharacterCount);
     
@@ -32,6 +34,9 @@ document.addEventListener('DOMContentLoaded', () => {
     addEventListenerToElement("previousGrid", "click", previousGrid);
     addEventListenerToElement("nextGrid", "click", nextGrid);
     addEventListenerToElement("lastGrid", "click", lastGrid);
+
+    // Chat buttons
+    addEventListenerToElement("send-chat", "click", sendChatMessage);
 
     // Grid Modal Buttons
     addEventListenerToElement("grid-image-close", "click", closeGridModal);
@@ -49,7 +54,7 @@ function addEventListenerToElement(elementId: string, eventType: string, handler
     }
 }
 
-type TabId = 'generationTab' | 'gridViewTab';
+type TabId = 'generationTab' | 'gridViewTab' | 'chatTab';
 
 // Event Handlers
 function handleTabClick(evt: Event) {
@@ -58,7 +63,8 @@ function handleTabClick(evt: Event) {
 
     const tabMap: Record<TabId, string> = {
         "generationTab": "Generation",
-        "gridViewTab": "GridView"
+        "gridViewTab": "GridView",
+        "chatTab": "Chat"
     };
 
     if (tabMap[elementId]) {
@@ -210,4 +216,36 @@ function closeGenModal(): void {
 
 function closeGridModal(): void {
     document.getElementById('grid-image-modal')!.style.display = "none";
+}
+
+//////////////////////
+////   Chat tab   ////
+//////////////////////
+
+function sendChatMessage(): void {
+    const chatName = "TEMP"
+    const chatInput = document.getElementById("chat-input") as HTMLTextAreaElement;
+    const userMessage = chatInput.value.trim();
+    if (!userMessage) return;
+
+    // Display user message in chat history
+    const chatHistory = document.getElementById("chat-history") as HTMLDivElement;
+    chatHistory.innerHTML += `<div class="user-message">${userMessage}</div>`;
+
+    // Send the message to the server
+    $.ajax({
+        type: 'POST',
+        url: '/chat',
+        contentType: 'application/json',
+        data: JSON.stringify({ user_input: userMessage, chat_name: chatName }),
+        success: (response: string) => {
+            // Display AI response in chat history
+            chatHistory.innerHTML += `<div class="ai-message">${response}</div>`;
+            chatInput.value = ''; // Clear input field
+            chatHistory.scrollTop = chatHistory.scrollHeight; // Scroll to bottom
+        },
+        error: (error) => {
+            console.error('Error:', error);
+        }
+    });
 }

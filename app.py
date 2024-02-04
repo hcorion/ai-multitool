@@ -1,7 +1,9 @@
 from flask import Flask, render_template, request, session, redirect, url_for, jsonify
 from PIL import Image
 from PIL.PngImagePlugin import PngInfo
-import pngquant
+from pygments.formatters import HtmlFormatter
+import markdown
+import markdown.extensions.fenced_code
 import openai
 import requests
 import os, io, secrets
@@ -42,7 +44,11 @@ def remove_stop_words(input_string):
                       "down", "in", "out", "on", "off", "over", "under", "again", "further", "then", "once", "here", "there", "when",
                       "where", "why", "how", "all", "any", "both", "each", "few", "more", "most", "other", "some", "such", "no", "nor",
                       "not", "only", "own", "same", "so", "than", "too", "very", "s", "t", "can", "will", "just", "don", "should", "now",
-                      "photo", "artwork", "painting", "impressionist", "promotional", "marketing", "full", "shot"])
+                      "photo", "artwork", "painting", "impressionist", "promotional", "marketing", "full", "shot", "pixel", "art", 
+                      "product", "image", "showcasing", "high", "resolution", "lineart", "b&w", "illustration", "ink", "detail", "detailed",
+                      "styled", "style", "hdr", "photoreal", "hyperreal", "photo-real", "hyper-real", "hyper-realistic", "realistic", 
+                      "professional", "photography", "concept", "depicts", "depicted", "depiction", "create", "digital", "vector", 
+                      "produce", "realistic", "depict", "depiction"])
 
     # Splitting the input string into words
     words = input_string.lower().split()
@@ -99,10 +105,11 @@ def index():
 
                 file_count = 0
                 for path in os.listdir(image_path):
-                    if os.path.isfile(os.path.join(image_path, path)):
+                    file_path = os.path.join(image_path, path)
+                    if file_path.endswith(".png") and os.path.isfile(file_path):
                         file_count += 1
                 cleaned_prompt = before_prompt.strip().lower()
-                cleaned_prompt = remove_stop_words(cleaned_prompt).replace('  ', ' ').replace(' ', '_').replace('.', '')[:30]
+                cleaned_prompt = remove_stop_words(cleaned_prompt.replace('.', ' ').replace(',', ' ')).replace('  ', ' ').replace(' ', '_')[:30]
                 image_name = f"{str(file_count).zfill(10)}-{cleaned_prompt}.png"
                 image_thumb_name = f"{str(file_count).zfill(10)}-{cleaned_prompt}.thumb.jpg"
                 image_filename = os.path.join(image_path, image_name)
@@ -150,24 +157,64 @@ def index():
 
 images_per_page = 6 * 3 # (6 wide * 3 tall)
 
-@app.route('/converse', methods=['POST'])
+
+#################################
+########    CHAT API    #########
+#################################
+
+@app.route('/chat', methods=['GET', 'POST'])
 def converse():
     if 'username' not in session:
         return redirect(url_for('login'))
-    
-    user_input = request.json.get('user_input')
-    if not user_input:
-        return {'error': 'No input provided'}, 400
 
-    try:
-        response = client.conversations.create(
-            model="gpt-4.0-turbo", 
-            messages=[{"role": "system", "content": "You are a helpful assistant."}, {"role": "user", "content": user_input}]
+    chat_name = re.sub(r'[^\w_. -]', '_', request.json.get('chat_name'))
+    user_path = os.path.join(app.static_folder, 'chats', session['username'])
+    user_file = os.path.join(user_path, f'{chat_name}.json')
+
+    if request.method == 'POST':
+        user_input = request.json.get('user_input')
+        if not user_input:
+            return {'error': 'No input provided'}, 400
+
+        # Load existing conversation or start a new one
+        if os.path.exists(user_file):
+            with open(user_file, 'r') as file:
+                chat = json.load(file)
+        else:
+            chat = [{"role": "system", "content": "You are a helpful assistant."}]
+
+        chat.append({"role": "user", "content": user_input})
+        response = client.chat.completions.create(
+            model="gpt-4-1106-preview", 
+            messages=chat
         )
-        return response.choices[0].message.content
-    except Exception as e:
-        return {'error': str(e)}, 500
+        ai_response = response.choices[0].message.content
+        chat.append({"role": "assistant", "content": ai_response})
 
+        # Save updated conversation
+        
+        os.makedirs(user_path, exist_ok=True)
+
+        with open(user_file, 'w') as file:
+            json.dump(chat, file)
+
+        # TODO: Set this up: https://platform.openai.com/docs/api-reference/making-requests#chat/create-stream
+
+        markdown_string = markdown.markdown(ai_response, extensions=["fenced_code", "codehilite"])
+
+        return markdown_string
+    else:
+        # GET request to retrieve conversation history
+        if os.path.exists(user_file):
+            with open(user_file, 'r') as file:
+                chat = json.load(file)
+            return jsonify(chat)
+        else:
+            return jsonify([])
+
+#################################
+########   IMAGE GRID   #########
+#################################
 
 @app.route('/get-total-pages')
 def get_total_pages():
@@ -175,9 +222,8 @@ def get_total_pages():
         return None
     image_directory = os.path.join(app.static_folder, "images", session["username"])
     images = sorted([os.path.join("images", file) for file in os.listdir(image_directory) if file.endswith('.png')])
-    print(len(images))
 
-    return str(len(images) // (images_per_page - 1))
+    return str(-(-len(images) // images_per_page))
 
 @app.route('/get-images/<int:page>')
 def get_images(page):
@@ -185,9 +231,22 @@ def get_images(page):
         return None
     image_directory = os.path.join(app.static_folder, "images", session["username"])
     images = sorted([os.path.join("static/images/", session["username"], file) for file in os.listdir(image_directory) if file.endswith('.jpg')], reverse=True)
+    
+    total_images = len(images)
+    total_pages = (total_images + images_per_page - 1) // images_per_page
+    
+    # Calculate how many images are on the final page (which is displayed first)
+    images_on_first_page = total_images % images_per_page or images_per_page
+    if page == 1:
+        start = 0
+        end = images_on_first_page
+    else:
+        # Adjust the start and end for pages after the first
+        start = images_on_first_page + (page - 2) * images_per_page
+        end = start + images_per_page
+        if end > total_images:
+            end = total_images
 
-    start = (page) * images_per_page
-    end = start + images_per_page
     paginated_images = images[start:end]
 
     return json.dumps(paginated_images)
