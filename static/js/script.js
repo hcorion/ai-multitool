@@ -110,7 +110,7 @@ function loadImages(page) {
     });
 }
 function firstGrid() {
-    currentPage = 0;
+    currentPage = 1;
     loadImages(currentPage);
 }
 function nextGrid() {

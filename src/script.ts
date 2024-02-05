@@ -135,7 +135,7 @@ function loadImages(page: number): void {
 }
 
 function firstGrid(): void {
-    currentPage = 0;
+    currentPage = 1;
     loadImages(currentPage);
 }
 
