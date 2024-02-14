@@ -148,7 +148,7 @@ function nextGrid(): void {
 }
 
 function previousGrid(): void {
-    if (currentPage > 0) {
+    if (currentPage > 1) {
         currentPage -= 1;
         loadImages(currentPage);
     }
@@ -224,6 +224,16 @@ function closeGridModal(): void {
 ////   Chat tab   ////
 //////////////////////
 
+type ChatMessage = {
+    role: string;
+    text: string;
+}
+
+type ChatData = {
+    data: ChatMessage[];
+}
+
+
 function sendChatMessage(): void {
     const chatName = "TEMP"
     const chatInput = document.getElementById("chat-input") as HTMLTextAreaElement;
@@ -232,7 +242,7 @@ function sendChatMessage(): void {
 
     // Display user message in chat history
     const chatHistory = document.getElementById("chat-history") as HTMLDivElement;
-    chatHistory.innerHTML += `<div class="user-message">${userMessage}</div>`;
+    //chatHistory.innerHTML += `<div class="user-message">${userMessage}</div>`;
 
     // Send the message to the server
     $.ajax({
@@ -241,8 +251,13 @@ function sendChatMessage(): void {
         contentType: 'application/json',
         data: JSON.stringify({ user_input: userMessage, chat_name: chatName }),
         success: (response: string) => {
+            let chat_data: ChatData = JSON.parse(response)
+            console.log(response)
+            chatHistory.innerHTML = "";
             // Display AI response in chat history
-            chatHistory.innerHTML += `<div class="ai-message">${response}</div>`;
+            chat_data.data.forEach((message) => {
+                chatHistory.innerHTML += `<div class="ai-message">${message.text}</div>`;
+            })
             chatInput.value = ''; // Clear input field
             chatHistory.scrollTop = chatHistory.scrollHeight; // Scroll to bottom
         },

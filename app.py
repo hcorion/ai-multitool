@@ -6,7 +6,7 @@ import markdown
 import markdown.extensions.fenced_code
 import openai
 import requests
-import os, io, secrets
+import os, io, secrets, time
 import json
 import re
 
@@ -167,42 +167,58 @@ def converse():
     if 'username' not in session:
         return redirect(url_for('login'))
 
+    thread_id = request.json.get('thread_id')
     chat_name = re.sub(r'[^\w_. -]', '_', request.json.get('chat_name'))
-    user_path = os.path.join(app.static_folder, 'chats', session['username'])
-    user_file = os.path.join(user_path, f'{chat_name}.json')
+    user_file = os.path.join(app.static_folder, 'chats', f'{session["username"]}.json')
 
     if request.method == 'POST':
         user_input = request.json.get('user_input')
         if not user_input:
             return {'error': 'No input provided'}, 400
-
+        
         # Load existing conversation or start a new one
         if os.path.exists(user_file):
             with open(user_file, 'r') as file:
                 chat = json.load(file)
         else:
-            chat = [{"role": "system", "content": "You are a helpful assistant."}]
+            with open(user_file, 'a') as file:
+                chat = {"threads": []}
+                file.write(json.dumps(chat))
 
-        chat.append({"role": "user", "content": user_input})
-        response = client.chat.completions.create(
-            model="gpt-4-1106-preview", 
-            messages=chat
-        )
-        ai_response = response.choices[0].message.content
-        chat.append({"role": "assistant", "content": ai_response})
+        # TODO: Allow listing assistants
+        assistant = client.beta.assistants.retrieve("asst_nYZeL982wB4AgoX4M7lfq7Qv")
+        if thread_id and chat.threads[thread_id]:
+            print("Have thread")
+            thread = client.beta.threads.retrieve(thread_id)
+        else:
+            print("Need to create thread")
+            thread = client.beta.threads.create()
+            thread_id = thread.id
+            chat[thread_id] = { "data": thread.__dict__, "chat_name": chat_name }
+        thread_message = client.beta.threads.messages.create(thread_id, role="user", content=user_input)
+        run = client.beta.threads.runs.create(thread_id=thread_id, assistant_id=assistant.id)
 
-        # Save updated conversation
+        run_retrieved = False
+        while not run_retrieved:
+            run = client.beta.threads.runs.retrieve(run_id=run.id, thread_id=thread_id)
+            if run.status == "failed" or run.status == "completed" or run.status == "expired":
+                run_retrieved = True
+                print(f"Run retrieved! {run.status}")
         
-        os.makedirs(user_path, exist_ok=True)
-
+        chat[thread_id]["last_update"] = time.time()
         with open(user_file, 'w') as file:
             json.dump(chat, file)
-
-        # TODO: Set this up: https://platform.openai.com/docs/api-reference/making-requests#chat/create-stream
-
-        markdown_string = markdown.markdown(ai_response, extensions=["fenced_code", "codehilite"])
-
-        return markdown_string
+        
+        message_list = client.beta.threads.messages.list(run.thread_id)
+        all_messages = { "data": [] }
+        for message in message_list.data:
+            if message.content:
+                for msg_content in message.content:
+                    all_messages["data"].append({
+                        "role": message.role,
+                        "text": markdown.markdown(msg_content.text.value, extensions=["fenced_code", "codehilite"])
+                    })
+        return json.dumps(all_messages)
     else:
         # GET request to retrieve conversation history
         if os.path.exists(user_file):

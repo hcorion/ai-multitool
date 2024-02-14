@@ -120,7 +120,7 @@ function nextGrid() {
     }
 }
 function previousGrid() {
-    if (currentPage > 0) {
+    if (currentPage > 1) {
         currentPage -= 1;
         loadImages(currentPage);
     }
@@ -181,9 +181,6 @@ function closeGenModal() {
 function closeGridModal() {
     document.getElementById('grid-image-modal').style.display = "none";
 }
-//////////////////////
-////   Chat tab   ////
-//////////////////////
 function sendChatMessage() {
     const chatName = "TEMP";
     const chatInput = document.getElementById("chat-input");
@@ -192,7 +189,7 @@ function sendChatMessage() {
         return;
     // Display user message in chat history
     const chatHistory = document.getElementById("chat-history");
-    chatHistory.innerHTML += `<div class="user-message">${userMessage}</div>`;
+    //chatHistory.innerHTML += `<div class="user-message">${userMessage}</div>`;
     // Send the message to the server
     $.ajax({
         type: 'POST',
@@ -200,8 +197,13 @@ function sendChatMessage() {
         contentType: 'application/json',
         data: JSON.stringify({ user_input: userMessage, chat_name: chatName }),
         success: (response) => {
+            let chat_data = JSON.parse(response);
+            console.log(response);
+            chatHistory.innerHTML = "";
             // Display AI response in chat history
-            chatHistory.innerHTML += `<div class="ai-message">${response}</div>`;
+            chat_data.data.forEach((message) => {
+                chatHistory.innerHTML += `<div class="ai-message">${message.text}</div>`;
+            });
             chatInput.value = ''; // Clear input field
             chatHistory.scrollTop = chatHistory.scrollHeight; // Scroll to bottom
         },
