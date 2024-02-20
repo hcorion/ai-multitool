@@ -82,8 +82,17 @@ function openTab(evt, tabName) {
     const tab = document.getElementById(tabName);
     tab.style.display = "block";
     evt.currentTarget.className += " active";
-    if (tabName === "GridView") {
-        gridTabLoaded();
+    switch (tabName) {
+        case "GridView":
+            gridTabLoaded();
+            break;
+        case "Chat":
+            chatTabLoaded();
+            break;
+        default:
+            break;
+    }
+    if (tabName === "") {
     }
 }
 let currentPage = 1;
@@ -181,34 +190,105 @@ function closeGenModal() {
 function closeGridModal() {
     document.getElementById('grid-image-modal').style.display = "none";
 }
-function sendChatMessage() {
-    const chatName = "TEMP";
+let allConversations = {};
+var currentThreadId = "";
+function chatTabLoaded() {
+    refreshConversationList();
+}
+function refreshConversationList() {
+    const conversationsList = document.getElementById("conversations-list");
+    $.get('/get-all-conversations', (response) => {
+        console.error("convos pulled");
+        let conversations = JSON.parse(response);
+        allConversations = conversations;
+        let children = [];
+        for (let key in conversations) {
+            let value = conversations[key];
+            var convoItem = document.createElement('div');
+            convoItem.className = "conversation-item";
+            let creationDate = new Date(value.data.created_at * 1000);
+            console.log(`date: ${value.data.created_at}`);
+            convoItem.textContent = `${value.chat_name}\n${creationDate.toDateString()}`;
+            convoItem.setAttribute('data-conversation-id', key);
+            convoItem.addEventListener('click', onConversationSelected);
+            conversationsList.appendChild(convoItem);
+            children.push(convoItem);
+        }
+        conversationsList.replaceChildren(...children);
+    });
+}
+function onConversationSelected(ev) {
+    let conversationId = this.getAttribute('data-conversation-id');
+    console.log(`conversation: ${conversationId}`);
     const chatInput = document.getElementById("chat-input");
-    const userMessage = chatInput.value.trim();
-    if (!userMessage)
-        return;
-    // Display user message in chat history
-    const chatHistory = document.getElementById("chat-history");
-    //chatHistory.innerHTML += `<div class="user-message">${userMessage}</div>`;
-    // Send the message to the server
     $.ajax({
-        type: 'POST',
-        url: '/chat',
+        type: 'GET',
+        url: '/chat?thread_id=' + encodeURIComponent(conversationId),
         contentType: 'application/json',
-        data: JSON.stringify({ user_input: userMessage, chat_name: chatName }),
+        scriptCharset: 'utf-8',
         success: (response) => {
-            let chat_data = JSON.parse(response);
-            console.log(response);
-            chatHistory.innerHTML = "";
-            // Display AI response in chat history
-            chat_data.data.forEach((message) => {
-                chatHistory.innerHTML += `<div class="ai-message">${message.text}</div>`;
-            });
+            let chatData = JSON.parse(response);
             chatInput.value = ''; // Clear input field
-            chatHistory.scrollTop = chatHistory.scrollHeight; // Scroll to bottom
+            refreshChatMessages(chatData.messages);
+            currentThreadId = chatData.threadId;
         },
         error: (error) => {
             console.error('Error:', error);
         }
     });
+}
+function sendChatMessage() {
+    var chatName = "";
+    if (currentThreadId) {
+        chatName = allConversations[currentThreadId].chat_name;
+    }
+    while (!chatName) {
+        chatName = prompt("Please title this conversation (max 30 chars):", "Conversation");
+        if (chatName.length > 30) {
+            chatName = "";
+        }
+    }
+    const chatInput = document.getElementById("chat-input");
+    const userMessage = chatInput.value.trim();
+    if (!userMessage)
+        return;
+    // Send the message to the server
+    $.ajax({
+        type: 'POST',
+        url: '/chat',
+        contentType: 'application/json',
+        data: JSON.stringify({ user_input: userMessage, chat_name: chatName, thread_id: currentThreadId }),
+        success: (response) => {
+            let chatData = JSON.parse(response);
+            refreshChatMessages(chatData.messages);
+            chatInput.value = ''; // Clear input field
+            currentThreadId = chatData.threadId;
+            // Just populate it with dummy data so that we have data in case the refresh takes too long
+            let currentTimeEpoch = new Date(Date.now()).getUTCSeconds();
+            allConversations[chatData.threadId] = {
+                data: {
+                    id: chatData.threadId,
+                    created_at: new Date(Date.now()).getUTCSeconds(),
+                    metadata: {},
+                    object: "thread"
+                },
+                chat_name: chatName,
+                last_update: currentTimeEpoch
+            };
+            // Refresh the conversation list
+            refreshConversationList();
+        },
+        error: (error) => {
+            console.error('Error:', error);
+        }
+    });
+}
+function refreshChatMessages(messages) {
+    const chatHistory = document.getElementById("chat-history");
+    chatHistory.innerHTML = "";
+    // Display AI response in chat history
+    messages.forEach((message) => {
+        chatHistory.innerHTML += `<div class="ai-message">${message.text}</div>`;
+    });
+    chatHistory.scrollTop = chatHistory.scrollHeight; // Scroll to bottom
 }

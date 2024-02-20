@@ -83,9 +83,16 @@
     </div>
     <div id="Chat" class="tabcontent">
         <div class="chat-container">
-            <div id="chat-history"></div>
-            <textarea id="chat-input" placeholder="Type your message here..."></textarea>
-            <button id="send-chat">Send</button>
+            <div id="sidebar" class="sidebar">
+                <div id="conversations-list"><!-- Populated in TypeScript at runtime --></div>
+            </div>
+            <div class="chat-content">
+                <div id="chat-history"><!-- Populated in TypeScript at runtime --></div>
+                <div class="input-area">
+                    <textarea id="chat-input" placeholder="Type your message here..."></textarea>
+                    <button id="send-chat">Send</button>
+                </div>
+            </div>
         </div>
     </div>
     <a href="https://loading.io/icon/" target="_blank" rel="noopener noreferrer">Loading icon 'chunk' from loading.io</a>

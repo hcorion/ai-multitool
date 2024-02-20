@@ -3,9 +3,9 @@ document.addEventListener('DOMContentLoaded', () => {
     $('#prompt-form').on('submit', (event: JQuery.SubmitEvent) => {
         event.preventDefault();
         const formData: string = $('#prompt-form').serialize();
-        
+
         $('#loading-spinner').show();
-    
+
         $.ajax({
             type: 'POST',
             url: '/',
@@ -20,7 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    
+
     // Assigning event listeners
     addEventListenerToElement("generationTab", "click", handleTabClick);
     addEventListenerToElement("gridViewTab", "click", handleTabClick);
@@ -28,7 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     addEventListenerToElement("style", "input", updateStyleDescription);
     addEventListenerToElement("prompt", "input", updateCharacterCount);
-    
+
     // Grid buttons
     addEventListenerToElement("firstGrid", "click", firstGrid);
     addEventListenerToElement("previousGrid", "click", previousGrid);
@@ -102,8 +102,17 @@ function openTab(evt: MouseEvent, tabName: string): void {
     tab.style.display = "block";
     (evt.currentTarget as HTMLElement).className += " active";
 
-    if (tabName === "GridView") {
-        gridTabLoaded();
+    switch (tabName) {
+        case "GridView":
+            gridTabLoaded();
+            break;
+        case "Chat":
+            chatTabLoaded();
+            break;
+        default:
+            break;
+    }
+    if (tabName === "") {
     }
 }
 
@@ -140,8 +149,7 @@ function firstGrid(): void {
 }
 
 function nextGrid(): void {
-    if (currentPage < totalPages)
-    {
+    if (currentPage < totalPages) {
         currentPage += 1;
         loadImages(currentPage);
     }
@@ -167,20 +175,20 @@ function openGenModal(evt: Event): void {
     document.getElementById('image-modal')!.addEventListener('wheel', (event: WheelEvent) => {
         event.preventDefault(); // Prevent background scrolling when the    modal is open
     });
-    
+
     document.getElementById('modal-image')!.addEventListener('wheel', (event: WheelEvent) => {
         const img = event.target as HTMLImageElement;
         const scaleIncrement: number = 0.1;
         const currentScale = img.style.transform.match(/scale\(([^)]+)\)/);
-    
+
         let scale: number = currentScale ? parseFloat(currentScale[1]) : 1;
-    
+
         if (event.deltaY < 0) {
             scale += scaleIncrement; // Zoom in
         } else {
             scale -= scaleIncrement; // Zoom out
         }
-    
+
         scale = Math.max(1, Math.min(scale, 5)); // Adjust min and max scale as needed
         img.style.transform = `scale(${scale})`;
     });
@@ -189,13 +197,13 @@ function openGenModal(evt: Event): void {
 function openGridModal(evt: Event): void {
     const filePath = (evt.currentTarget as HTMLImageElement).src
     document.getElementById('grid-image-modal')!.style.display = "block";
-    
+
     const thumbFileName = filePath.split('/').pop();
     const pathDir = filePath.slice(0, -(thumbFileName?.length ?? 0))
-    const fileName = thumbFileName?.slice(0,-(".thumb.jpg".length)).concat(".png");
+    const fileName = thumbFileName?.slice(0, -(".thumb.jpg".length)).concat(".png");
     (document.getElementById('grid-modal-image') as HTMLImageElement).src = pathDir + fileName;
 
-    $.getJSON('/get-image-metadata/' + fileName, function(metadata) {
+    $.getJSON('/get-image-metadata/' + fileName, function (metadata) {
         var metadataDiv = document.getElementById('grid-info-panel') as HTMLElement;
         metadataDiv.innerHTML = ''; // Clear previous metadata
         for (var key in metadata) {
@@ -224,45 +232,136 @@ function closeGridModal(): void {
 ////   Chat tab   ////
 //////////////////////
 
+type ThreadData = {
+    id: string;
+    created_at: number;
+    metadata: { [key: string]: string };
+    object: string;
+}
+
+type ConversationData = {
+    data: ThreadData;
+    chat_name: string;
+    last_update: number;
+}
+
+let allConversations: { [key: string]: ConversationData } = {};
+var currentThreadId: string = "";
+
+function chatTabLoaded(): void {
+    refreshConversationList();
+}
+
+function refreshConversationList(): void {
+    const conversationsList = document.getElementById("conversations-list") as HTMLDivElement;
+
+    $.get('/get-all-conversations', (response: string) => {
+        console.error("convos pulled")
+        let conversations: { [key: string]: ConversationData } = JSON.parse(response);
+        allConversations = conversations
+        let children: Node[] = []
+        for (let key in conversations) {
+            let value = conversations[key];
+            var convoItem = document.createElement('div');
+            convoItem.className = "conversation-item";
+            let creationDate = new Date(value.data.created_at * 1000);
+            console.log(`date: ${value.data.created_at}`)
+            convoItem.textContent = `${value.chat_name}\n${creationDate.toDateString()}`;
+            convoItem.setAttribute('data-conversation-id', key);
+            convoItem.addEventListener('click', onConversationSelected);
+            conversationsList.appendChild(convoItem);
+            children.push(convoItem)
+        }
+        conversationsList.replaceChildren(...children)
+    });
+}
+
+function onConversationSelected(this: HTMLDivElement, ev: MouseEvent) {
+    let conversationId = this.getAttribute('data-conversation-id') as string;
+    console.log(`conversation: ${conversationId}`);
+    const chatInput = document.getElementById("chat-input") as HTMLTextAreaElement;
+
+    $.ajax({
+        type: 'GET',
+        url: '/chat?thread_id=' + encodeURIComponent(conversationId),
+        contentType: 'application/json',
+        scriptCharset: 'utf-8',
+        success: (response: string) => {
+            let chatData: MessageHistory = JSON.parse(response);
+            chatInput.value = ''; // Clear input field
+            refreshChatMessages(chatData.messages)
+            currentThreadId = chatData.threadId
+        },
+        error: (error) => {
+            console.error('Error:', error);
+        }
+    });
+}
+
 type ChatMessage = {
     role: string;
     text: string;
 }
-
-type ChatData = {
-    data: ChatMessage[];
+type MessageHistory = {
+    threadId: string;
+    messages: ChatMessage[];
 }
 
-
 function sendChatMessage(): void {
-    const chatName = "TEMP"
+    var chatName: string = "";
+    if (currentThreadId) {
+        chatName = allConversations[currentThreadId].chat_name
+    }
+    while (!chatName) {
+        chatName = prompt("Please title this conversation (max 30 chars):", "Conversation") as string;
+        if (chatName.length > 30)
+        {
+            chatName = "";
+        }
+    }
     const chatInput = document.getElementById("chat-input") as HTMLTextAreaElement;
     const userMessage = chatInput.value.trim();
     if (!userMessage) return;
-
-    // Display user message in chat history
-    const chatHistory = document.getElementById("chat-history") as HTMLDivElement;
-    //chatHistory.innerHTML += `<div class="user-message">${userMessage}</div>`;
 
     // Send the message to the server
     $.ajax({
         type: 'POST',
         url: '/chat',
         contentType: 'application/json',
-        data: JSON.stringify({ user_input: userMessage, chat_name: chatName }),
+        data: JSON.stringify({ user_input: userMessage, chat_name: chatName, thread_id: currentThreadId }),
         success: (response: string) => {
-            let chat_data: ChatData = JSON.parse(response)
-            console.log(response)
-            chatHistory.innerHTML = "";
-            // Display AI response in chat history
-            chat_data.data.forEach((message) => {
-                chatHistory.innerHTML += `<div class="ai-message">${message.text}</div>`;
-            })
+            let chatData: MessageHistory = JSON.parse(response);
+            refreshChatMessages(chatData.messages);
             chatInput.value = ''; // Clear input field
-            chatHistory.scrollTop = chatHistory.scrollHeight; // Scroll to bottom
+            currentThreadId = chatData.threadId;
+            // Just populate it with dummy data so that we have data in case the refresh takes too long
+            let currentTimeEpoch = new Date(Date.now()).getUTCSeconds()
+            allConversations[chatData.threadId] = {
+                data: {
+                    id: chatData.threadId,
+                    created_at: new Date(Date.now()).getUTCSeconds(),
+                    metadata: {},
+                    object: "thread"
+                },
+                chat_name: chatName,
+                last_update: currentTimeEpoch
+            }
+
+            // Refresh the conversation list
+            refreshConversationList();
         },
         error: (error) => {
             console.error('Error:', error);
         }
     });
+}
+
+function refreshChatMessages(messages: ChatMessage[]): void {
+    const chatHistory = document.getElementById("chat-history") as HTMLDivElement;
+    chatHistory.innerHTML = "";
+    // Display AI response in chat history
+    messages.forEach((message) => {
+        chatHistory.innerHTML += `<div class="ai-message">${message.text}</div>`;
+    })
+    chatHistory.scrollTop = chatHistory.scrollHeight; // Scroll to bottom
 }

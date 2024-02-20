@@ -6,6 +6,7 @@ import markdown
 import markdown.extensions.fenced_code
 import openai
 import requests
+from collections import deque
 import os, io, secrets, time
 import json
 import re
@@ -162,39 +163,62 @@ images_per_page = 6 * 3 # (6 wide * 3 tall)
 ########    CHAT API    #########
 #################################
 
+@app.route('/get-all-conversations')
+def get_all_conversations():
+    if 'username' not in session:
+        return None
+    
+    user_file = os.path.join(app.static_folder, 'chats', f'{session["username"]}.json')
+    if os.path.exists(user_file):
+        with open(user_file, 'r') as file:
+            chat = json.load(file)
+    else:
+        with open(user_file, 'a') as file:
+            chat = dict()
+            file.write(json.dumps(chat))
+    print (json.dumps(chat))
+    return json.dumps(chat)
+
 @app.route('/chat', methods=['GET', 'POST'])
 def converse():
     if 'username' not in session:
         return redirect(url_for('login'))
 
-    thread_id = request.json.get('thread_id')
-    chat_name = re.sub(r'[^\w_. -]', '_', request.json.get('chat_name'))
+    # Need to change how we fetch the thread_id depending on if POST or GET.
+    thread_id = request.json.get('thread_id') if request.method == 'POST' else request.args.get('thread_id')
     user_file = os.path.join(app.static_folder, 'chats', f'{session["username"]}.json')
+
+    # Load existing conversation or start a new one
+    if os.path.exists(user_file):
+        with open(user_file, 'r') as file:
+            chat = json.load(file)
+    else:
+        with open(user_file, 'a') as file:
+            chat = dict()
+            file.write(json.dumps(chat))
 
     if request.method == 'POST':
         user_input = request.json.get('user_input')
         if not user_input:
             return {'error': 'No input provided'}, 400
         
-        # Load existing conversation or start a new one
-        if os.path.exists(user_file):
-            with open(user_file, 'r') as file:
-                chat = json.load(file)
-        else:
-            with open(user_file, 'a') as file:
-                chat = {"threads": []}
-                file.write(json.dumps(chat))
-
-        # TODO: Allow listing assistants
-        assistant = client.beta.assistants.retrieve("asst_nYZeL982wB4AgoX4M7lfq7Qv")
-        if thread_id and chat.threads[thread_id]:
+        if thread_id and thread_id in chat:
             print("Have thread")
             thread = client.beta.threads.retrieve(thread_id)
         else:
             print("Need to create thread")
             thread = client.beta.threads.create()
             thread_id = thread.id
+            chat_name = re.sub(r'[^\w_. -]', '_', request.json.get('chat_name'))
             chat[thread_id] = { "data": thread.__dict__, "chat_name": chat_name }
+
+        # TODO: Allow listing assistants
+        # Regular ChatGPT-like ID
+        #assistant_id = "asst_nYZeL982wB4AgoX4M7lfq7Qv"
+        # CodeGPT
+        assistant_id = "asst_FX4sCfRsD6G3Vvc84ozABA8N"
+        assistant = client.beta.assistants.retrieve(assistant_id=assistant_id)
+        
         thread_message = client.beta.threads.messages.create(thread_id, role="user", content=user_input)
         run = client.beta.threads.runs.create(thread_id=thread_id, assistant_id=assistant.id)
 
@@ -204,29 +228,24 @@ def converse():
             if run.status == "failed" or run.status == "completed" or run.status == "expired":
                 run_retrieved = True
                 print(f"Run retrieved! {run.status}")
+                thread_id = run.thread_id
         
         chat[thread_id]["last_update"] = time.time()
+        chat[thread_id]["assistant_id"] = assistant_id
         with open(user_file, 'w') as file:
             json.dump(chat, file)
-        
-        message_list = client.beta.threads.messages.list(run.thread_id)
-        all_messages = { "data": [] }
-        for message in message_list.data:
-            if message.content:
-                for msg_content in message.content:
-                    all_messages["data"].append({
-                        "role": message.role,
-                        "text": markdown.markdown(msg_content.text.value, extensions=["fenced_code", "codehilite"])
-                    })
-        return json.dumps(all_messages)
-    else:
-        # GET request to retrieve conversation history
-        if os.path.exists(user_file):
-            with open(user_file, 'r') as file:
-                chat = json.load(file)
-            return jsonify(chat)
-        else:
-            return jsonify([])
+
+    # POST or GET return all thread messages
+    message_list = client.beta.threads.messages.list(thread_id)
+    all_messages = deque()
+    for message in message_list.data:
+        if message.content:
+            for msg_content in message.content:
+                all_messages.appendleft({
+                    "role": message.role,
+                    "text": markdown.markdown(msg_content.text.value, extensions=["fenced_code", "codehilite"])
+                })
+    return json.dumps({ "threadId": thread_id, "messages": list(all_messages)})
 
 #################################
 ########   IMAGE GRID   #########
