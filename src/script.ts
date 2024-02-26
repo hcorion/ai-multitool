@@ -1,25 +1,24 @@
-document.addEventListener('DOMContentLoaded', () => {
-    $('#loading-spinner').hide();
-    $('#prompt-form').on('submit', (event: JQuery.SubmitEvent) => {
+document.addEventListener("DOMContentLoaded", () => {
+    $("#loading-spinner").hide();
+    $("#prompt-form").on("submit", (event: JQuery.SubmitEvent) => {
         event.preventDefault();
-        const formData: string = $('#prompt-form').serialize();
+        const formData: string = $("#prompt-form").serialize();
 
-        $('#loading-spinner').show();
+        $("#loading-spinner").show();
 
         $.ajax({
-            type: 'POST',
-            url: '/',
+            type: "POST",
+            url: "/",
             data: formData,
             success: (response: string) => {
-                $('#result-section').html(response);
+                $("#result-section").html(response);
 
                 addEventListenerToElement("generatedImage", "click", openGenModal);
                 addEventListenerToElement("generatedImageClose", "click", closeGenModal);
-                $('#loading-spinner').hide();
-            }
+                $("#loading-spinner").hide();
+            },
         });
     });
-
 
     // Assigning event listeners
     addEventListenerToElement("generationTab", "click", handleTabClick);
@@ -54,7 +53,7 @@ function addEventListenerToElement(elementId: string, eventType: string, handler
     }
 }
 
-type TabId = 'generationTab' | 'gridViewTab' | 'chatTab';
+type TabId = "generationTab" | "gridViewTab" | "chatTab";
 
 // Event Handlers
 function handleTabClick(evt: Event) {
@@ -62,9 +61,9 @@ function handleTabClick(evt: Event) {
     const elementId = element.id as TabId;
 
     const tabMap: Record<TabId, string> = {
-        "generationTab": "Generation",
-        "gridViewTab": "GridView",
-        "chatTab": "Chat"
+        generationTab: "Generation",
+        gridViewTab: "GridView",
+        chatTab: "Chat",
     };
 
     if (tabMap[elementId]) {
@@ -85,18 +84,20 @@ function updateStyleDescription(): void {
     const styleDescriptionDisplay = document.getElementById("styleDescription") as HTMLDivElement;
 
     if (currentStyle === "vivid") {
-        styleDescriptionDisplay.textContent = "(Vivid causes the model to lean towards generating hyper-real and dramatic images)";
+        styleDescriptionDisplay.textContent =
+            "(Vivid causes the model to lean towards generating hyper-real and dramatic images)";
     } else if (currentStyle === "natural") {
-        styleDescriptionDisplay.textContent = "(Natural causes the model to produce more natural, less hyper-real looking images)";
+        styleDescriptionDisplay.textContent =
+            "(Natural causes the model to produce more natural, less hyper-real looking images)";
     }
 }
 
 function openTab(evt: MouseEvent, tabName: string): void {
     const tabcontent = Array.from(document.getElementsByClassName("tabcontent") as HTMLCollectionOf<HTMLElement>);
-    tabcontent.forEach(element => element.style.display = "none");
+    tabcontent.forEach((element) => (element.style.display = "none"));
 
     const tablinks = Array.from(document.getElementsByClassName("tablinks") as HTMLCollectionOf<HTMLElement>);
-    tablinks.forEach(element => element.className = element.className.replace(" active", ""));
+    tablinks.forEach((element) => (element.className = element.className.replace(" active", "")));
 
     const tab = document.getElementById(tabName) as HTMLElement;
     tab.style.display = "block";
@@ -120,7 +121,7 @@ let currentPage: number = 1;
 let totalPages: number = -1;
 
 function gridTabLoaded(): void {
-    $.get('/get-total-pages', (data: string) => {
+    $.get("/get-total-pages", (data: string) => {
         totalPages = parseInt(data, 10);
         loadImages(currentPage);
     });
@@ -128,17 +129,17 @@ function gridTabLoaded(): void {
 
 function loadImages(page: number): void {
     $.getJSON(`/get-images/${page}`, (data: string[]) => {
-        const grid = $('.image-grid');
+        const grid = $(".image-grid");
         grid.empty(); // Clear existing images
 
         data.forEach((image: string) => {
-            const aspectRatioBox = $('<div>').addClass('aspect-ratio-box');
-            const imgElement = $('<img>').attr('src', image).attr('id', "gridImage");
-            imgElement.on("click", openGridModal)
+            const aspectRatioBox = $("<div>").addClass("aspect-ratio-box");
+            const imgElement = $("<img>").attr("src", image).attr("id", "gridImage");
+            imgElement.on("click", openGridModal);
             aspectRatioBox.append(imgElement);
             grid.append(aspectRatioBox);
         });
-        document.getElementsByTagName
+        document.getElementsByTagName;
         document.getElementById("gridPageNum")!.textContent = `Page ${page}/${totalPages}`;
     });
 }
@@ -168,15 +169,15 @@ function lastGrid(): void {
 }
 
 function openGenModal(evt: Event): void {
-    const src = (evt.currentTarget as HTMLImageElement).src
-    document.getElementById('image-modal')!.style.display = "block";
-    (document.getElementById('modal-image') as HTMLImageElement).src = src;
+    const src = (evt.currentTarget as HTMLImageElement).src;
+    document.getElementById("image-modal")!.style.display = "block";
+    (document.getElementById("modal-image") as HTMLImageElement).src = src;
 
-    document.getElementById('image-modal')!.addEventListener('wheel', (event: WheelEvent) => {
-        event.preventDefault(); // Prevent background scrolling when the    modal is open
+    document.getElementById("image-modal")!.addEventListener("wheel", (event: WheelEvent) => {
+        event.preventDefault(); // Prevent background scrolling when the modal is open
     });
 
-    document.getElementById('modal-image')!.addEventListener('wheel', (event: WheelEvent) => {
+    document.getElementById("modal-image")!.addEventListener("wheel", (event: WheelEvent) => {
         const img = event.target as HTMLImageElement;
         const scaleIncrement: number = 0.1;
         const currentScale = img.style.transform.match(/scale\(([^)]+)\)/);
@@ -195,24 +196,24 @@ function openGenModal(evt: Event): void {
 }
 
 function openGridModal(evt: Event): void {
-    const filePath = (evt.currentTarget as HTMLImageElement).src
-    document.getElementById('grid-image-modal')!.style.display = "block";
+    const filePath = (evt.currentTarget as HTMLImageElement).src;
+    document.getElementById("grid-image-modal")!.style.display = "block";
 
-    const thumbFileName = filePath.split('/').pop();
-    const pathDir = filePath.slice(0, -(thumbFileName?.length ?? 0))
-    const fileName = thumbFileName?.slice(0, -(".thumb.jpg".length)).concat(".png");
-    (document.getElementById('grid-modal-image') as HTMLImageElement).src = pathDir + fileName;
+    const thumbFileName = filePath.split("/").pop();
+    const pathDir = filePath.slice(0, -(thumbFileName?.length ?? 0));
+    const fileName = thumbFileName?.slice(0, -".thumb.jpg".length).concat(".png");
+    (document.getElementById("grid-modal-image") as HTMLImageElement).src = pathDir + fileName;
 
-    $.getJSON('/get-image-metadata/' + fileName, function (metadata) {
-        var metadataDiv = document.getElementById('grid-info-panel') as HTMLElement;
-        metadataDiv.innerHTML = ''; // Clear previous metadata
+    $.getJSON("/get-image-metadata/" + fileName, function (metadata) {
+        var metadataDiv = document.getElementById("grid-info-panel") as HTMLElement;
+        metadataDiv.innerHTML = ""; // Clear previous metadata
         for (var key in metadata) {
             // <div class="info-item"><span>Prompt:</span><span id="prompt-value"></span></div>
-            var infoItem = document.createElement('div');
+            var infoItem = document.createElement("div");
             infoItem.className = "info-item";
             infoItem.textContent = key + ":";
             metadataDiv.appendChild(infoItem);
-            var infoValue = document.createElement('div');
+            var infoValue = document.createElement("div");
             infoValue.className = "prompt-value";
             infoValue.textContent = metadata[key];
             metadataDiv.appendChild(infoValue);
@@ -221,11 +222,11 @@ function openGridModal(evt: Event): void {
 }
 
 function closeGenModal(): void {
-    document.getElementById('image-modal')!.style.display = "none";
+    document.getElementById("image-modal")!.style.display = "none";
 }
 
 function closeGridModal(): void {
-    document.getElementById('grid-image-modal')!.style.display = "none";
+    document.getElementById("grid-image-modal")!.style.display = "none";
 }
 
 //////////////////////
@@ -237,13 +238,13 @@ type ThreadData = {
     created_at: number;
     metadata: { [key: string]: string };
     object: string;
-}
+};
 
 type ConversationData = {
     data: ThreadData;
     chat_name: string;
     last_update: number;
-}
+};
 
 let allConversations: { [key: string]: ConversationData } = {};
 var currentThreadId: string = "";
@@ -255,67 +256,66 @@ function chatTabLoaded(): void {
 function refreshConversationList(): void {
     const conversationsList = document.getElementById("conversations-list") as HTMLDivElement;
 
-    $.get('/get-all-conversations', (response: string) => {
-        console.error("convos pulled")
+    $.get("/get-all-conversations", (response: string) => {
+        console.log("convos pulled");
         let conversations: { [key: string]: ConversationData } = JSON.parse(response);
-        allConversations = conversations
-        let children: Node[] = []
+        allConversations = conversations;
+        let children: Node[] = [];
         for (let key in conversations) {
             let value = conversations[key];
-            var convoItem = document.createElement('div');
+            var convoItem = document.createElement("div");
             convoItem.className = "conversation-item";
             let creationDate = new Date(value.data.created_at * 1000);
-            console.log(`date: ${value.data.created_at}`)
+            console.log(`date: ${value.data.created_at}`);
             convoItem.textContent = `${value.chat_name}\n${creationDate.toDateString()}`;
-            convoItem.setAttribute('data-conversation-id', key);
-            convoItem.addEventListener('click', onConversationSelected);
+            convoItem.setAttribute("data-conversation-id", key);
+            convoItem.addEventListener("click", onConversationSelected);
             conversationsList.appendChild(convoItem);
-            children.push(convoItem)
+            children.unshift(convoItem);
         }
-        conversationsList.replaceChildren(...children)
+        conversationsList.replaceChildren(...children);
     });
 }
 
 function onConversationSelected(this: HTMLDivElement, ev: MouseEvent) {
-    let conversationId = this.getAttribute('data-conversation-id') as string;
+    let conversationId = this.getAttribute("data-conversation-id") as string;
     console.log(`conversation: ${conversationId}`);
     const chatInput = document.getElementById("chat-input") as HTMLTextAreaElement;
 
     $.ajax({
-        type: 'GET',
-        url: '/chat?thread_id=' + encodeURIComponent(conversationId),
-        contentType: 'application/json',
-        scriptCharset: 'utf-8',
+        type: "GET",
+        url: "/chat?thread_id=" + encodeURIComponent(conversationId),
+        contentType: "application/json",
+        scriptCharset: "utf-8",
         success: (response: string) => {
             let chatData: MessageHistory = JSON.parse(response);
-            chatInput.value = ''; // Clear input field
-            refreshChatMessages(chatData.messages)
-            currentThreadId = chatData.threadId
+            chatInput.value = ""; // Clear input field
+            refreshChatMessages(chatData.messages);
+            currentThreadId = chatData.threadId;
         },
         error: (error) => {
-            console.error('Error:', error);
-        }
+            console.error("Error:", error);
+        },
     });
 }
 
 type ChatMessage = {
     role: string;
     text: string;
-}
+};
 type MessageHistory = {
     threadId: string;
     messages: ChatMessage[];
-}
+};
 
 function sendChatMessage(): void {
     var chatName: string = "";
     if (currentThreadId) {
-        chatName = allConversations[currentThreadId].chat_name
+        chatName = allConversations[currentThreadId].chat_name;
     }
     while (!chatName) {
         chatName = prompt("Please title this conversation (max 30 chars):", "Conversation") as string;
-        if (chatName.length > 30)
-        {
+        if (chatName.length > 30) {
             chatName = "";
         }
     }
@@ -325,43 +325,85 @@ function sendChatMessage(): void {
 
     // Send the message to the server
     $.ajax({
-        type: 'POST',
-        url: '/chat',
-        contentType: 'application/json',
-        data: JSON.stringify({ user_input: userMessage, chat_name: chatName, thread_id: currentThreadId }),
+        type: "POST",
+        url: "/chat",
+        contentType: "application/json",
+        data: JSON.stringify({
+            user_input: userMessage,
+            chat_name: chatName,
+            thread_id: currentThreadId,
+        }),
         success: (response: string) => {
             let chatData: MessageHistory = JSON.parse(response);
             refreshChatMessages(chatData.messages);
-            chatInput.value = ''; // Clear input field
+            chatInput.value = ""; // Clear input field
             currentThreadId = chatData.threadId;
             // Just populate it with dummy data so that we have data in case the refresh takes too long
-            let currentTimeEpoch = new Date(Date.now()).getUTCSeconds()
+            let currentTimeEpoch = new Date(Date.now()).getUTCSeconds();
             allConversations[chatData.threadId] = {
                 data: {
                     id: chatData.threadId,
                     created_at: new Date(Date.now()).getUTCSeconds(),
                     metadata: {},
-                    object: "thread"
+                    object: "thread",
                 },
                 chat_name: chatName,
-                last_update: currentTimeEpoch
-            }
+                last_update: currentTimeEpoch,
+            };
 
             // Refresh the conversation list
             refreshConversationList();
         },
         error: (error) => {
-            console.error('Error:', error);
-        }
+            console.error("Error:", error);
+        },
     });
 }
+
+showdown.extension("highlight", function () {
+    return [
+        {
+            type: "output",
+            filter: function (text, converter, options) {
+                var left = "<pre><code\\b[^>]*>",
+                    right = "</code></pre>",
+                    flags = "g";
+                var replacement = function (_wholeMatch: string, match: string, left: string, right: string) {
+                    var lang = (left.match(/class=\"([^ \"]+)/) || [])[1];
+                    left = left.slice(0, 18) + "hljs " + left.slice(18);
+                    if (lang) {
+                        left = left.slice(0, 18) + "hljs " + left.slice(18);
+                        if (hljs.getLanguage(lang)) {
+                            console.log("got language");
+                            return left + hljs.highlight(lang, match).value + right;
+                        } else {
+                            return left + hljs.highlightAuto(match).value + right;
+                        }
+                    } else {
+                        left = left.slice(0, 10) + ' class="hljs" ' + left.slice(10);
+                        return left + hljs.highlightAuto(match).value + right;
+                    }
+                };
+                return showdown.helper.replaceRecursiveRegExp(text, replacement, left, right, flags);
+            },
+        },
+    ];
+});
 
 function refreshChatMessages(messages: ChatMessage[]): void {
     const chatHistory = document.getElementById("chat-history") as HTMLDivElement;
     chatHistory.innerHTML = "";
     // Display AI response in chat history
     messages.forEach((message) => {
-        chatHistory.innerHTML += `<div class="ai-message">${message.text}</div>`;
-    })
+        var converter = new showdown.Converter({
+                strikethrough: true,
+                smoothLivePreview: true,
+                tasklists: true,
+                extensions: ["highlight"],
+            }),
+            text = message.text,
+            html = converter.makeHtml(text);
+        chatHistory.innerHTML += `<div class="ai-message">${html}</div>`;
+    });
     chatHistory.scrollTop = chatHistory.scrollHeight; // Scroll to bottom
 }

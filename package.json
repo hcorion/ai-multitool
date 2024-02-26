@@ -1,5 +1,7 @@
 {
   "dependencies": {
-    "@types/jquery": "^3.5.29"
+    "@types/highlightjs": "^9.12.6",
+    "@types/jquery": "^3.5.29",
+    "@types/showdown": "^2.0.6"
   }
 }

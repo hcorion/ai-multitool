@@ -1,20 +1,20 @@
 "use strict";
-document.addEventListener('DOMContentLoaded', () => {
-    $('#loading-spinner').hide();
-    $('#prompt-form').on('submit', (event) => {
+document.addEventListener("DOMContentLoaded", () => {
+    $("#loading-spinner").hide();
+    $("#prompt-form").on("submit", (event) => {
         event.preventDefault();
-        const formData = $('#prompt-form').serialize();
-        $('#loading-spinner').show();
+        const formData = $("#prompt-form").serialize();
+        $("#loading-spinner").show();
         $.ajax({
-            type: 'POST',
-            url: '/',
+            type: "POST",
+            url: "/",
             data: formData,
             success: (response) => {
-                $('#result-section').html(response);
+                $("#result-section").html(response);
                 addEventListenerToElement("generatedImage", "click", openGenModal);
                 addEventListenerToElement("generatedImageClose", "click", closeGenModal);
-                $('#loading-spinner').hide();
-            }
+                $("#loading-spinner").hide();
+            },
         });
     });
     // Assigning event listeners
@@ -49,9 +49,9 @@ function handleTabClick(evt) {
     const element = evt.target;
     const elementId = element.id;
     const tabMap = {
-        "generationTab": "Generation",
-        "gridViewTab": "GridView",
-        "chatTab": "Chat"
+        generationTab: "Generation",
+        gridViewTab: "GridView",
+        chatTab: "Chat",
     };
     if (tabMap[elementId]) {
         openTab(evt, tabMap[elementId]);
@@ -68,17 +68,19 @@ function updateStyleDescription() {
     const currentStyle = styleInput.value;
     const styleDescriptionDisplay = document.getElementById("styleDescription");
     if (currentStyle === "vivid") {
-        styleDescriptionDisplay.textContent = "(Vivid causes the model to lean towards generating hyper-real and dramatic images)";
+        styleDescriptionDisplay.textContent =
+            "(Vivid causes the model to lean towards generating hyper-real and dramatic images)";
     }
     else if (currentStyle === "natural") {
-        styleDescriptionDisplay.textContent = "(Natural causes the model to produce more natural, less hyper-real looking images)";
+        styleDescriptionDisplay.textContent =
+            "(Natural causes the model to produce more natural, less hyper-real looking images)";
     }
 }
 function openTab(evt, tabName) {
     const tabcontent = Array.from(document.getElementsByClassName("tabcontent"));
-    tabcontent.forEach(element => element.style.display = "none");
+    tabcontent.forEach((element) => (element.style.display = "none"));
     const tablinks = Array.from(document.getElementsByClassName("tablinks"));
-    tablinks.forEach(element => element.className = element.className.replace(" active", ""));
+    tablinks.forEach((element) => (element.className = element.className.replace(" active", "")));
     const tab = document.getElementById(tabName);
     tab.style.display = "block";
     evt.currentTarget.className += " active";
@@ -98,18 +100,18 @@ function openTab(evt, tabName) {
 let currentPage = 1;
 let totalPages = -1;
 function gridTabLoaded() {
-    $.get('/get-total-pages', (data) => {
+    $.get("/get-total-pages", (data) => {
         totalPages = parseInt(data, 10);
         loadImages(currentPage);
     });
 }
 function loadImages(page) {
     $.getJSON(`/get-images/${page}`, (data) => {
-        const grid = $('.image-grid');
+        const grid = $(".image-grid");
         grid.empty(); // Clear existing images
         data.forEach((image) => {
-            const aspectRatioBox = $('<div>').addClass('aspect-ratio-box');
-            const imgElement = $('<img>').attr('src', image).attr('id', "gridImage");
+            const aspectRatioBox = $("<div>").addClass("aspect-ratio-box");
+            const imgElement = $("<img>").attr("src", image).attr("id", "gridImage");
             imgElement.on("click", openGridModal);
             aspectRatioBox.append(imgElement);
             grid.append(aspectRatioBox);
@@ -140,12 +142,12 @@ function lastGrid() {
 }
 function openGenModal(evt) {
     const src = evt.currentTarget.src;
-    document.getElementById('image-modal').style.display = "block";
-    document.getElementById('modal-image').src = src;
-    document.getElementById('image-modal').addEventListener('wheel', (event) => {
-        event.preventDefault(); // Prevent background scrolling when the    modal is open
+    document.getElementById("image-modal").style.display = "block";
+    document.getElementById("modal-image").src = src;
+    document.getElementById("image-modal").addEventListener("wheel", (event) => {
+        event.preventDefault(); // Prevent background scrolling when the modal is open
     });
-    document.getElementById('modal-image').addEventListener('wheel', (event) => {
+    document.getElementById("modal-image").addEventListener("wheel", (event) => {
         const img = event.target;
         const scaleIncrement = 0.1;
         const currentScale = img.style.transform.match(/scale\(([^)]+)\)/);
@@ -163,21 +165,21 @@ function openGenModal(evt) {
 function openGridModal(evt) {
     var _a;
     const filePath = evt.currentTarget.src;
-    document.getElementById('grid-image-modal').style.display = "block";
-    const thumbFileName = filePath.split('/').pop();
+    document.getElementById("grid-image-modal").style.display = "block";
+    const thumbFileName = filePath.split("/").pop();
     const pathDir = filePath.slice(0, -((_a = thumbFileName === null || thumbFileName === void 0 ? void 0 : thumbFileName.length) !== null && _a !== void 0 ? _a : 0));
-    const fileName = thumbFileName === null || thumbFileName === void 0 ? void 0 : thumbFileName.slice(0, -(".thumb.jpg".length)).concat(".png");
-    document.getElementById('grid-modal-image').src = pathDir + fileName;
-    $.getJSON('/get-image-metadata/' + fileName, function (metadata) {
-        var metadataDiv = document.getElementById('grid-info-panel');
-        metadataDiv.innerHTML = ''; // Clear previous metadata
+    const fileName = thumbFileName === null || thumbFileName === void 0 ? void 0 : thumbFileName.slice(0, -".thumb.jpg".length).concat(".png");
+    document.getElementById("grid-modal-image").src = pathDir + fileName;
+    $.getJSON("/get-image-metadata/" + fileName, function (metadata) {
+        var metadataDiv = document.getElementById("grid-info-panel");
+        metadataDiv.innerHTML = ""; // Clear previous metadata
         for (var key in metadata) {
             // <div class="info-item"><span>Prompt:</span><span id="prompt-value"></span></div>
-            var infoItem = document.createElement('div');
+            var infoItem = document.createElement("div");
             infoItem.className = "info-item";
             infoItem.textContent = key + ":";
             metadataDiv.appendChild(infoItem);
-            var infoValue = document.createElement('div');
+            var infoValue = document.createElement("div");
             infoValue.className = "prompt-value";
             infoValue.textContent = metadata[key];
             metadataDiv.appendChild(infoValue);
@@ -185,10 +187,10 @@ function openGridModal(evt) {
     });
 }
 function closeGenModal() {
-    document.getElementById('image-modal').style.display = "none";
+    document.getElementById("image-modal").style.display = "none";
 }
 function closeGridModal() {
-    document.getElementById('grid-image-modal').style.display = "none";
+    document.getElementById("grid-image-modal").style.display = "none";
 }
 let allConversations = {};
 var currentThreadId = "";
@@ -197,44 +199,44 @@ function chatTabLoaded() {
 }
 function refreshConversationList() {
     const conversationsList = document.getElementById("conversations-list");
-    $.get('/get-all-conversations', (response) => {
-        console.error("convos pulled");
+    $.get("/get-all-conversations", (response) => {
+        console.log("convos pulled");
         let conversations = JSON.parse(response);
         allConversations = conversations;
         let children = [];
         for (let key in conversations) {
             let value = conversations[key];
-            var convoItem = document.createElement('div');
+            var convoItem = document.createElement("div");
             convoItem.className = "conversation-item";
             let creationDate = new Date(value.data.created_at * 1000);
             console.log(`date: ${value.data.created_at}`);
             convoItem.textContent = `${value.chat_name}\n${creationDate.toDateString()}`;
-            convoItem.setAttribute('data-conversation-id', key);
-            convoItem.addEventListener('click', onConversationSelected);
+            convoItem.setAttribute("data-conversation-id", key);
+            convoItem.addEventListener("click", onConversationSelected);
             conversationsList.appendChild(convoItem);
-            children.push(convoItem);
+            children.unshift(convoItem);
         }
         conversationsList.replaceChildren(...children);
     });
 }
 function onConversationSelected(ev) {
-    let conversationId = this.getAttribute('data-conversation-id');
+    let conversationId = this.getAttribute("data-conversation-id");
     console.log(`conversation: ${conversationId}`);
     const chatInput = document.getElementById("chat-input");
     $.ajax({
-        type: 'GET',
-        url: '/chat?thread_id=' + encodeURIComponent(conversationId),
-        contentType: 'application/json',
-        scriptCharset: 'utf-8',
+        type: "GET",
+        url: "/chat?thread_id=" + encodeURIComponent(conversationId),
+        contentType: "application/json",
+        scriptCharset: "utf-8",
         success: (response) => {
             let chatData = JSON.parse(response);
-            chatInput.value = ''; // Clear input field
+            chatInput.value = ""; // Clear input field
             refreshChatMessages(chatData.messages);
             currentThreadId = chatData.threadId;
         },
         error: (error) => {
-            console.error('Error:', error);
-        }
+            console.error("Error:", error);
+        },
     });
 }
 function sendChatMessage() {
@@ -254,14 +256,18 @@ function sendChatMessage() {
         return;
     // Send the message to the server
     $.ajax({
-        type: 'POST',
-        url: '/chat',
-        contentType: 'application/json',
-        data: JSON.stringify({ user_input: userMessage, chat_name: chatName, thread_id: currentThreadId }),
+        type: "POST",
+        url: "/chat",
+        contentType: "application/json",
+        data: JSON.stringify({
+            user_input: userMessage,
+            chat_name: chatName,
+            thread_id: currentThreadId,
+        }),
         success: (response) => {
             let chatData = JSON.parse(response);
             refreshChatMessages(chatData.messages);
-            chatInput.value = ''; // Clear input field
+            chatInput.value = ""; // Clear input field
             currentThreadId = chatData.threadId;
             // Just populate it with dummy data so that we have data in case the refresh takes too long
             let currentTimeEpoch = new Date(Date.now()).getUTCSeconds();
@@ -270,25 +276,60 @@ function sendChatMessage() {
                     id: chatData.threadId,
                     created_at: new Date(Date.now()).getUTCSeconds(),
                     metadata: {},
-                    object: "thread"
+                    object: "thread",
                 },
                 chat_name: chatName,
-                last_update: currentTimeEpoch
+                last_update: currentTimeEpoch,
             };
             // Refresh the conversation list
             refreshConversationList();
         },
         error: (error) => {
-            console.error('Error:', error);
-        }
+            console.error("Error:", error);
+        },
     });
 }
+showdown.extension("highlight", function () {
+    return [
+        {
+            type: "output",
+            filter: function (text, converter, options) {
+                var left = "<pre><code\\b[^>]*>", right = "</code></pre>", flags = "g";
+                var replacement = function (_wholeMatch, match, left, right) {
+                    var lang = (left.match(/class=\"([^ \"]+)/) || [])[1];
+                    left = left.slice(0, 18) + "hljs " + left.slice(18);
+                    if (lang) {
+                        left = left.slice(0, 18) + "hljs " + left.slice(18);
+                        if (hljs.getLanguage(lang)) {
+                            console.log("got language");
+                            return left + hljs.highlight(lang, match).value + right;
+                        }
+                        else {
+                            return left + hljs.highlightAuto(match).value + right;
+                        }
+                    }
+                    else {
+                        left = left.slice(0, 10) + ' class="hljs" ' + left.slice(10);
+                        return left + hljs.highlightAuto(match).value + right;
+                    }
+                };
+                return showdown.helper.replaceRecursiveRegExp(text, replacement, left, right, flags);
+            },
+        },
+    ];
+});
 function refreshChatMessages(messages) {
     const chatHistory = document.getElementById("chat-history");
     chatHistory.innerHTML = "";
     // Display AI response in chat history
     messages.forEach((message) => {
-        chatHistory.innerHTML += `<div class="ai-message">${message.text}</div>`;
+        var converter = new showdown.Converter({
+            strikethrough: true,
+            smoothLivePreview: true,
+            tasklists: true,
+            extensions: ["highlight"],
+        }), text = message.text, html = converter.makeHtml(text);
+        chatHistory.innerHTML += `<div class="ai-message">${html}</div>`;
     });
     chatHistory.scrollTop = chatHistory.scrollHeight; // Scroll to bottom
 }

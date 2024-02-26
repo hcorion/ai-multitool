@@ -1,11 +1,18 @@
 # DALL-E Image API
 A simple web frontend to interact with OpenAI's DALL-E 3
 
-## Running it
+## Setup
 
 ### Windows
 1. Add your OpenAI API key to `run-user.ps1`
-2. Run the script:
+2. Install `python`, `pipenv` and `npm`
+3. Install the typescript compiler: `npm install -g typescript`
+4. run `npm install`
+
+## Running it
+
+### Windows
+1. Run the script:
     ```
     pipenv shell
     .\run-user.ps1
@@ -15,7 +22,9 @@ A simple web frontend to interact with OpenAI's DALL-E 3
 
 The main code is licensed under the MIT license. See LICENSE for more info.
 
-monokai.css under UNLICENSE from [richleland/pygments-css](https://github.com/richleland/pygments-css)
+showdown.min.js under MIT License from [showdownjs/showdown](https://github.com/showdownjs/showdown)
+
+highlight.min.js under BSD 3-Clause License from [highlightjs/highlight.js](https://github.com/highlightjs/highlight.js)
 
 The loading spinner 'chunk' is from loading.io under the Loading.io BY License:
 Assets relesed under Loading.io BY License ( LD-BY / BY / BY License ) are free to use if you attribute to loading.io properly. To attribute, just add a link ( for using in websites ) or credit text ( for using in slide or video ) to loading.io.

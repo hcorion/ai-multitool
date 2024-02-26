@@ -243,7 +243,7 @@ def converse():
             for msg_content in message.content:
                 all_messages.appendleft({
                     "role": message.role,
-                    "text": markdown.markdown(msg_content.text.value, extensions=["fenced_code", "codehilite"])
+                    "text": msg_content.text.value,
                 })
     return json.dumps({ "threadId": thread_id, "messages": list(all_messages)})
 
