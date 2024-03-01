@@ -60,6 +60,107 @@ def remove_stop_words(input_string):
     # Joining the remaining words back into a string
     return ' '.join(filtered_words)
 
+class ModerationException(Exception):
+    def __init__(self, message):
+        super().__init__(message)
+        self.message = message
+
+class DownloadError(Exception):
+    def __init__(self, message):
+        super().__init__(message)
+        self.message = message
+
+class GeneratedImageData:
+    image_url: str
+    local_image_path: str
+    revised_prompt: str
+    prompt: str
+    image_name: str
+    def __init__(self, image_url, local_image_path, revised_prompt, prompt, image_name):
+        self.image_url = image_url
+        self.local_image_path = local_image_path
+        self.revised_prompt = revised_prompt
+        self.prompt = prompt
+        self.image_name = image_name
+
+def generate_dalle_image(prompt: str, username: str, size: str = "1024x1024", quality: str = "standard", style: str = "vivid", strict_follow_prompt: bool = False) -> GeneratedImageData:
+    before_prompt = prompt
+    if strict_follow_prompt:
+        if len(prompt) < 800:
+            prompt = "I NEED to test how the tool works with extremely simple prompts. DO NOT add any detail, just use it AS-IS:\n" + prompt
+        else:
+            prompt = "My prompt has full detail so no need to add more:\n" + prompt
+    
+    # Run the prompt through moderation first, I don't want to get my account banned.
+    moderation = client.moderations.create(input=prompt)
+    for result in moderation.results:
+        if result.flagged:
+            flagged_categories = ""
+            for category, flagged in result.categories.__dict__.items():
+                if flagged:
+                    flagged_categories = flagged_categories + category + ", "
+            if len(flagged_categories) > 0:
+                flagged_categories = flagged_categories[:-2]
+            raise ModerationException(message = flagged_categories)
+        
+    # Call DALL-E 3 API
+    response = client.images.generate(
+        model="dall-e-3",
+        prompt=prompt,
+        size=size,
+        style=style,
+        quality=quality,
+        n=1,
+    )
+    image_url = response.data[0].url
+    print(f"url: {image_url}")
+    revised_prompt = response.data[0].revised_prompt
+
+    # Download the image
+    image_response = requests.get(image_url)
+    if image_response.status_code == 200:
+        image_path = os.path.join(app.static_folder, "images", username)
+        # Make sure the path directory exists first
+        os.makedirs(image_path, exist_ok=True)
+
+        file_count = 0
+        for path in os.listdir(image_path):
+            file_path = os.path.join(image_path, path)
+            if file_path.endswith(".png") and os.path.isfile(file_path):
+                file_count += 1
+        cleaned_prompt = before_prompt.strip().lower()
+        cleaned_prompt = remove_stop_words(cleaned_prompt.replace('.', ' ').replace(',', ' ')).replace('  ', ' ').replace(' ', '_')[:30]
+        image_name = f"{str(file_count).zfill(10)}-{cleaned_prompt}.png"
+        image_thumb_name = f"{str(file_count).zfill(10)}-{cleaned_prompt}.thumb.jpg"
+        image_filename = os.path.join(image_path, image_name)
+        image_thumb_filename = os.path.join(image_path, image_thumb_name)
+
+        # Create an in-memory image from the downloaded content
+        image = Image.open(io.BytesIO(image_response.content))
+
+        # Create a thumbnail
+        thumb_image = image.copy()
+        aspect_ratio = image.height / image.width
+        new_height = int(256 * aspect_ratio)
+        thumb_image.thumbnail((256, new_height))
+        
+        # Create metadata
+        metadata = PngInfo()
+        metadata.add_text("Prompt", prompt)
+        metadata.add_text("Quality", quality)
+        metadata.add_text("Style", style)
+        metadata.add_text("Revised Prompt", revised_prompt)
+        # Save the image with metadata directly to disk
+        with open(image_filename, 'wb') as f:
+            image.save(f, "PNG", pnginfo=metadata, optimize=True, compression_level=9)
+        with open(image_thumb_filename, 'wb') as f:
+            thumb_image.save(f, "JPEG", quality=75)
+
+        local_image_path = image_filename
+        return GeneratedImageData(image_url, local_image_path, revised_prompt, prompt, image_name)
+    else:
+        raise DownloadError(f"Error downloading image {image_response.status_code}")
+
 @app.route('/', methods=['GET', 'POST'])
 def index():
     if 'username' not in session:
@@ -78,72 +179,19 @@ def index():
         strict_follow_prompt = request.form.get('add-follow-prompt')
         print(f"Size: {size}, Quality: {quality}, Style: {style}, Prompt: {prompt}, strict_follow_prompt: {strict_follow_prompt}")
         if not prompt.strip():
-            print("No prompt providing, not doing anything.")
+            print("No prompt provided, not doing anything.")
             return render_template('index.html')
         try:
-            before_prompt = prompt
-            if strict_follow_prompt:
-                prompt = "I NEED to test how the tool works with extremely simple prompts. DO NOT add any detail, just use it AS-IS:\n" + prompt
-            # Call DALL-E 3 API
-            response = client.images.generate(
-                model="dall-e-3",
-                prompt=prompt,
-                size=size,
-                style=style,
-                quality=quality,
-                n=1,
-            )
-            image_url = response.data[0].url
-            print(f"url: {image_url}")
-            revised_prompt = response.data[0].revised_prompt
-
-            # Download the image
-            image_response = requests.get(image_url)
-            if image_response.status_code == 200:
-                image_path = os.path.join(app.static_folder, "images", session["username"])
-                # Make sure the path directory exists first
-                os.makedirs(image_path, exist_ok=True)
-
-                file_count = 0
-                for path in os.listdir(image_path):
-                    file_path = os.path.join(image_path, path)
-                    if file_path.endswith(".png") and os.path.isfile(file_path):
-                        file_count += 1
-                cleaned_prompt = before_prompt.strip().lower()
-                cleaned_prompt = remove_stop_words(cleaned_prompt.replace('.', ' ').replace(',', ' ')).replace('  ', ' ').replace(' ', '_')[:30]
-                image_name = f"{str(file_count).zfill(10)}-{cleaned_prompt}.png"
-                image_thumb_name = f"{str(file_count).zfill(10)}-{cleaned_prompt}.thumb.jpg"
-                image_filename = os.path.join(image_path, image_name)
-                image_thumb_filename = os.path.join(image_path, image_thumb_name)
-
-                # Create an in-memory image from the downloaded content
-                image = Image.open(io.BytesIO(image_response.content))
-
-                # Create a thumbnail
-                thumb_image = image.copy()
-                aspect_ratio = image.height / image.width
-                new_height = int(256 * aspect_ratio)
-                thumb_image.thumbnail((256, new_height))
-                
-                # Create metadata
-                metadata = PngInfo()
-                metadata.add_text("Prompt", prompt)
-                metadata.add_text("Quality", quality)
-                metadata.add_text("Style", style)
-                metadata.add_text("Revised Prompt", revised_prompt)
-                # Save the image with metadata directly to disk
-                with open(image_filename, 'wb') as f:
-                    image.save(f, "PNG", pnginfo=metadata, optimize=True, compression_level=9)
-                with open(image_thumb_filename, 'wb') as f:
-                    thumb_image.save(f, "JPEG", quality=75)
-
-                local_image_path = image_filename
-
-                return render_template('result-section.html', image_url=image_url, local_image_path=local_image_path, revised_prompt=revised_prompt, prompt=prompt, image_name=image_name, errmr_message=error_message)
-            else:
-                local_image_path = "Error downloading image"
-                print(local_image_path)
-
+            generated_image_data = generate_dalle_image(prompt, session["username"], size, quality, style, strict_follow_prompt)
+            image_url = generated_image_data.image_url
+            local_image_path = generated_image_data.local_image_path
+            image_name = generated_image_data.image_name
+            prompt = generated_image_data.prompt
+            revised_prompt = generated_image_data.revised_prompt
+            return render_template('result-section.html', image_url=image_url, local_image_path=local_image_path, revised_prompt=revised_prompt, prompt=prompt, image_name=image_name, error_message=error_message)
+        except ModerationException as e:
+            error_message = f"Your prompt doesn't pass OpenAI moderation. It triggers the following flags: {e.message}."
+            return render_template('result-section.html', image_url=image_url, local_image_path=local_image_path, revised_prompt=revised_prompt, prompt=prompt, image_name=image_name, error_message=error_message)
         except openai.BadRequestError as e:
             error = json.loads(e.response.content)
             error_message = error["error"]["message"]
@@ -152,7 +200,7 @@ def index():
                 error_message = "Your prompt has been blocked by the OpenAI content filters. Try adjusting your prompt."
             return render_template('result-section.html', image_url=image_url, local_image_path=local_image_path, revised_prompt=revised_prompt, prompt=prompt, image_name=image_name, error_message=error_message)
         
-        return render_template('result-section.html', image_url=image_url, local_image_path=local_image_path, revised_prompt=revised_prompt, prompt=prompt, image_name=image_name, errmr_message=error_message)
+        return render_template('result-section.html', image_url=image_url, local_image_path=local_image_path, revised_prompt=revised_prompt, prompt=prompt, image_name=image_name, error_message=error_message)
 
     return render_template('index.html')
 
@@ -176,7 +224,6 @@ def get_all_conversations():
         with open(user_file, 'a') as file:
             chat = dict()
             file.write(json.dumps(chat))
-    print (json.dumps(chat))
     return json.dumps(chat)
 
 @app.route('/chat', methods=['GET', 'POST'])
@@ -214,21 +261,31 @@ def converse():
 
         # TODO: Allow listing assistants
         # Regular ChatGPT-like ID
-        #assistant_id = "asst_nYZeL982wB4AgoX4M7lfq7Qv"
+        assistant_id = "asst_nYZeL982wB4AgoX4M7lfq7Qv"
         # CodeGPT
-        assistant_id = "asst_FX4sCfRsD6G3Vvc84ozABA8N"
+        #assistant_id = "asst_FX4sCfRsD6G3Vvc84ozABA8N"
         assistant = client.beta.assistants.retrieve(assistant_id=assistant_id)
         
         thread_message = client.beta.threads.messages.create(thread_id, role="user", content=user_input)
         run = client.beta.threads.runs.create(thread_id=thread_id, assistant_id=assistant.id)
 
         run_retrieved = False
+        required_action_called = False
         while not run_retrieved:
             run = client.beta.threads.runs.retrieve(run_id=run.id, thread_id=thread_id)
             if run.status == "failed" or run.status == "completed" or run.status == "expired":
                 run_retrieved = True
                 print(f"Run retrieved! {run.status}")
                 thread_id = run.thread_id
+            if run.status == "requires_action":
+                if required_action_called:
+                    print("required action called twice!!")
+                    continue
+                if run.required_action.type != "submit_tool_outputs":
+                    raise Exception(f"Unsupported action type in requires_action: {run.required_action.type}.")
+                process_tool_output(session["username"], run.id, run.thread_id, run.required_action.submit_tool_outputs.tool_calls)
+                required_action_called = True
+                
         
         chat[thread_id]["last_update"] = time.time()
         chat[thread_id]["assistant_id"] = assistant_id
@@ -246,6 +303,43 @@ def converse():
                     "text": msg_content.text.value,
                 })
     return json.dumps({ "threadId": thread_id, "messages": list(all_messages)})
+
+#################################
+####### CHAT TOOL OUTPUT ########
+#################################
+
+def process_tool_output(username: str, run_id: str, thread_id: str, tool_calls):
+    tool_outputs = []
+    for call in tool_calls:
+        tool_output = {"tool_call_id": call.id}
+        output_result = dict()
+        if call.function.name == "generate_dalle_image":
+            print(call.function.name)
+            arguments = json.loads(call.function.arguments)
+            if "prompt" not in arguments:
+                raise Exception("'prompt' has not been passed to the generate_dalle_image argument!")
+            try:
+                generated_image_data = generate_dalle_image(arguments["prompt"], username)
+                output_result["image_url"] = url_for('static', filename='images/' + username + '/' + generated_image_data.image_name)
+                print(output_result["image_url"])
+                output_result["revised_prompt"] = generated_image_data.revised_prompt
+            except ModerationException as e:
+                output_result["error_message"] = f"Your prompt doesn't pass OpenAI moderation. It triggers the following flags: {e.message}. Please adjust your prompt."
+            except openai.BadRequestError as e:
+                error = json.loads(e.response.content)
+                error_message = error["error"]["message"]
+                error_code = error["error"]["code"]
+                if error_code == "content_policy_violation":
+                    error_message = "Your prompt has been blocked by the OpenAI content filters. Try adjusting your prompt."
+                output_result["error_message"]
+        tool_output["output"] = json.dumps(output_result)
+        tool_outputs.append(tool_output)
+    run = client.beta.threads.runs.submit_tool_outputs(
+        run_id=run_id,
+        thread_id=thread_id,
+        tool_outputs=tool_outputs
+    )
+
 
 #################################
 ########   IMAGE GRID   #########
