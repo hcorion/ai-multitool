@@ -319,7 +319,7 @@ def process_tool_output(username: str, run_id: str, thread_id: str, tool_calls):
             if "prompt" not in arguments:
                 raise Exception("'prompt' has not been passed to the generate_dalle_image argument!")
             try:
-                generated_image_data = generate_dalle_image(arguments["prompt"], username)
+                generated_image_data = generate_dalle_image(arguments["prompt"], username, strict_follow_prompt=True)
                 output_result["image_url"] = url_for('static', filename='images/' + username + '/' + generated_image_data.image_name)
                 print(output_result["image_url"])
                 output_result["revised_prompt"] = generated_image_data.revised_prompt
@@ -331,7 +331,7 @@ def process_tool_output(username: str, run_id: str, thread_id: str, tool_calls):
                 error_code = error["error"]["code"]
                 if error_code == "content_policy_violation":
                     error_message = "Your prompt has been blocked by the OpenAI content filters. Try adjusting your prompt."
-                output_result["error_message"]
+                output_result["error_message"] = error_message
         tool_output["output"] = json.dumps(output_result)
         tool_outputs.append(tool_output)
     run = client.beta.threads.runs.submit_tool_outputs(
