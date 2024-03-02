@@ -270,7 +270,6 @@ def converse():
         run = client.beta.threads.runs.create(thread_id=thread_id, assistant_id=assistant.id)
 
         run_retrieved = False
-        required_action_called = False
         while not run_retrieved:
             run = client.beta.threads.runs.retrieve(run_id=run.id, thread_id=thread_id)
             if run.status == "failed" or run.status == "completed" or run.status == "expired":
@@ -278,13 +277,9 @@ def converse():
                 print(f"Run retrieved! {run.status}")
                 thread_id = run.thread_id
             if run.status == "requires_action":
-                if required_action_called:
-                    print("required action called twice!!")
-                    continue
                 if run.required_action.type != "submit_tool_outputs":
                     raise Exception(f"Unsupported action type in requires_action: {run.required_action.type}.")
                 process_tool_output(session["username"], run.id, run.thread_id, run.required_action.submit_tool_outputs.tool_calls)
-                required_action_called = True
                 
         
         chat[thread_id]["last_update"] = time.time()
