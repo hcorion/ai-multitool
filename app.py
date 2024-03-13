@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, session, redirect, url_for, jsonify
+from flask import Flask, render_template, request, session, redirect, url_for, jsonify, stream_with_context, Response
 from PIL import Image
 from PIL.PngImagePlugin import PngInfo
 from pygments.formatters import HtmlFormatter
@@ -190,14 +190,14 @@ def index():
             revised_prompt = generated_image_data.revised_prompt
             return render_template('result-section.html', image_url=image_url, local_image_path=local_image_path, revised_prompt=revised_prompt, prompt=prompt, image_name=image_name, error_message=error_message)
         except ModerationException as e:
-            error_message = f"Your prompt doesn't pass OpenAI moderation. It triggers the following flags: {e.message}."
+            error_message = f"Your prompt doesn't pass OpenAI moderation. It triggers the following flags: {e.message}. Please adjust your prompt."
             return render_template('result-section.html', image_url=image_url, local_image_path=local_image_path, revised_prompt=revised_prompt, prompt=prompt, image_name=image_name, error_message=error_message)
         except openai.BadRequestError as e:
             error = json.loads(e.response.content)
             error_message = error["error"]["message"]
             error_code = error["error"]["code"]
             if error_code == "content_policy_violation":
-                error_message = "Your prompt has been blocked by the OpenAI content filters. Try adjusting your prompt."
+                error_message = "DALL-E 3 has generated an image that doesn't pass it's own moderation filters. You may want to adjust your prompt slightly."
             return render_template('result-section.html', image_url=image_url, local_image_path=local_image_path, revised_prompt=revised_prompt, prompt=prompt, image_name=image_name, error_message=error_message)
         
         return render_template('result-section.html', image_url=image_url, local_image_path=local_image_path, revised_prompt=revised_prompt, prompt=prompt, image_name=image_name, error_message=error_message)
@@ -226,6 +226,20 @@ def get_all_conversations():
             file.write(json.dumps(chat))
     return json.dumps(chat)
 
+def get_message_list(thread_id: str):
+    message_list = client.beta.threads.messages.list(thread_id)
+    all_messages = deque()
+    for message in message_list.data:
+        if message.content:
+            for msg_content in message.content:
+                all_messages.appendleft({
+                    "role": message.role,
+                    "text": msg_content.text.value,
+                })
+    return list(all_messages)
+
+eos_str = "␆␄"
+
 @app.route('/chat', methods=['GET', 'POST'])
 def converse():
     if 'username' not in session:
@@ -243,8 +257,9 @@ def converse():
         with open(user_file, 'a') as file:
             chat = dict()
             file.write(json.dumps(chat))
-
-    if request.method == 'POST':
+    if request.method == 'GET':
+        return json.dumps({ "threadId": thread_id, "messages": get_message_list(thread_id)})
+    elif request.method == 'POST':
         user_input = request.json.get('user_input')
         if not user_input:
             return {'error': 'No input provided'}, 400
@@ -269,35 +284,36 @@ def converse():
         thread_message = client.beta.threads.messages.create(thread_id, role="user", content=user_input)
         run = client.beta.threads.runs.create(thread_id=thread_id, assistant_id=assistant.id)
 
-        run_retrieved = False
-        while not run_retrieved:
-            run = client.beta.threads.runs.retrieve(run_id=run.id, thread_id=thread_id)
-            if run.status == "failed" or run.status == "completed" or run.status == "expired":
-                run_retrieved = True
-                print(f"Run retrieved! {run.status}")
-                thread_id = run.thread_id
-            if run.status == "requires_action":
-                if run.required_action.type != "submit_tool_outputs":
-                    raise Exception(f"Unsupported action type in requires_action: {run.required_action.type}.")
-                process_tool_output(session["username"], run.id, run.thread_id, run.required_action.submit_tool_outputs.tool_calls)
-                
-        
-        chat[thread_id]["last_update"] = time.time()
-        chat[thread_id]["assistant_id"] = assistant_id
-        with open(user_file, 'w') as file:
-            json.dump(chat, file)
+        def generate(run, thread_id):
+            run_retrieved = False
+            last_status = ""
+            while not run_retrieved:
+                run = client.beta.threads.runs.retrieve(run_id=run.id, thread_id=thread_id)
+                yield_data = { "threadId": thread_id, "messages": get_message_list(thread_id)}
+                if last_status != run.status:
+                    last_status = run.status
+                    yield f"{json.dumps({ 'status': last_status })}{eos_str}"
+                if run.status == "failed" or run.status == "completed" or run.status == "expired":
+                    run_retrieved = True
+                    print(f"Run retrieved! {run.status}")
+                    thread_id = run.thread_id
+                elif run.status == "requires_action":
+                    if run.required_action.type != "submit_tool_outputs":
+                        raise Exception(f"Unsupported action type in requires_action: {run.required_action.type}.")
+                    process_tool_output(session["username"], run.id, run.thread_id, run.required_action.submit_tool_outputs.tool_calls)
+                elif run.status == "queued":
+                    print("queued")
+                elif run.status == "in_progress":
+                    print("in_progress")
+            
+            message_list = get_message_list(thread_id)
+            chat[thread_id]["last_update"] = time.time()
+            chat[thread_id]["assistant_id"] = assistant_id
+            with open(user_file, 'w') as file:
+                json.dump(chat, file)
+            yield f"{json.dumps(json.dumps({ 'threadId': thread_id, 'messages': message_list}))}{eos_str}"
 
-    # POST or GET return all thread messages
-    message_list = client.beta.threads.messages.list(thread_id)
-    all_messages = deque()
-    for message in message_list.data:
-        if message.content:
-            for msg_content in message.content:
-                all_messages.appendleft({
-                    "role": message.role,
-                    "text": msg_content.text.value,
-                })
-    return json.dumps({ "threadId": thread_id, "messages": list(all_messages)})
+        return Response(stream_with_context(generate(run, thread_id)), mimetype='text/plain')
 
 #################################
 ####### CHAT TOOL OUTPUT ########
@@ -325,7 +341,7 @@ def process_tool_output(username: str, run_id: str, thread_id: str, tool_calls):
                 error_message = error["error"]["message"]
                 error_code = error["error"]["code"]
                 if error_code == "content_policy_violation":
-                    error_message = "Your prompt has been blocked by the OpenAI content filters. Try adjusting your prompt."
+                    error_message = "DALL-E 3 has generated an image that doesn't pass it's own moderation filters. You may want to adjust your prompt slightly."
                 output_result["error_message"] = error_message
         tool_output["output"] = json.dumps(output_result)
         tool_outputs.append(tool_output)

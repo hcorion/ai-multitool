@@ -305,7 +305,57 @@ type ChatMessage = {
 };
 type MessageHistory = {
     threadId: string;
+    status: string;
     messages: ChatMessage[];
+};
+
+async function fetchWithStreaming(url: string, data: any, processChunk: (chunkData: any) => void) {
+    try {
+        const response = await fetch(url, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify(data),
+        });
+
+        if (response.body) {
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let resultString = "";
+
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
+                const chunk = decoder.decode(value, { stream: true });
+                resultString += chunk;
+
+                const parts = resultString.split("␆␄");
+                resultString = parts.pop() as string; // Handle the rest in the next iteration.
+
+                parts.forEach((part) => {
+                    if (part) {
+                        try {
+                            processChunk(part);
+                        } catch (e) {
+                            console.error("Error parsing JSON chunk:", e);
+                        }
+                    }
+                });
+            }
+        } else {
+            console.log("Response body is not readable");
+        }
+    } catch (error) {
+        console.error("Fetch error:", error);
+    }
+}
+
+// "queued", "in_progress", "requires_action", "cancelling", "cancelled", "failed", "completed", "expired"
+let prettyStatuses: { [key: string]: string } = {
+    queued: "in queue",
+    in_progress: "in progress...",
+    requires_action: "processing action...",
 };
 
 function sendChatMessage(): void {
@@ -320,21 +370,31 @@ function sendChatMessage(): void {
         }
     }
     const chatInput = document.getElementById("chat-input") as HTMLTextAreaElement;
+    const sendChatButton = document.getElementById("send-chat") as HTMLInputElement;
+    const chatStatusText = document.getElementById("chat-current-status") as HTMLDivElement;
     const userMessage = chatInput.value.trim();
     if (!userMessage) return;
 
     // Send the message to the server
-    $.ajax({
-        type: "POST",
-        url: "/chat",
-        contentType: "application/json",
-        data: JSON.stringify({
+    sendChatButton.disabled = true;
+    fetchWithStreaming(
+        "/chat",
+        {
             user_input: userMessage,
             chat_name: chatName,
             thread_id: currentThreadId,
-        }),
-        success: (response: string) => {
-            let chatData: MessageHistory = JSON.parse(response);
+        },
+        (chunkData) => {
+            console.log("succeess");
+            var parsedData = JSON.parse(chunkData);
+            // Weird hack to prevent "too stringified" json blobs getting converted to just strings.
+            let chatData: MessageHistory = typeof parsedData === "string" ? JSON.parse(parsedData) : parsedData;
+
+            if (chatData.status) {
+                chatStatusText.textContent =
+                    chatData.status in prettyStatuses ? prettyStatuses[chatData.status] : chatData.status;
+                return;
+            }
             refreshChatMessages(chatData.messages);
             chatInput.value = ""; // Clear input field
             currentThreadId = chatData.threadId;
@@ -353,11 +413,10 @@ function sendChatMessage(): void {
 
             // Refresh the conversation list
             refreshConversationList();
+            chatStatusText.textContent = "Awaiting input...";
+            sendChatButton.disabled = false;
         },
-        error: (error) => {
-            console.error("Error:", error);
-        },
-    });
+    );
 }
 
 showdown.extension("highlight", function () {

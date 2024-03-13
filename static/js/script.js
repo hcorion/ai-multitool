@@ -1,4 +1,13 @@
 "use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 document.addEventListener("DOMContentLoaded", () => {
     $("#loading-spinner").hide();
     $("#prompt-form").on("submit", (event) => {
@@ -239,6 +248,55 @@ function onConversationSelected(ev) {
         },
     });
 }
+function fetchWithStreaming(url, data, processChunk) {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            const response = yield fetch(url, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(data),
+            });
+            if (response.body) {
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let resultString = "";
+                while (true) {
+                    const { value, done } = yield reader.read();
+                    if (done)
+                        break;
+                    const chunk = decoder.decode(value, { stream: true });
+                    resultString += chunk;
+                    const parts = resultString.split("␆␄");
+                    resultString = parts.pop(); // Handle the rest in the next iteration.
+                    parts.forEach((part) => {
+                        if (part) {
+                            try {
+                                processChunk(part);
+                            }
+                            catch (e) {
+                                console.error("Error parsing JSON chunk:", e);
+                            }
+                        }
+                    });
+                }
+            }
+            else {
+                console.log("Response body is not readable");
+            }
+        }
+        catch (error) {
+            console.error("Fetch error:", error);
+        }
+    });
+}
+// "queued", "in_progress", "requires_action", "cancelling", "cancelled", "failed", "completed", "expired"
+let prettyStatuses = {
+    queued: "in queue",
+    in_progress: "in progress...",
+    requires_action: "processing action...",
+};
 function sendChatMessage() {
     var chatName = "";
     if (currentThreadId) {
@@ -251,42 +309,46 @@ function sendChatMessage() {
         }
     }
     const chatInput = document.getElementById("chat-input");
+    const sendChatButton = document.getElementById("send-chat");
+    const chatStatusText = document.getElementById("chat-current-status");
     const userMessage = chatInput.value.trim();
     if (!userMessage)
         return;
     // Send the message to the server
-    $.ajax({
-        type: "POST",
-        url: "/chat",
-        contentType: "application/json",
-        data: JSON.stringify({
-            user_input: userMessage,
+    sendChatButton.disabled = true;
+    fetchWithStreaming("/chat", {
+        user_input: userMessage,
+        chat_name: chatName,
+        thread_id: currentThreadId,
+    }, (chunkData) => {
+        console.log("succeess");
+        var parsedData = JSON.parse(chunkData);
+        // Weird hack to prevent "too stringified" json blobs getting converted to just strings.
+        let chatData = typeof parsedData === "string" ? JSON.parse(parsedData) : parsedData;
+        if (chatData.status) {
+            chatStatusText.textContent =
+                chatData.status in prettyStatuses ? prettyStatuses[chatData.status] : chatData.status;
+            return;
+        }
+        refreshChatMessages(chatData.messages);
+        chatInput.value = ""; // Clear input field
+        currentThreadId = chatData.threadId;
+        // Just populate it with dummy data so that we have data in case the refresh takes too long
+        let currentTimeEpoch = new Date(Date.now()).getUTCSeconds();
+        allConversations[chatData.threadId] = {
+            data: {
+                id: chatData.threadId,
+                created_at: new Date(Date.now()).getUTCSeconds(),
+                metadata: {},
+                object: "thread",
+            },
             chat_name: chatName,
-            thread_id: currentThreadId,
-        }),
-        success: (response) => {
-            let chatData = JSON.parse(response);
-            refreshChatMessages(chatData.messages);
-            chatInput.value = ""; // Clear input field
-            currentThreadId = chatData.threadId;
-            // Just populate it with dummy data so that we have data in case the refresh takes too long
-            let currentTimeEpoch = new Date(Date.now()).getUTCSeconds();
-            allConversations[chatData.threadId] = {
-                data: {
-                    id: chatData.threadId,
-                    created_at: new Date(Date.now()).getUTCSeconds(),
-                    metadata: {},
-                    object: "thread",
-                },
-                chat_name: chatName,
-                last_update: currentTimeEpoch,
-            };
-            // Refresh the conversation list
-            refreshConversationList();
-        },
-        error: (error) => {
-            console.error("Error:", error);
-        },
+            last_update: currentTimeEpoch,
+        };
+        // Refresh the conversation list
+        refreshConversationList();
+        chatStatusText.textContent = "Awaiting input...";
+        sendChatButton.disabled = false;
     });
 }
 showdown.extension("highlight", function () {
