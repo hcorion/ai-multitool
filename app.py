@@ -3,9 +3,12 @@ from PIL import Image
 from PIL.PngImagePlugin import PngInfo
 from pygments.formatters import HtmlFormatter
 import markdown
-import markdown.extensions.fenced_code
+from typing_extensions import override
 import openai
+from openai import AssistantEventHandler
 import requests
+import threading
+from queue import Queue
 from collections import deque
 import os, io, secrets, time
 import json
@@ -227,7 +230,7 @@ def get_all_conversations():
     return json.dumps(chat)
 
 def get_message_list(thread_id: str):
-    message_list = client.beta.threads.messages.list(thread_id)
+    message_list = client.beta.threads.messages.list(thread_id, limit=100)
     all_messages = deque()
     for message in message_list.data:
         if message.content:
@@ -276,44 +279,65 @@ def converse():
 
         # TODO: Allow listing assistants
         # Regular ChatGPT-like ID
-        assistant_id = "asst_nYZeL982wB4AgoX4M7lfq7Qv"
+        #assistant_id = "asst_nYZeL982wB4AgoX4M7lfq7Qv"
         # CodeGPT
         #assistant_id = "asst_FX4sCfRsD6G3Vvc84ozABA8N"
+        # StoryGPT
+        assistant_id = "asst_aGGDp8e82QjnbkLk4kgXzBT1"
         assistant = client.beta.assistants.retrieve(assistant_id=assistant_id)
         
         thread_message = client.beta.threads.messages.create(thread_id, role="user", content=user_input)
-        run = client.beta.threads.runs.create(thread_id=thread_id, assistant_id=assistant.id)
+        message_list = get_message_list(thread_id)
 
-        def generate(run, thread_id):
-            run_retrieved = False
-            last_status = ""
-            while not run_retrieved:
-                run = client.beta.threads.runs.retrieve(run_id=run.id, thread_id=thread_id)
-                yield_data = { "threadId": thread_id, "messages": get_message_list(thread_id)}
-                if last_status != run.status:
-                    last_status = run.status
-                    yield f"{json.dumps({ 'status': last_status })}{eos_str}"
-                if run.status == "failed" or run.status == "completed" or run.status == "expired":
-                    run_retrieved = True
-                    print(f"Run retrieved! {run.status}")
-                    thread_id = run.thread_id
-                elif run.status == "requires_action":
-                    if run.required_action.type != "submit_tool_outputs":
-                        raise Exception(f"Unsupported action type in requires_action: {run.required_action.type}.")
-                    process_tool_output(session["username"], run.id, run.thread_id, run.required_action.submit_tool_outputs.tool_calls)
-                elif run.status == "queued":
-                    print("queued")
-                elif run.status == "in_progress":
-                    print("in_progress")
-            
-            message_list = get_message_list(thread_id)
-            chat[thread_id]["last_update"] = time.time()
-            chat[thread_id]["assistant_id"] = assistant_id
-            with open(user_file, 'w') as file:
-                json.dump(chat, file)
-            yield f"{json.dumps(json.dumps({ 'threadId': thread_id, 'messages': message_list}))}{eos_str}"
+        event_queue = Queue()
+        
+        def start_stream_thread(event_queue, thread_id, assistant_id):
+            event_handler = StreamingEventHandler(event_queue)
+            with client.beta.threads.runs.create_and_stream(
+                thread_id=thread_id, 
+                assistant_id=assistant_id, 
+                event_handler=event_handler
+            ) as stream:
+                stream.until_done()
 
-        return Response(stream_with_context(generate(run, thread_id)), mimetype='text/plain')
+        def stream_events(thread_id, assistant_id, message_list):
+            yield f"{json.dumps(json.dumps({ 'type': 'message_list', 'threadId': thread_id, 'messages': message_list}))}{eos_str}"
+            event_queue = Queue()
+            # Start the stream in a separate thread
+            threading.Thread(target=start_stream_thread, args=(event_queue, thread_id, assistant_id)).start()
+
+            # Yield from queue as events come
+            while True:
+                event = event_queue.get()  # This will block until an item is available
+                yield event + eos_str
+        
+        chat[thread_id]["last_update"] = time.time()
+        chat[thread_id]["assistant_id"] = assistant_id
+        with open(user_file, 'w') as file:
+            json.dump(chat, file)
+
+        return Response(stream_with_context(stream_events(thread_id, assistant_id, message_list)), mimetype='text/plain')
+
+class StreamingEventHandler(AssistantEventHandler):
+    def __init__(self, event_queue):
+        self.event_queue = event_queue
+        super().__init__()
+
+    def on_text_created(self, text) -> None:
+        self.event_queue.put(json.dumps({"type": "text_created", "text": text.value}))
+
+    def on_text_delta(self, delta, snapshot):
+        self.event_queue.put(json.dumps({"type": "text_delta", "delta": delta.value, "snapshot": snapshot.value}))
+    
+    def on_text_done(self, text) -> None:
+        self.event_queue.put(json.dumps({"type": "text_done", "text": text.value}))
+
+    def on_tool_call_created(self, tool_call):
+        # TODO: Need to hook this up properly
+        self.event_queue.put(json.dumps({"type": "tool_call_created", "tool_call": tool_call}))
+
+    def on_tool_call_delta(self, delta, snapshot):
+        self.event_queue.put(json.dumps({"type": "tool_call_delta", "delta": delta, "snapshot": snapshot}))
 
 #################################
 ####### CHAT TOOL OUTPUT ########

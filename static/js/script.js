@@ -297,6 +297,8 @@ let prettyStatuses = {
     in_progress: "in progress...",
     requires_action: "processing action...",
 };
+var cachedMessageList;
+var progressNum = 0;
 function sendChatMessage() {
     var chatName = "";
     if (currentThreadId) {
@@ -325,30 +327,56 @@ function sendChatMessage() {
         var parsedData = JSON.parse(chunkData);
         // Weird hack to prevent "too stringified" json blobs getting converted to just strings.
         let chatData = typeof parsedData === "string" ? JSON.parse(parsedData) : parsedData;
-        if (chatData.status) {
-            chatStatusText.textContent =
-                chatData.status in prettyStatuses ? prettyStatuses[chatData.status] : chatData.status;
-            return;
+        if (chatData.type == "message_list") {
+            chatStatusText.textContent = "In queue...";
+            currentThreadId = chatData.threadId;
+            cachedMessageList = chatData.messages;
+            chatInput.value = ""; // Clear input field
+            refreshChatMessages(cachedMessageList);
+            // Just populate it with dummy data so that we have data in case the refresh takes too long
+            let currentTimeEpoch = new Date(Date.now()).getUTCSeconds();
+            allConversations[chatData.threadId] = {
+                data: {
+                    id: chatData.threadId,
+                    created_at: new Date(Date.now()).getUTCSeconds(),
+                    metadata: {},
+                    object: "thread",
+                },
+                chat_name: chatName,
+                last_update: currentTimeEpoch,
+            };
         }
-        refreshChatMessages(chatData.messages);
-        chatInput.value = ""; // Clear input field
-        currentThreadId = chatData.threadId;
-        // Just populate it with dummy data so that we have data in case the refresh takes too long
-        let currentTimeEpoch = new Date(Date.now()).getUTCSeconds();
-        allConversations[chatData.threadId] = {
-            data: {
-                id: chatData.threadId,
-                created_at: new Date(Date.now()).getUTCSeconds(),
-                metadata: {},
-                object: "thread",
-            },
-            chat_name: chatName,
-            last_update: currentTimeEpoch,
-        };
-        // Refresh the conversation list
-        refreshConversationList();
-        chatStatusText.textContent = "Awaiting input...";
-        sendChatButton.disabled = false;
+        else if (chatData.type == "text_created") {
+            cachedMessageList.push({ role: "assistant", text: "" });
+            chatStatusText.textContent = "In progress...";
+        }
+        else if (chatData.type == "text_delta") {
+            cachedMessageList[cachedMessageList.length - 1].text = chatData.snapshot;
+            refreshChatMessages(cachedMessageList);
+            switch (progressNum) {
+                case 0:
+                    chatStatusText.textContent = "In progress.";
+                    break;
+                case 1:
+                    chatStatusText.textContent = "In progress..";
+                    break;
+                case 2:
+                    chatStatusText.textContent = "In progress...";
+                    break;
+                default:
+                    break;
+            }
+            progressNum += 1;
+            if (progressNum > 3) {
+                progressNum = 0;
+            }
+        }
+        else if (chatData.type == "text_done") {
+            sendChatButton.disabled = false;
+            chatStatusText.textContent = "Awaiting Input...";
+            progressNum = 0;
+        }
+        // TODO: Hook up the tool-based outputs
     });
 }
 showdown.extension("highlight", function () {
@@ -363,7 +391,6 @@ showdown.extension("highlight", function () {
                     if (lang) {
                         left = left.slice(0, 18) + "hljs " + left.slice(18);
                         if (hljs.getLanguage(lang)) {
-                            console.log("got language");
                             return left + hljs.highlight(lang, match).value + right;
                         }
                         else {
