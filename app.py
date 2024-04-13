@@ -279,11 +279,11 @@ def converse():
 
         # TODO: Allow listing assistants
         # Regular ChatGPT-like ID
-        #assistant_id = "asst_nYZeL982wB4AgoX4M7lfq7Qv"
+        assistant_id = "asst_nYZeL982wB4AgoX4M7lfq7Qv"
         # CodeGPT
         #assistant_id = "asst_FX4sCfRsD6G3Vvc84ozABA8N"
         # StoryGPT
-        assistant_id = "asst_aGGDp8e82QjnbkLk4kgXzBT1"
+        #assistant_id = "asst_aGGDp8e82QjnbkLk4kgXzBT1"
         assistant = client.beta.assistants.retrieve(assistant_id=assistant_id)
         
         thread_message = client.beta.threads.messages.create(thread_id, role="user", content=user_input)
