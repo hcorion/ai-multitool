@@ -20,6 +20,10 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     });
 
+    // Image gen elements
+    addEventListenerToElement("provider", "change", providerChanged);
+    addEventListenerToElement("model", "change", modelChanged);
+
     // Assigning event listeners
     addEventListenerToElement("generationTab", "click", handleTabClick);
     addEventListenerToElement("gridViewTab", "click", handleTabClick);
@@ -41,6 +45,9 @@ document.addEventListener("DOMContentLoaded", () => {
     addEventListenerToElement("grid-image-close", "click", closeGridModal);
 
     document.getElementById("generationTab")!.click();
+
+    // Just refresh the image gen provider
+    providerChanged();
 });
 
 // Function to add an event listener to an element
@@ -68,6 +75,33 @@ function handleTabClick(evt: Event) {
 
     if (tabMap[elementId]) {
         openTab(evt as MouseEvent, tabMap[elementId]);
+    }
+}
+
+function providerChanged() {
+    const selection = document.getElementById("provider") as HTMLSelectElement;
+    if (selection.value == "openai") {
+        $(".openai").show();
+        $(".stabilityai").hide();
+    } else if ((selection.value = "stabilityai")) {
+        $(".openai").hide();
+        $(".stabilityai").show();
+        modelChanged();
+    } else {
+        throw new Error(`Tried to switch to unsupported provider ${selection}`);
+    }
+}
+
+function modelChanged() {
+    const selection = document.getElementById("model") as HTMLSelectElement;
+    if (!selection.hidden) {
+        if (selection.value == "sd3-turbo") {
+            $(".negativeprompt").hide();
+        } else if ((selection.value = "sd3")) {
+            $(".negativeprompt").show();
+        } else {
+            throw new Error(`Tried to switch to unsupported SD3 model ${selection}`);
+        }
     }
 }
 

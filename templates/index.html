@@ -10,12 +10,12 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/atom-one-dark-reasonable.min.css') }}">
     <script type="module" src="{{ url_for('static', filename='js/script.js') }}"></script>
-    <title>DALL-E Image Generator</title>
+    <title>AI Multi-tool</title>
 </head>
 
 <body>
     <div class="tab">
-        <button id="generationTab" class="tablinks">Generation</button>
+        <button id="generationTab" class="tablinks">Image</button>
         <button id="gridViewTab" class="tablinks">Grid View</button>
         <button id="chatTab" class="tablinks">Chat</button>
 
@@ -28,33 +28,65 @@
     
     <div id="Generation" class="tabcontent">
         <form id="prompt-form">
-            <label for="size">Select Size:</label>
-            <select name="size" id="size">
+            <label for="provider" >Select Provider:</label>
+            <select name="provider" id="provider">
+                <option value="openai">OpenAI (DALL-E 3)</option>
+                <option value="stabilityai">Stability AI (Stable Diffusion 3)</option>
+            </select><br><br>
+
+            <label for="model" class="stabilityai">Select Model</label>
+            <select name="model" id="model" class="stabilityai">
+                <option value="sd3-turbo">Stable Diffusion 3 Turbo (faster, lower quality)</option>
+                <option value="sd3">Stable Diffusion 3 (slower, better quality)</option>
+            </select><br class="stabilityai"><br class="stabilityai">
+
+            <label for="size" class="openai">Select Size:</label>
+            <select name="size" id="size" class="openai">
                 <option value="1024x1024">1024x1024 (Square)</option>
                 <option value="1792x1024">1792x1024 (Landscape)</option>
                 <option value="1024x1792">1024x1792 (Portrait)</option>
-            </select><br><br>
+            </select><br class="openai"><br class="openai">
+
+            <label for="aspect_ratio" class="stabilityai">Aspect Ratio:</label>
+            <select name="aspect_ratio" id="aspect_ratio" class="stabilityai">
+                <option value="1:1">1:1 (Square)</option>
+                <option value="16:9">16:9 (Landscape)</option>
+                <option value="21:9">21:9 (Landscape)</option>
+                <option value="3:2">3:2 (Landscape)</option>
+                <option value="5:4">5:4 (Landscape)</option>
+                <option value="2:3">2:3 (Portrait)</option>
+                <option value="4:5">4:5 (Portrait)</option>
+                <option value="9:16">9:16 (Portrait)</option>
+                <option value="9:21">9:21 (Portrait)</option>
+            </select><br class="stabilityai"><br class="stabilityai">
     
-            <label for="quality">Select Quality:</label>
-            <select name="quality" id="quality">
+            <label for="quality" class="openai">Select Quality:</label>
+            <select name="quality" id="quality" class="openai">
                 <option value="standard">standard</option>
                 <option value="hd">HD</option>
-            </select><br><br>
+            </select><br class="openai"><br class="openai">
     
-            <label for="style">Select Style:</label>
-            <div id="styleDescription" style="font-size: medium;">(Vivid causes the model to lean towards generating hyper-real and dramatic images.)</div>
-            <select name="style" id="style">
+            <label for="style" class="openai">Select Style:</label>
+            <div id="styleDescription" style="font-size: medium;" class="openai">(Vivid causes the model to lean towards generating hyper-real and dramatic images.)</div>
+            <select name="style" id="style" class="openai">
                 <option value="vivid">Vivid</option>
                 <option value="natural">Natural</option>
             </select>
-            <br><br>
-    
+            <br class="openai"><br class="openai">
+
+            <label for="seed" class="stabilityai">Select Seed (0 means random):</label>
+            <input name="seed" id="seed" type="number" value="0" min="0" max="4294967294" step="1" class="stabilityai"/>
+            <br class="stabilityai"><br class="stabilityai">
+
+            <!-- TODO: Need to fix, the Stability AI max length is 10,000 characters, not 4000 -->
             <div>Enter Prompt:</div>
             <textarea name="prompt" id="prompt" maxlength="4000" rows="8" cols="50" spellcheck="true"></textarea>
             <div id="charCount">0 / 4000</div>
-            <div class="prompt-checkbox-group">
-                <input type="checkbox" id="add-follow-prompt" class="prompt-checkbox" name="add-follow-prompt">
-                <label class="prompt-checkbox-label" for="add-follow-prompt" id="add-follow-prompt">Strictly follow prompt</label>
+            <div class="stabilityai negativeprompt">Enter Negative Prompt:</div>
+            <textarea name="negative_prompt" id="negative_prompt" class="stabilityai negativeprompt" maxlength="4000" rows="8" cols="50" spellcheck="true"></textarea>
+            <div class="prompt-checkbox-group openai">
+                <input type="checkbox" id="add-follow-prompt" class="prompt-checkbox openai" name="add-follow-prompt">
+                <label class="prompt-checkbox-label openai" for="add-follow-prompt" id="add-follow-prompt">Strictly follow prompt</label>
             </div>
             <br><br>
             <input class="submit-button" type="submit" value="Generate Image">
