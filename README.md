@@ -1,4 +1,4 @@
-# AI 
+# AI Multitool
 A simple web frontend to interact with OpenAI's text chat, text-to-image services and StabilityAI's text-to-image service.
 
 ## Setup
