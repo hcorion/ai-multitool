@@ -72,7 +72,6 @@ function handleTabClick(evt) {
     }
 }
 function providerChanged() {
-    console.log("ooga booga");
     const selection = document.getElementById("provider");
     if (selection.value == "openai") {
         $(".openai").show();

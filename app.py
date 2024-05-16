@@ -473,7 +473,13 @@ def converse():
             thread = client.beta.threads.create()
             thread_id = thread.id
             chat_name = re.sub(r"[^\w_. -]", "_", request.json.get("chat_name"))
-            chat[thread_id] = {"data": thread.__dict__, "chat_name": chat_name}
+            thread_data = {
+                "id": thread.id,
+                "created_at": thread.created_at,
+                "metadata": thread.metadata,
+                "object": thread.object,
+            }
+            chat[thread_id] = {"data": thread_data, "chat_name": chat_name}
 
         # TODO: Allow listing assistants
         # Regular ChatGPT-like ID
