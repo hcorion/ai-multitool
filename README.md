@@ -1,10 +1,10 @@
-# DALL-E Image API
-A simple web frontend to interact with OpenAI's DALL-E 3
+# AI 
+A simple web frontend to interact with OpenAI's text chat, text-to-image services and StabilityAI's text-to-image service.
 
 ## Setup
 
 ### Windows
-1. Add your OpenAI API key to `run-user.ps1`
+1. Add your OpenAI API and StabilityAI key to `run-user.ps1`
 2. Install `python`, `pipenv` and `npm`
 3. Install the typescript compiler: `npm install -g typescript`
 4. run `npm install`
