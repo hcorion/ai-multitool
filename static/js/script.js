@@ -1,4 +1,3 @@
-"use strict";
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -8,6 +7,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
+import * as utils from "./utils.js";
 document.addEventListener("DOMContentLoaded", () => {
     $("#loading-spinner").hide();
     $("#prompt-form").on("submit", (event) => {
@@ -452,7 +452,7 @@ function refreshChatMessages(messages) {
             tasklists: true,
             extensions: ["highlight"],
         }), text = message.text, html = converter.makeHtml(text);
-        chatHistory.innerHTML += `<div class="ai-message">${html}</div>`;
+        chatHistory.innerHTML += `<div class="ai-message">${utils.unescapeHTML(html)}</div>`;
     });
     chatHistory.scrollTop = chatHistory.scrollHeight; // Scroll to bottom
 }

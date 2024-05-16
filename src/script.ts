@@ -1,3 +1,5 @@
+import * as utils from "./utils.js";
+
 document.addEventListener("DOMContentLoaded", () => {
     $("#loading-spinner").hide();
     $("#prompt-form").on("submit", (event: JQuery.SubmitEvent) => {
@@ -524,7 +526,7 @@ function refreshChatMessages(messages: ChatMessage[]): void {
             }),
             text = message.text,
             html = converter.makeHtml(text);
-        chatHistory.innerHTML += `<div class="ai-message">${html}</div>`;
+        chatHistory.innerHTML += `<div class="ai-message">${utils.unescapeHTML(html)}</div>`;
     });
     chatHistory.scrollTop = chatHistory.scrollHeight; // Scroll to bottom
 }
