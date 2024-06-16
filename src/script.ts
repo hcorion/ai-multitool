@@ -455,8 +455,8 @@ function sendChatMessage(): void {
                 cachedMessageList.push({ role: "assistant", text: "" } as ChatMessage);
                 chatStatusText.textContent = "In progress...";
             } else if (chatData.type == "text_delta") {
-                cachedMessageList[cachedMessageList.length - 1].text = chatData.snapshot;
-                refreshChatMessages(cachedMessageList);
+                cachedMessageList[cachedMessageList.length - 1].text += chatData.delta;
+                updateMostRecentChatMessage(cachedMessageList);
                 switch (progressNum) {
                     case 0:
                         chatStatusText.textContent = "In progress.";
@@ -512,6 +512,29 @@ showdown.extension("highlight", function () {
         },
     ];
 });
+
+function updateMostRecentChatMessage(messages: ChatMessage[]): void {
+    const chatHistory = document.getElementById("chat-history") as HTMLDivElement;
+    var message = messages[messages.length - 1];
+    var converter = new showdown.Converter({
+            strikethrough: true,
+            smoothLivePreview: true,
+            tasklists: true,
+            extensions: ["highlight"],
+        }),
+        text = message.text,
+        html = converter.makeHtml(text);
+    if (chatHistory.children.length < messages.length) {
+        const div = document.createElement("div") as HTMLDivElement;
+        div.className = "ai-message";
+        div.innerHTML = utils.unescapeHTML(html);
+        chatHistory.appendChild(div);
+    } else {
+        var lastChildDiv = chatHistory.lastChild as HTMLDivElement;
+        lastChildDiv.innerHTML = utils.unescapeHTML(html);
+    }
+    chatHistory.scrollTop = chatHistory.scrollHeight; // Scroll to bottom
+}
 
 function refreshChatMessages(messages: ChatMessage[]): void {
     const chatHistory = document.getElementById("chat-history") as HTMLDivElement;

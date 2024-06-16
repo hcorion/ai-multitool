@@ -483,9 +483,9 @@ def converse():
 
         # TODO: Allow listing assistants
         # Regular ChatGPT-like ID
-        assistant_id = "asst_nYZeL982wB4AgoX4M7lfq7Qv"
+        # assistant_id = "asst_nYZeL982wB4AgoX4M7lfq7Qv"
         # CodeGPT
-        # assistant_id = "asst_FX4sCfRsD6G3Vvc84ozABA8N"
+        assistant_id = "asst_FX4sCfRsD6G3Vvc84ozABA8N"
         # StoryGPT
         # assistant_id = "asst_aGGDp8e82QjnbkLk4kgXzBT1"
         assistant = client.beta.assistants.retrieve(assistant_id=assistant_id)
@@ -538,12 +538,12 @@ class StreamingEventHandler(AssistantEventHandler):
     def on_text_created(self, text) -> None:
         self.event_queue.put(json.dumps({"type": "text_created", "text": text.value}))
 
-    def on_text_delta(self, delta, snapshot):
-        self.event_queue.put(
-            json.dumps(
-                {"type": "text_delta", "delta": delta.value, "snapshot": snapshot.value}
-            )
-        )
+    def on_text_delta(
+        self,
+        delta: openai.types.beta.threads.TextDelta,
+        snapshot: openai.types.beta.threads.Text,
+    ):
+        self.event_queue.put(json.dumps({"type": "text_delta", "delta": delta.value}))
 
     def on_text_done(self, text) -> None:
         self.event_queue.put(json.dumps({"type": "text_done", "text": text.value}))
