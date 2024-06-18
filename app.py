@@ -499,7 +499,7 @@ def converse():
 
         def start_stream_thread(event_queue, thread_id, assistant_id):
             event_handler = StreamingEventHandler(event_queue)
-            with client.beta.threads.runs.create_and_stream(
+            with client.beta.threads.runs.stream(
                 thread_id=thread_id,
                 assistant_id=assistant_id,
                 event_handler=event_handler,
