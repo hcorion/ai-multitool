@@ -28,6 +28,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     // Image gen elements
     addEventListenerToElement("provider", "change", providerChanged);
+    addEventListenerToElement("model", "change", modelChanged);
     // Assigning event listeners
     addEventListenerToElement("generationTab", "click", handleTabClick);
     addEventListenerToElement("gridViewTab", "click", handleTabClick);
@@ -79,12 +80,26 @@ function providerChanged() {
     else if ((selection.value = "stabilityai")) {
         $(".openai").hide();
         $(".stabilityai").show();
+        modelChanged();
     }
     else {
         throw new Error(`Tried to switch to unsupported provider ${selection}`);
     }
 }
-
+function modelChanged() {
+    const selection = document.getElementById("model");
+    if (!selection.hidden) {
+        if (selection.value == "sd3-turbo") {
+            $(".negativeprompt").hide();
+        }
+        else if ((selection.value = "sd3")) {
+            $(".negativeprompt").show();
+        }
+        else {
+            throw new Error(`Tried to switch to unsupported SD3 model ${selection}`);
+        }
+    }
+}
 function updateCharacterCount() {
     const promptInput = document.getElementById("prompt");
     const charCount = promptInput.value.length;

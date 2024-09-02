@@ -70,6 +70,10 @@
 
             <label for="seed" class="stabilityai">Select Seed (0 means random):</label>
             <input name="seed" id="seed" type="number" value="0" min="0" max="4294967294" step="1" class="stabilityai"/>
+            <div class="prompt-checkbox-group stabilityai">
+                <input type="checkbox" id="upscale" class="prompt-checkbox stabilityai" name="upscale">
+                <label class="prompt-checkbox-label stabilityai" for="upscale" id="upscale">Upscale</label>
+            </div>
             <br class="stabilityai"><br class="stabilityai">
 
             <!-- TODO: Need to fix, the Stability AI max length is 10,000 characters, not 4000 -->

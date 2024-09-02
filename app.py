@@ -21,7 +21,7 @@ import requests
 import threading
 from queue import Queue
 from collections import deque
-import sys, os, io, time, json, re
+import sys, os, io, time, json, re, tempfile
 import secrets
 
 app = Flask(__name__)
@@ -89,12 +89,58 @@ class SavedImageData:
         self.image_name = image_name
 
 
+def upscale_stability_creative(
+    lowres_response: requests.Response, prompt: str, stability_headers: object
+) -> requests.Response:
+    lowres_image = Image.open(io.BytesIO(lowres_response.content))
+    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp_file:
+        lowres_image.save(tmp_file.name, "PNG")
+
+    upscale_response = requests.post(
+        f"https://api.stability.ai/v2beta/stable-image/upscale/creative",
+        headers=stability_headers,
+        files={"image": open(tmp_file.name, "rb")},
+        data={"prompt": prompt},
+    )
+    if upscale_response.status_code == 200:
+        generation_id = upscale_response.json().get("id")
+
+        upscale_finished = False
+        while not upscale_finished:
+            upscale_response = requests.request(
+                "GET",
+                f"https://api.stability.ai/v2beta/stable-image/upscale/creative/result/{generation_id}",
+                headers=stability_headers,
+            )
+            if upscale_response.status_code == 202:
+                time.sleep(1)
+            else:
+                upscale_finished = True
+        if upscale_response.status_code == 200:
+            return upscale_response
+        else:
+            body = upscale_response.json()
+            error_message = f"SAI Get Upscale Result {upscale_response.status_code}: {body['name']}: "
+            for error in body["errors"]:
+                error_message += f"{error}\n"
+            raise Exception(error_message)
+    else:
+        body = upscale_response.json()
+        error_message = (
+            f"SAI Creative Upscale {upscale_response.status_code}: {body['name']}: "
+        )
+        for error in body["errors"]:
+            error_message += f"{error}\n"
+        raise Exception(error_message)
+
+
 def generate_stability_image(
     prompt: str,
     negative_prompt: str,
     username: str,
     aspect_ratio: str = "1:1",
     seed: int = 0,
+    upscale: bool = False,
 ) -> GeneratedImageData:
     data = {
         "prompt": prompt,
@@ -112,14 +158,15 @@ def generate_stability_image(
         raise Exception(
             "Stability API key not provided to server, unable to generate image using this backend!"
         )
+    stability_headers = {
+        "authorization": f"Bearer {stability_api_key}",
+        "accept": "image/*",
+        "stability-client-id": "ai-toolkit",
+        "stability-client-user-id": username,
+    }
     response = requests.post(
         f"https://api.stability.ai/v2beta/stable-image/generate/ultra",
-        headers={
-            "authorization": f"Bearer {stability_api_key}",
-            "accept": "image/*",
-            "stability-client-id": "ai-toolkit",
-            "stability-client-user-id": username,
-        },
+        headers=stability_headers,
         files={"none": ""},
         data=data,
     )
@@ -130,6 +177,8 @@ def generate_stability_image(
     if "seed" in response.headers:
         image_metadata["seed"] = response.headers["seed"]
     if response.status_code == 200:
+        if upscale:
+            response = upscale_stability_creative(response, prompt, stability_headers)
         saved_data = process_image_response(response, prompt, username, image_metadata)
         return GeneratedImageData(
             # TODO: We need to remove this field, we don't actually get a URL from Stability AI so just stub it
@@ -141,7 +190,7 @@ def generate_stability_image(
         )
     else:
         body = response.json()
-        error_message = f"{body['name']}: "
+        error_message = f"SAI Generate Image {response.status_code}: {body['name']}: "
         for error in body["errors"]:
             error_message += f"{error}\n"
         raise Exception(error_message)
@@ -313,12 +362,14 @@ def index():
                 aspect_ratio = request.form.get("aspect_ratio")
                 model = request.form.get("model")
                 seed = request.form.get("seed")
+                upscale = request.form.get("upscale")
                 generated_image_data = generate_stability_image(
                     prompt=prompt,
                     negative_prompt=negative_prompt,
                     username=session["username"],
                     aspect_ratio=aspect_ratio,
                     seed=seed,
+                    upscale=upscale,
                 )
                 image_url = generated_image_data.image_url
                 local_image_path = generated_image_data.local_image_path
