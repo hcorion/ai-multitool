@@ -94,14 +94,14 @@ def generate_stability_image(
     negative_prompt: str,
     username: str,
     aspect_ratio: str = "1:1",
-    model: str = "sd3-turbo",
     seed: int = 0,
 ) -> GeneratedImageData:
     data = {
         "prompt": prompt,
         "output_format": "png",
-        "mode": "text-to-image",
-        "model": model,
+        # These have been removed from ultra and core APIs
+        # "mode": "text-to-image",
+        # "model": model,
         "seed": seed,
         "aspect_ratio": aspect_ratio,
     }
@@ -113,19 +113,18 @@ def generate_stability_image(
             "Stability API key not provided to server, unable to generate image using this backend!"
         )
     response = requests.post(
-        f"https://api.stability.ai/v2beta/stable-image/generate/sd3",
+        f"https://api.stability.ai/v2beta/stable-image/generate/ultra",
         headers={
             "authorization": f"Bearer {stability_api_key}",
             "accept": "image/*",
+            "stability-client-id": "ai-toolkit",
+            "stability-client-user-id": username,
         },
         files={"none": ""},
         data=data,
     )
 
-    image_metadata = {
-        "Prompt": prompt,
-        "Model": model,
-    }
+    image_metadata = {"Prompt": prompt}
     if negative_prompt:
         image_metadata["Negative Prompt"] = negative_prompt
     if "seed" in response.headers:
@@ -319,7 +318,6 @@ def index():
                     negative_prompt=negative_prompt,
                     username=session["username"],
                     aspect_ratio=aspect_ratio,
-                    model=model,
                     seed=seed,
                 )
                 image_url = generated_image_data.image_url

@@ -34,12 +34,6 @@
                 <option value="stabilityai">Stability AI (Stable Diffusion 3)</option>
             </select><br><br>
 
-            <label for="model" class="stabilityai">Select Model</label>
-            <select name="model" id="model" class="stabilityai">
-                <option value="sd3-turbo">Stable Diffusion 3 Turbo (faster, lower quality)</option>
-                <option value="sd3">Stable Diffusion 3 (slower, better quality)</option>
-            </select><br class="stabilityai"><br class="stabilityai">
-
             <label for="size" class="openai">Select Size:</label>
             <select name="size" id="size" class="openai">
                 <option value="1024x1024">1024x1024 (Square)</option>
@@ -82,7 +76,7 @@
             <div>Enter Prompt:</div>
             <textarea name="prompt" id="prompt" maxlength="4000" rows="8" cols="50" spellcheck="true"></textarea>
             <div id="charCount">0 / 4000</div>
-            <div class="stabilityai negativeprompt">Enter Negative Prompt:</div>
+            <div class="stabilityai">Enter Negative Prompt:</div>
             <textarea name="negative_prompt" id="negative_prompt" class="stabilityai negativeprompt" maxlength="4000" rows="8" cols="50" spellcheck="true"></textarea>
             <div class="prompt-checkbox-group openai">
                 <input type="checkbox" id="add-follow-prompt" class="prompt-checkbox openai" name="add-follow-prompt">
