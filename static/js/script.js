@@ -449,16 +449,16 @@ function updateMostRecentChatMessage(messages) {
         smoothLivePreview: true,
         tasklists: true,
         extensions: ["highlight"],
-    }), text = message.text, html = converter.makeHtml(text);
+    }), text = message.text, html = converter.makeHtml(utils.unescapeHTML(text));
     if (chatHistory.children.length < messages.length) {
         const div = document.createElement("div");
         div.className = "ai-message";
-        div.innerHTML = utils.unescapeHTML(html);
+        div.innerHTML = html;
         chatHistory.appendChild(div);
     }
     else {
         var lastChildDiv = chatHistory.lastChild;
-        lastChildDiv.innerHTML = utils.unescapeHTML(html);
+        lastChildDiv.innerHTML = html;
     }
     chatHistory.scrollTop = chatHistory.scrollHeight; // Scroll to bottom
 }
@@ -472,8 +472,8 @@ function refreshChatMessages(messages) {
             smoothLivePreview: true,
             tasklists: true,
             extensions: ["highlight"],
-        }), text = message.text, html = converter.makeHtml(text);
-        chatHistory.innerHTML += `<div class="ai-message">${utils.unescapeHTML(html)}</div>`;
+        }), text = message.text, html = converter.makeHtml(utils.unescapeHTML(text));
+        chatHistory.innerHTML += `<div class="ai-message">${html}</div>`;
     });
     chatHistory.scrollTop = chatHistory.scrollHeight; // Scroll to bottom
 }
