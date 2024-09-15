@@ -498,13 +498,13 @@ showdown.extension("highlight", function () {
                     if (lang) {
                         left = left.slice(0, 18) + "hljs " + left.slice(18);
                         if (hljs.getLanguage(lang)) {
-                            return left + hljs.highlight(lang, match).value + right;
+                            return left + hljs.highlight(lang, utils.unescapeHTML(match)).value + right;
                         } else {
-                            return left + hljs.highlightAuto(match).value + right;
+                            return left + hljs.highlightAuto(utils.unescapeHTML(match)).value + right;
                         }
                     } else {
                         left = left.slice(0, 10) + ' class="hljs" ' + left.slice(10);
-                        return left + hljs.highlightAuto(match).value + right;
+                        return left + hljs.highlightAuto(utils.unescapeHTML(match)).value + right;
                     }
                 };
                 return showdown.helper.replaceRecursiveRegExp(text, replacement, left, right, flags);
@@ -523,15 +523,15 @@ function updateMostRecentChatMessage(messages: ChatMessage[]): void {
             extensions: ["highlight"],
         }),
         text = message.text,
-        html = converter.makeHtml(utils.unescapeHTML(text));
+        html = converter.makeHtml(text);
     if (chatHistory.children.length < messages.length) {
         const div = document.createElement("div") as HTMLDivElement;
         div.className = "ai-message";
-        div.innerHTML = html;
+        div.innerHTML = utils.unescapeHTML(html);
         chatHistory.appendChild(div);
     } else {
         var lastChildDiv = chatHistory.lastChild as HTMLDivElement;
-        lastChildDiv.innerHTML = html;
+        lastChildDiv.innerHTML = utils.unescapeHTML(html);
     }
     chatHistory.scrollTop = chatHistory.scrollHeight; // Scroll to bottom
 }
@@ -541,6 +541,7 @@ function refreshChatMessages(messages: ChatMessage[]): void {
     chatHistory.innerHTML = "";
     // Display AI response in chat history
     messages.forEach((message) => {
+        console.log(message.text);
         var converter = new showdown.Converter({
                 strikethrough: true,
                 smoothLivePreview: true,
@@ -548,8 +549,9 @@ function refreshChatMessages(messages: ChatMessage[]): void {
                 extensions: ["highlight"],
             }),
             text = message.text,
-            html = converter.makeHtml(utils.unescapeHTML(text));
-        chatHistory.innerHTML += `<div class="ai-message">${html}</div>`;
+            html = converter.makeHtml(text);
+        console.log(html);
+        chatHistory.innerHTML += `<div class="ai-message">${utils.unescapeHTML(html)}</div>`;
     });
     chatHistory.scrollTop = chatHistory.scrollHeight; // Scroll to bottom
 }
