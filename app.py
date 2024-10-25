@@ -145,9 +145,8 @@ def generate_stability_image(
     data = {
         "prompt": prompt,
         "output_format": "png",
-        # These have been removed from ultra and core APIs
-        # "mode": "text-to-image",
-        # "model": model,
+        "mode": "text-to-image",
+        "model": "sd3.5-large-turbo",
         "seed": seed,
         "aspect_ratio": aspect_ratio,
     }
@@ -165,7 +164,7 @@ def generate_stability_image(
         "stability-client-user-id": username,
     }
     response = requests.post(
-        f"https://api.stability.ai/v2beta/stable-image/generate/ultra",
+        f"https://api.stability.ai/v2beta/stable-image/generate/sd3",
         headers=stability_headers,
         files={"none": ""},
         data=data,
