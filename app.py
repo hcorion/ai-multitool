@@ -1,28 +1,38 @@
-import utils
+import io
+import json
+import os
+import random
+import re
+import secrets
+import sys
+import tempfile
+import threading
+import time
+import zipfile
+from collections import deque
+from queue import Queue
+
+import openai
+import requests
 from flask import (
     Flask,
+    Response,
+    redirect,
     render_template,
     request,
     session,
-    redirect,
-    url_for,
-    jsonify,
     stream_with_context,
-    Response,
+    url_for,
+)
+from openai import AssistantEventHandler
+from openai.types.beta.threads import (
+    Text,
+    TextDelta,
 )
 from PIL import Image
 from PIL.PngImagePlugin import PngInfo
-from pygments.formatters import HtmlFormatter
-import markdown
-from typing_extensions import override
-import openai
-from openai import AssistantEventHandler
-import requests
-import threading
-from queue import Queue
-from collections import deque
-import sys, os, io, time, json, re, tempfile
-import secrets
+
+import utils
 
 app = Flask(__name__)
 
@@ -30,6 +40,7 @@ app = Flask(__name__)
 client = openai.OpenAI()
 
 stability_api_key = os.environ.get("STABILITY_API_KEY")
+novelai_api_key = os.environ.get("NOVELAI_API_KEY")
 
 secret_key_filename = "secret-key.txt"
 if not os.path.isfile(secret_key_filename):
@@ -97,7 +108,7 @@ def upscale_stability_creative(
         lowres_image.save(tmp_file.name, "PNG")
 
     upscale_response = requests.post(
-        f"https://api.stability.ai/v2beta/stable-image/upscale/creative",
+        "https://api.stability.ai/v2beta/stable-image/upscale/creative",
         headers=stability_headers,
         files={"image": open(tmp_file.name, "rb")},
         data={"prompt": prompt},
@@ -134,9 +145,116 @@ def upscale_stability_creative(
         raise Exception(error_message)
 
 
+def generate_novelai_image(
+    prompt: str,
+    negative_prompt: str | None,
+    username: str,
+    size: tuple[int, int],
+    seed: int = 0,
+    upscale: bool = False,
+) -> GeneratedImageData:
+    if seed <= 0:
+        seed = random.getrandbits(64)
+    data = {
+        "action": "generate",
+        "model": "nai-diffusion-4-full",
+        "parameters": {
+            "add_original_image": False,
+            "cfg_rescale": 0,
+            "deliberate_euler_ancestral_bug": False,
+            "dynamic_thresholding": True,
+            "width": size[0],
+            "height": size[1],
+            "legacy": False,
+            "legacy_v3_extend": False,
+            "n_samples": 1,
+            "noise": 0.2,
+            "noise_schedule": "karras",
+            "extra_noise_seed": 0,
+            "params_version": 3,
+            "prefer_brownian": True,
+            "qualityToggle": True,
+            "sampler": "k_dpmpp_2m_sde",
+            "sm": False,
+            "sm_dyn": False,
+            "steps": 28,
+            "strength": 0.7,
+            "scale": 6,
+            "ucPreset": 4,
+            "seed": seed,
+            "v4_negative_prompt": {
+                "caption": {
+                    "base_caption": negative_prompt,
+                    "char_captions": [
+                        {"centers": [{"x": 0, "y": 0}], "char_caption": ""}
+                    ],
+                },
+                "use_coords": False,
+                "use_order": True,
+            },
+            "v4_prompt": {
+                "caption": {
+                    "base_caption": prompt,
+                    "char_captions": [
+                        {
+                            "centers": [{"x": 0, "y": 0}],
+                            # TODO: Add char_captions
+                            "char_caption": "",
+                        }
+                    ],
+                },
+                "use_coords": False,
+                "use_order": True,
+            },
+        },
+    }
+
+    novelai_headers = {"authorization": f"Bearer {novelai_api_key}"}
+
+    image_metadata = {"Prompt": prompt}
+    if negative_prompt:
+        image_metadata["Negative Prompt"] = negative_prompt
+
+    response = requests.post(
+        "https://image.novelai.net/ai/generate-image",
+        headers=novelai_headers,
+        data=json.dumps(data),
+    )
+    if response.status_code == 200:
+        zipped_file = zipfile.ZipFile(io.BytesIO(response.content))
+        file_bytes = io.BytesIO(zipped_file.read(zipped_file.infolist()[0]))
+
+        if upscale:
+            raise NotImplementedError("No upscale right now for novelai")
+            stability_headers = {
+                "authorization": f"Bearer {stability_api_key}",
+                "accept": "image/*",
+                "stability-client-id": "ai-toolkit",
+                "stability-client-user-id": username,
+            }
+            response = upscale_stability_creative(response, prompt, stability_headers)
+        saved_data = process_image_response(
+            file_bytes, prompt, username, image_metadata
+        )
+        return GeneratedImageData(
+            # TODO: We need to remove this field, we don't actually get a URL from Stability AI so just stub it
+            "https://image.novelai.net",
+            saved_data.local_image_path,
+            prompt,
+            prompt,
+            saved_data.image_name,
+        )
+    else:
+        body = response.json()
+        error_message = (
+            f"NovelAI Generate Image {response.status_code}: {body['message']}: "
+        )
+        raise Exception(error_message)
+
+
 def generate_stability_image(
     prompt: str,
-    negative_prompt: str,
+    negative_prompt: str | None,
     username: str,
     aspect_ratio: str = "1:1",
     seed: int = 0,
@@ -150,7 +268,6 @@ def generate_stability_image(
         "seed": seed,
         "aspect_ratio": aspect_ratio,
     }
-    print(f"using seed: {seed}")
     if negative_prompt:
         data["negative_prompt"] = negative_prompt
     if not stability_api_key:
@@ -164,7 +281,7 @@ def generate_stability_image(
         "stability-client-user-id": username,
     }
     response = requests.post(
-        f"https://api.stability.ai/v2beta/stable-image/generate/sd3",
+        "https://api.stability.ai/v2beta/stable-image/generate/sd3",
         headers=stability_headers,
         files={"none": ""},
         data=data,
@@ -178,7 +295,9 @@ def generate_stability_image(
     if response.status_code == 200:
         if upscale:
             response = upscale_stability_creative(response, prompt, stability_headers)
-        saved_data = process_image_response(response, prompt, username, image_metadata)
+        saved_data = process_image_response(
+            io.BytesIO(response.content), prompt, username, image_metadata
+        )
         return GeneratedImageData(
             # TODO: We need to remove this field, we don't actually get a URL from Stability AI so just stub it
             "https://platform.stability.ai/",
@@ -235,14 +354,16 @@ def generate_dalle_image(
         n=1,
     )
     image_url = response.data[0].url
+    if not image_url:
+        raise DownloadError("Was not able to get image url")
     print(f"url: {image_url}")
     revised_prompt = response.data[0].revised_prompt
 
     # Download the image
     image_response = requests.get(image_url)
-    if image_response.status_code == 200:
+    if image_response.status_code == 200 and revised_prompt:
         saved_data = process_image_response(
-            image_response,
+            io.BytesIO(image_response.content),
             before_prompt,
             username,
             {
@@ -264,7 +385,10 @@ def generate_dalle_image(
 
 
 def process_image_response(
-    image_response, before_prompt: str, username: str, metadata_to_add: dict[str, str]
+    image_response_bytes: io.BytesIO,
+    before_prompt: str,
+    username: str,
+    metadata_to_add: dict[str, str],
 ) -> SavedImageData:
     image_path = os.path.join(app.static_folder, "images", username)
     # Make sure the path directory exists first
@@ -287,13 +411,14 @@ def process_image_response(
     image_thumb_filename = os.path.join(image_path, image_thumb_name)
 
     # Create an in-memory image from the downloaded content
-    image = Image.open(io.BytesIO(image_response.content))
+    image = Image.open(image_response_bytes)
 
     # Create a thumbnail
     thumb_image = image.copy()
     aspect_ratio = image.height / image.width
     new_height = int(256 * aspect_ratio)
     thumb_image.thumbnail((256, new_height))
+    thumb_image = thumb_image.convert("RGB")
 
     # Create metadata
     metadata = PngInfo()
@@ -326,10 +451,8 @@ def index():
         style = request.form.get("style")
         prompt = request.form.get("prompt")
         strict_follow_prompt = request.form.get("add-follow-prompt")
-        print(
-            f"Provider: {provider}, Size: {size}, Quality: {quality}, Style: {style}, Prompt: {prompt}, strict_follow_prompt: {strict_follow_prompt}"
-        )
-        if not prompt.strip():
+
+        if not prompt or not prompt.strip():
             print("No prompt provided, not doing anything.")
             return render_template("index.html")
         try:
@@ -359,22 +482,62 @@ def index():
             elif provider == "stabilityai":
                 negative_prompt = request.form.get("negative_prompt")
                 aspect_ratio = request.form.get("aspect_ratio")
-                model = request.form.get("model")
                 seed = request.form.get("seed")
-                upscale = request.form.get("upscale")
+                upscale = bool(request.form.get("upscale"))
+
+                if not seed:
+                    raise ValueError("Unable to get 'seed' field.")
+                if not aspect_ratio:
+                    raise ValueError("Unable to get 'aspect_ratio' field.")
+
                 generated_image_data = generate_stability_image(
                     prompt=prompt,
                     negative_prompt=negative_prompt,
                     username=session["username"],
                     aspect_ratio=aspect_ratio,
-                    seed=seed,
+                    seed=int(seed),
+                    upscale=upscale,
+                )
+
+                image_url = generated_image_data.image_url
+                local_image_path = generated_image_data.local_image_path
+                image_name = generated_image_data.image_name
+                prompt = generated_image_data.prompt
+                revised_prompt = generated_image_data.revised_prompt
+                return render_template(
+                    "result-section.html",
+                    image_url=image_url,
+                    local_image_path=local_image_path,
+                    revised_prompt=prompt,
+                    prompt=prompt,
+                    image_name=image_name,
+                    error_message=error_message,
+                )
+            elif provider == "novelai":
+                negative_prompt = request.form.get("negative_prompt")
+                aspect_ratio = request.form.get("aspect_ratio")
+                seed = request.form.get("seed")
+                upscale = bool(request.form.get("upscale"))
+
+                if not seed:
+                    raise ValueError("Unable to get 'seed' field.")
+                if not size:
+                    raise ValueError("Unable to get 'size' field.")
+                
+                split_size = size.split('x')
+
+                generated_image_data = generate_novelai_image(
+                    prompt=prompt,
+                    negative_prompt=negative_prompt,
+                    username=session["username"],
+                    size=(int(split_size[0]), int(split_size[1])),
+                    seed=int(seed),
                     upscale=upscale,
                 )
                 image_url = generated_image_data.image_url
                 local_image_path = generated_image_data.local_image_path
                 image_name = generated_image_data.image_name
                 prompt = generated_image_data.prompt
-                # This is identical to prompt with Stability AI
                 revised_prompt = generated_image_data.revised_prompt
                 return render_template(
                     "result-section.html",
@@ -454,7 +617,7 @@ def get_all_conversations():
     if "username" not in session:
         return None
 
-    user_file = os.path.join(app.static_folder, "chats", f'{session["username"]}.json')
+    user_file = os.path.join(app.static_folder, "chats", f"{session['username']}.json")
     if os.path.exists(user_file):
         with open(user_file, "r") as file:
             chat = json.load(file)
@@ -494,7 +657,7 @@ def converse():
         if request.method == "POST"
         else request.args.get("thread_id")
     )
-    user_file = os.path.join(app.static_folder, "chats", f'{session["username"]}.json')
+    user_file = os.path.join(app.static_folder, "chats", f"{session['username']}.json")
 
     # Load existing conversation or start a new one
     if os.path.exists(user_file):
@@ -555,7 +718,7 @@ def converse():
                 stream.until_done()
 
         def stream_events(thread_id, assistant_id, message_list):
-            yield f"{json.dumps(json.dumps({ 'type': 'message_list', 'threadId': thread_id, 'messages': message_list}))}{eos_str}"
+            yield f"{json.dumps(json.dumps({'type': 'message_list', 'threadId': thread_id, 'messages': message_list}))}{eos_str}"
             event_queue = Queue()
             # Start the stream in a separate thread
             threading.Thread(
@@ -588,8 +751,8 @@ class StreamingEventHandler(AssistantEventHandler):
 
     def on_text_delta(
         self,
-        delta: openai.types.beta.threads.TextDelta,
-        snapshot: openai.types.beta.threads.Text,
+        delta: TextDelta,
+        snapshot: Text,
     ):
         self.event_queue.put(json.dumps({"type": "text_delta", "delta": delta.value}))
 

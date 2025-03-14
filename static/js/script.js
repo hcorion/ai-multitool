@@ -28,7 +28,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     // Image gen elements
     addEventListenerToElement("provider", "change", providerChanged);
-    addEventListenerToElement("model", "change", modelChanged);
+    addEventListenerToElement("model", "change", modelButtonChanged);
     // Assigning event listeners
     addEventListenerToElement("generationTab", "click", handleTabClick);
     addEventListenerToElement("gridViewTab", "click", handleTabClick);
@@ -74,30 +74,53 @@ function handleTabClick(evt) {
 function providerChanged() {
     const selection = document.getElementById("provider");
     if (selection.value == "openai") {
-        $(".openai").show();
         $(".stabilityai").hide();
+        $(".novelai").hide();
+        $(".openai").show();
     }
-    else if ((selection.value = "stabilityai")) {
+    else if ((selection.value == "stabilityai")) {
         $(".openai").hide();
+        $(".novelai").hide();
         $(".stabilityai").show();
-        modelChanged();
+        modelChanged(selection.value);
+    }
+    else if ((selection.value == "novelai")) {
+        $(".openai").hide();
+        $(".stabilityai").hide();
+        $(".novelai").show();
+        modelChanged(selection.value);
     }
     else {
         throw new Error(`Tried to switch to unsupported provider ${selection}`);
     }
 }
-function modelChanged() {
+function modelButtonChanged() {
+    const provider = document.getElementById("provider");
+    modelChanged(provider.value);
+}
+function modelChanged(provider) {
     const selection = document.getElementById("model");
-    if (!selection.hidden) {
-        if (selection.value == "sd3-turbo") {
-            $(".negativeprompt").hide();
+    if (provider == "stabilityai") {
+        if (selection && !selection.hidden) {
+            if (selection.value == "sd3-turbo") {
+                $(".negativeprompt").hide();
+            }
+            else if ((selection.value = "sd3")) {
+                $(".negativeprompt").show();
+            }
+            else {
+                throw new Error(`Tried to switch to unsupported SD3 model ${selection}`);
+            }
         }
-        else if ((selection.value = "sd3")) {
-            $(".negativeprompt").show();
-        }
-        else {
-            throw new Error(`Tried to switch to unsupported SD3 model ${selection}`);
-        }
+    }
+    else if (provider == "novelai") {
+        $(".negativeprompt").show();
+    }
+    else if (provider == "openai") {
+        $(".negativeprompt").hide();
+    }
+    else {
+        throw new Error(`modelChanged called with unsupported provider ${selection}`);
     }
 }
 function updateCharacterCount() {

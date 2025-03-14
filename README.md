@@ -6,8 +6,9 @@ A simple web frontend to interact with OpenAI's text chat, text-to-image service
 ### Windows
 1. Add your OpenAI API and StabilityAI key to `run-user.ps1`
 2. Install `python`, `pipenv` and `npm`
-3. Install the typescript compiler: `npm install -g typescript`
+3. Install the typescript and sass compiler: `npm install -g typescript sass`
 4. run `npm install`
+5. run `pipenv sync`
 
 ## Running it
 

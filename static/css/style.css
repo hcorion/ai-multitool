@@ -48,7 +48,7 @@ select {
   background-size: 15px;
 }
 select:hover {
-  background-color: #1a1a1a;
+  background-color: rgb(25.5, 25.5, 25.5);
 }
 select:focus {
   border-color: #0a84ff;
