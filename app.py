@@ -8,6 +8,7 @@ import sys
 import tempfile
 import threading
 import time
+from typing import Mapping
 import zipfile
 from collections import deque
 from queue import Queue
@@ -32,6 +33,7 @@ from openai.types.beta.threads import (
 from PIL import Image
 from PIL.PngImagePlugin import PngInfo
 
+from dynamic_prompts import make_prompt_dynamic
 import utils
 
 app = Flask(__name__)
@@ -101,9 +103,9 @@ class SavedImageData:
 
 
 def upscale_stability_creative(
-    lowres_response: requests.Response, prompt: str, stability_headers: object
+    lowres_response_bytes: io.BytesIO, prompt: str, stability_headers: Mapping[str, str | bytes | None]
 ) -> requests.Response:
-    lowres_image = Image.open(io.BytesIO(lowres_response.content))
+    lowres_image = Image.open(lowres_response_bytes)
     with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp_file:
         lowres_image.save(tmp_file.name, "PNG")
 
@@ -155,6 +157,9 @@ def generate_novelai_image(
 ) -> GeneratedImageData:
     if seed <= 0:
         seed = random.getrandbits(64)
+    
+    revised_prompt = make_prompt_dynamic(prompt, username, app.static_folder, seed)
+
     data = {
         "action": "generate",
         "model": "nai-diffusion-4-full",
@@ -182,19 +187,9 @@ def generate_novelai_image(
             "scale": 6,
             "ucPreset": 4,
             "seed": seed,
-            "v4_negative_prompt": {
-                "caption": {
-                    "base_caption": negative_prompt,
-                    "char_captions": [
-                        {"centers": [{"x": 0, "y": 0}], "char_caption": ""}
-                    ],
-                },
-                "use_coords": False,
-                "use_order": True,
-            },
             "v4_prompt": {
                 "caption": {
-                    "base_caption": prompt,
+                    "base_caption": revised_prompt,
                     "char_captions": [
                         {
                             "centers": [{"x": 0, "y": 0}],
@@ -206,12 +201,25 @@ def generate_novelai_image(
                 "use_coords": False,
                 "use_order": True,
             },
+            "v4_negative_prompt": {
+                "caption": {
+                    "base_caption": negative_prompt,
+                    "char_captions": [
+                        {"centers": [{"x": 0, "y": 0}], "char_caption": ""}
+                    ],
+                },
+                "use_coords": False,
+                "use_order": True,
+            },
         },
     }
 
     novelai_headers = {"authorization": f"Bearer {novelai_api_key}"}
 
-    image_metadata = {"Prompt": prompt}
+    image_metadata = {
+        "Prompt": prompt,
+        "Revised Prompt": revised_prompt
+    }
     if negative_prompt:
         image_metadata["Negative Prompt"] = negative_prompt
 
@@ -225,14 +233,13 @@ def generate_novelai_image(
         file_bytes = io.BytesIO(zipped_file.read(zipped_file.infolist()[0]))
 
         if upscale:
-            raise NotImplementedError("No upscale right now for novelai")
             stability_headers = {
                 "authorization": f"Bearer {stability_api_key}",
                 "accept": "image/*",
                 "stability-client-id": "ai-toolkit",
                 "stability-client-user-id": username,
             }
-            response = upscale_stability_creative(response, prompt, stability_headers)
+            response = upscale_stability_creative(file_bytes, prompt, stability_headers)
         saved_data = process_image_response(
             file_bytes, prompt, username, image_metadata
         )
@@ -240,7 +247,7 @@ def generate_novelai_image(
             # TODO: We need to remove this field, we don't actually get a URL from Stability AI so just stub it
             "https://image.novelai.net",
             saved_data.local_image_path,
-            prompt,
+            revised_prompt,
             prompt,
             saved_data.image_name,
         )
@@ -293,10 +300,11 @@ def generate_stability_image(
     if "seed" in response.headers:
         image_metadata["seed"] = response.headers["seed"]
     if response.status_code == 200:
+        file_bytes = io.BytesIO(response.content)
         if upscale:
-            response = upscale_stability_creative(response, prompt, stability_headers)
+            response = upscale_stability_creative(file_bytes, prompt, stability_headers)
         saved_data = process_image_response(
-            io.BytesIO(response.content), prompt, username, image_metadata
+            file_bytes, prompt, username, image_metadata
         )
         return GeneratedImageData(
             # TODO: We need to remove this field, we don't actually get a URL from Stability AI so just stub it
@@ -543,7 +551,7 @@ def index():
                     "result-section.html",
                     image_url=image_url,
                     local_image_path=local_image_path,
-                    revised_prompt=prompt,
+                    revised_prompt=revised_prompt,
                     prompt=prompt,
                     image_name=image_name,
                     error_message=error_message,
