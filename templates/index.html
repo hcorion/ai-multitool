@@ -102,14 +102,17 @@
         <div class="image-grid">
             <!-- Images will be loaded here -->
         </div>
+        <!-- Grid view modal for full size image display with nav buttons -->
         <div id="grid-image-modal" style="display:none" class="modal grid-modal">
             <span id="grid-image-close" class="close">&times;</span>
+            <button id="grid-prev" class="grid-nav-btn">&lsaquo;</button>
             <div class="modal-content-wrapper">
                 <img class="modal-content" id="grid-modal-image">
                 <div class="info-panel" id="grid-info-panel">
-                    <!--Populated in TypeScript at runtime-->
+                    <!-- Populated in TypeScript at runtime -->
                 </div>
             </div>
+            <button id="grid-next" class="grid-nav-btn">&rsaquo;</button>
         </div>
         <button class="grid-nav-buttons" id="firstGrid">&laquo;</button>
         <button class="grid-nav-buttons" id="previousGrid">&nbsp;&lsaquo;&nbsp;</button>

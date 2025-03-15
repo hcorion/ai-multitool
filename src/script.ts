@@ -45,6 +45,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Grid Modal Buttons
     addEventListenerToElement("grid-image-close", "click", closeGridModal);
+    addEventListenerToElement("grid-prev", "click", previousGridImage);
+    addEventListenerToElement("grid-next", "click", nextGridImage);
 
     document.getElementById("generationTab")!.click();
 
@@ -184,20 +186,26 @@ function gridTabLoaded(): void {
     });
 }
 
+/* global variable to keep track of the current grid image index */
+let currentGridImageIndex: number = 0;
+
 function loadImages(page: number): void {
     $.getJSON(`/get-images/${page}`, (data: string[]) => {
         const grid = $(".image-grid");
         grid.empty(); // Clear existing images
 
-        data.forEach((image: string) => {
+        // For each image in “data”, attach an index so we can navigate later.
+        data.forEach((image: string, index: number) => {
             const aspectRatioBox = $("<div>").addClass("aspect-ratio-box");
-            const imgElement = $("<img>").attr("src", image).attr("id", "gridImage");
+            const imgElement = $("<img>")
+                .attr("src", image)
+                .attr("id", "gridImage")
+                .attr("data-index", index.toString());
             imgElement.on("click", openGridModal);
             aspectRatioBox.append(imgElement);
             grid.append(aspectRatioBox);
         });
-        document.getElementsByTagName;
-        document.getElementById("gridPageNum")!.textContent = `Page ${page}/${totalPages}`;
+        $("#gridPageNum").text(`Page ${page}/${totalPages}`);
     });
 }
 
@@ -253,24 +261,50 @@ function openGenModal(evt: Event): void {
 }
 
 function openGridModal(evt: Event): void {
-    const filePath = (evt.currentTarget as HTMLImageElement).src;
-    document.getElementById("grid-image-modal")!.style.display = "block";
+    // Get the clicked image and its index
+    const clickedImg = evt.currentTarget as HTMLImageElement;
+    const indexAttr = clickedImg.getAttribute("data-index");
+    if (indexAttr) {
+        currentGridImageIndex = parseInt(indexAttr, 10);
+    } else {
+        currentGridImageIndex = 0;
+    }
+    updateGridModalImage();
+    $("#grid-image-modal").show();
+}
 
+function updateGridModalImage(): void {
+    // Get the list of grid images from the current grid DOM
+    const gridImages = $(".image-grid img");
+    if (gridImages.length === 0) {
+        console.warn("No grid images found.");
+        return;
+    }
+    // Wrap-around if needed
+    if (currentGridImageIndex < 0) {
+        currentGridImageIndex = gridImages.length - 1;
+    } else if (currentGridImageIndex >= gridImages.length) {
+        currentGridImageIndex = 0;
+    }
+    const newImgElement = gridImages.get(currentGridImageIndex) as HTMLImageElement;
+
+    // The following logic re-uses your previous logic to convert thumbnail src to full image source.
+    const filePath = newImgElement.src;
     const thumbFileName = filePath.split("/").pop();
     const pathDir = filePath.slice(0, -(thumbFileName?.length ?? 0));
     const fileName = thumbFileName?.slice(0, -".thumb.jpg".length).concat(".png");
     (document.getElementById("grid-modal-image") as HTMLImageElement).src = pathDir + fileName;
 
+    // Optionally, you can update the metadata for the new image here
     $.getJSON("/get-image-metadata/" + fileName, function (metadata) {
-        var metadataDiv = document.getElementById("grid-info-panel") as HTMLElement;
+        const metadataDiv = document.getElementById("grid-info-panel") as HTMLElement;
         metadataDiv.innerHTML = ""; // Clear previous metadata
-        for (var key in metadata) {
-            // <div class="info-item"><span>Prompt:</span><span id="prompt-value"></span></div>
-            var infoItem = document.createElement("div");
+        for (const key in metadata) {
+            const infoItem = document.createElement("div");
             infoItem.className = "info-item";
             infoItem.textContent = key + ":";
             metadataDiv.appendChild(infoItem);
-            var infoValue = document.createElement("div");
+            const infoValue = document.createElement("div");
             infoValue.className = "prompt-value";
             infoValue.textContent = metadata[key];
             metadataDiv.appendChild(infoValue);
@@ -278,12 +312,22 @@ function openGridModal(evt: Event): void {
     });
 }
 
-function closeGenModal(): void {
-    document.getElementById("image-modal")!.style.display = "none";
+function previousGridImage(): void {
+    currentGridImageIndex -= 1;
+    updateGridModalImage();
+}
+
+function nextGridImage(): void {
+    currentGridImageIndex += 1;
+    updateGridModalImage();
 }
 
 function closeGridModal(): void {
-    document.getElementById("grid-image-modal")!.style.display = "none";
+    $("#grid-image-modal").hide();
+}
+
+function closeGenModal(): void {
+    document.getElementById("image-modal")!.style.display = "none";
 }
 
 //////////////////////

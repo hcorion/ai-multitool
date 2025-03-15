@@ -456,3 +456,23 @@ button#send-chat {
         background-color: $submit-btn-hover-color;
     }
 }
+
+/* Example CSS for grid navigation buttons inside the modal */
+.grid-nav-btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background-color: transparent;
+    border: none;
+    color: #fff;
+    font-size: 2rem;
+    cursor: pointer;
+    padding: 10px;
+    z-index: 2;
+}
+#grid-prev {
+    left: 10px;
+}
+#grid-next {
+    right: 10px;
+}
