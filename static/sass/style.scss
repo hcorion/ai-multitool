@@ -17,7 +17,9 @@ body {
     padding: 20px;
 }
 
-h1, h2, p {
+h1,
+h2,
+p {
     margin: 0 0 20px;
 }
 
@@ -27,7 +29,10 @@ form {
     border-radius: 8px;
 }
 
-label, select, textarea, input {
+label,
+select,
+textarea,
+input {
     display: block;
     width: 100%;
     margin-bottom: 10px;
@@ -184,6 +189,7 @@ img {
             background-color: $tab-active-bg-color;
         }
     }
+
     .user-info {
         position: absolute;
         right: 20px; // Adjust this value as needed for spacing from the right edge
@@ -229,6 +235,7 @@ img {
     .aspect-ratio-box {
         position: relative;
         width: 100%;
+
         &:before {
             content: '';
             display: block;
@@ -376,10 +383,8 @@ img {
 
 .chat-container {
     display: flex;
-    height: 80vh;
+    height: calc(100vh - 110px); // 110px accounts for top+bottom padding
     background-color: $background-color;
-    padding: 20px;
-    box-sizing: border-box;
 }
 
 .sidebar {
@@ -387,6 +392,11 @@ img {
     background-color: $tab-bg-color;
     padding: 20px;
     margin-right: 20px;
+}
+
+#conversations-list {
+    max-height: 100%;
+    overflow-y: auto;
 }
 
 .ai-message {
@@ -452,6 +462,7 @@ button#send-chat {
     color: $text-color;
     border: none;
     cursor: pointer;
+
     &:hover {
         background-color: $submit-btn-hover-color;
     }
@@ -470,9 +481,11 @@ button#send-chat {
     padding: 10px;
     z-index: 2;
 }
+
 #grid-prev {
     left: 10px;
 }
+
 #grid-next {
     right: 10px;
 }
