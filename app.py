@@ -8,16 +8,18 @@ import sys
 import tempfile
 import threading
 import time
-from typing import Mapping
 import zipfile
 from collections import deque
 from queue import Queue
+from typing import Any, AnyStr, Generator, Mapping
 
 import openai
 import requests
 from flask import (
     Flask,
     Response,
+    abort,
+    jsonify,
     redirect,
     render_template,
     request,
@@ -26,15 +28,15 @@ from flask import (
     url_for,
 )
 from openai import AssistantEventHandler
-from openai.types.beta.threads import (
-    Text,
-    TextDelta,
-)
+from openai.types.beta.threads import Text, TextContentBlock, TextDelta
+from openai.types.beta.threads.run_submit_tool_outputs_params import ToolOutput
+from openai.types.beta.threads.runs import FunctionToolCall, ToolCall, ToolCallDelta
+from openai.types.shared.metadata import Metadata
 from PIL import Image
 from PIL.PngImagePlugin import PngInfo
 
-from dynamic_prompts import make_prompt_dynamic
 import utils
+from dynamic_prompts import make_prompt_dynamic
 
 app = Flask(__name__)
 
@@ -52,6 +54,11 @@ with open(secret_key_filename, "r") as f:
     app.secret_key = f.read()
 
 
+@app.errorhandler(404)
+def resource_not_found(e: Response):
+    return jsonify(error=str(e)), 404
+
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
@@ -67,13 +74,13 @@ def logout():
 
 
 class ModerationException(Exception):
-    def __init__(self, message):
+    def __init__(self, message: str):
         super().__init__(message)
         self.message = message
 
 
 class DownloadError(Exception):
-    def __init__(self, message):
+    def __init__(self, message: str):
         super().__init__(message)
         self.message = message
 
@@ -85,7 +92,14 @@ class GeneratedImageData:
     prompt: str
     image_name: str
 
-    def __init__(self, image_url, local_image_path, revised_prompt, prompt, image_name):
+    def __init__(
+        self,
+        image_url: str,
+        local_image_path: str,
+        revised_prompt: str,
+        prompt: str,
+        image_name: str,
+    ):
         self.image_url = image_url
         self.local_image_path = local_image_path
         self.revised_prompt = revised_prompt
@@ -97,13 +111,15 @@ class SavedImageData:
     local_image_path: str
     image_name: str
 
-    def __init__(self, local_image_path, image_name):
+    def __init__(self, local_image_path: str, image_name: str):
         self.local_image_path = local_image_path
         self.image_name = image_name
 
 
 def upscale_stability_creative(
-    lowres_response_bytes: io.BytesIO, prompt: str, stability_headers: Mapping[str, str | bytes | None]
+    lowres_response_bytes: io.BytesIO,
+    prompt: str,
+    stability_headers: Mapping[str, str | bytes | None],
 ) -> requests.Response:
     lowres_image = Image.open(lowres_response_bytes)
     with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp_file:
@@ -157,10 +173,13 @@ def generate_novelai_image(
 ) -> GeneratedImageData:
     if seed <= 0:
         seed = random.getrandbits(64)
-    
+
+    if not app.static_folder:
+        raise ValueError("Flask static folder not defined")
+
     revised_prompt = make_prompt_dynamic(prompt, username, app.static_folder, seed)
 
-    data = {
+    data = {  # type: ignore
         "action": "generate",
         "model": "nai-diffusion-4-full",
         "parameters": {
@@ -216,9 +235,10 @@ def generate_novelai_image(
 
     novelai_headers = {"authorization": f"Bearer {novelai_api_key}"}
 
-    image_metadata = {
+    image_metadata: dict[str, str] = {
         "Prompt": prompt,
-        "Revised Prompt": revised_prompt
+        "Revised Prompt": revised_prompt,
+        "seed": str(seed),
     }
     if negative_prompt:
         image_metadata["Negative Prompt"] = negative_prompt
@@ -241,7 +261,7 @@ def generate_novelai_image(
             }
             response = upscale_stability_creative(file_bytes, prompt, stability_headers)
         saved_data = process_image_response(
-            file_bytes, prompt, username, image_metadata
+            file_bytes, prompt, revised_prompt, username, image_metadata
         )
         return GeneratedImageData(
             # TODO: We need to remove this field, we don't actually get a URL from Stability AI so just stub it
@@ -267,14 +287,23 @@ def generate_stability_image(
     seed: int = 0,
     upscale: bool = False,
 ) -> GeneratedImageData:
-    data = {
-        "prompt": prompt,
+    if seed <= 0:
+        seed = random.getrandbits(64)
+
+    if not app.static_folder:
+        raise ValueError("Flask static folder not defined")
+
+    revised_prompt = make_prompt_dynamic(prompt, username, app.static_folder, seed)
+
+    data = {  # type: ignore
+        "prompt": revised_prompt,
         "output_format": "png",
         "mode": "text-to-image",
         "model": "sd3.5-large-turbo",
         "seed": seed,
         "aspect_ratio": aspect_ratio,
     }
+
     if negative_prompt:
         data["negative_prompt"] = negative_prompt
     if not stability_api_key:
@@ -291,10 +320,10 @@ def generate_stability_image(
         "https://api.stability.ai/v2beta/stable-image/generate/sd3",
         headers=stability_headers,
         files={"none": ""},
-        data=data,
+        data=data,  # type: ignore
     )
 
-    image_metadata = {"Prompt": prompt}
+    image_metadata = {"Prompt": prompt, "Revised Prompt": prompt}
     if negative_prompt:
         image_metadata["Negative Prompt"] = negative_prompt
     if "seed" in response.headers:
@@ -304,7 +333,7 @@ def generate_stability_image(
         if upscale:
             response = upscale_stability_creative(file_bytes, prompt, stability_headers)
         saved_data = process_image_response(
-            file_bytes, prompt, username, image_metadata
+            file_bytes, prompt, prompt, username, image_metadata
         )
         return GeneratedImageData(
             # TODO: We need to remove this field, we don't actually get a URL from Stability AI so just stub it
@@ -356,9 +385,9 @@ def generate_dalle_image(
     response = client.images.generate(
         model="dall-e-3",
         prompt=prompt,
-        size=size,
-        style=style,
-        quality=quality,
+        size=size,  # type: ignore
+        style=style,  # type: ignore
+        quality=quality,  # type: ignore
         n=1,
     )
     image_url = response.data[0].url
@@ -373,6 +402,7 @@ def generate_dalle_image(
         saved_data = process_image_response(
             io.BytesIO(image_response.content),
             before_prompt,
+            revised_prompt,
             username,
             {
                 "Prompt": prompt,
@@ -395,9 +425,13 @@ def generate_dalle_image(
 def process_image_response(
     image_response_bytes: io.BytesIO,
     before_prompt: str,
+    after_prompt: str,
     username: str,
     metadata_to_add: dict[str, str],
 ) -> SavedImageData:
+    if not app.static_folder:
+        raise ValueError("Flask static folder not defined")
+
     image_path = os.path.join(app.static_folder, "images", username)
     # Make sure the path directory exists first
     os.makedirs(image_path, exist_ok=True)
@@ -409,7 +443,15 @@ def process_image_response(
             file_count += 1
     cleaned_prompt = before_prompt.strip().lower()
     cleaned_prompt = (
-        utils.remove_stop_words(cleaned_prompt.replace(".", " ").replace(",", " "))
+        utils.remove_stop_words(
+            cleaned_prompt.replace(".", " ")
+            .replace(",", " ")
+            .replace(":", " ")
+            .replace("{", " ")
+            .replace("}", " ")
+            .replace("[", " ")
+            .replace("]", " ")
+        )
         .replace("  ", " ")
         .replace(" ", "_")[:30]
     )
@@ -455,23 +497,31 @@ def index():
         error_message = None
         provider = request.form.get("provider")
         size = request.form.get("size")
-        quality = request.form.get("quality")
-        style = request.form.get("style")
         prompt = request.form.get("prompt")
-        strict_follow_prompt = request.form.get("add-follow-prompt")
 
         if not prompt or not prompt.strip():
             print("No prompt provided, not doing anything.")
             return render_template("index.html")
         try:
             if provider == "openai":
+                quality = request.form.get("quality")
+                style = request.form.get("style")
+                strict_follow_prompt = request.form.get("add-follow-prompt")
+
+                if not size:
+                    raise ValueError("Unable to get 'size' field.")
+                if not quality:
+                    raise ValueError("Unable to get 'quality' field.")
+                if not style:
+                    raise ValueError("Unable to get 'style' field.")
+
                 generated_image_data = generate_dalle_image(
                     prompt,
                     session["username"],
                     size,
                     quality,
                     style,
-                    strict_follow_prompt,
+                    bool(strict_follow_prompt),
                 )
                 image_url = generated_image_data.image_url
                 local_image_path = generated_image_data.local_image_path
@@ -531,8 +581,8 @@ def index():
                     raise ValueError("Unable to get 'seed' field.")
                 if not size:
                     raise ValueError("Unable to get 'size' field.")
-                
-                split_size = size.split('x')
+
+                split_size = size.split("x")
 
                 generated_image_data = generate_novelai_image(
                     prompt=prompt,
@@ -586,8 +636,10 @@ def index():
             )
         except Exception as e:
             error = str(e)
-            exc_type, exc_obj, exc_tb = sys.exc_info()
-            fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+            exc_type, _, exc_tb = sys.exc_info()
+            fname = (
+                os.path.split(exc_tb.tb_frame.f_code.co_filename)[1] if exc_tb else ""
+            )
             error_message = f"Error processing request: {exc_type} {error}: {fname}"
             return render_template(
                 "result-section.html",
@@ -621,40 +673,48 @@ images_per_page = 6 * 3  # (6 wide * 3 tall)
 
 
 @app.route("/get-all-conversations")
-def get_all_conversations():
+def get_all_conversations() -> str:
     if "username" not in session:
-        return None
+        abort(404, description="Username not in session")
 
-    user_file = os.path.join(app.static_folder, "chats", f"{session['username']}.json")
-    if os.path.exists(user_file):
-        with open(user_file, "r") as file:
+    if not app.static_folder:
+        raise ValueError("Flask static folder not defined")
+
+    user_file: str = os.path.join(
+        app.static_folder, "chats", f"{session['username']}.json"
+    )
+    if os.path.exists(user_file):  # type: ignore
+        with open(user_file, "r") as file:  # type: ignore
             chat = json.load(file)
     else:
-        with open(user_file, "a") as file:
-            chat = dict()
+        with open(user_file, "a") as file:  # type: ignore
+            chat: dict[Any, Any] = dict()
             file.write(json.dumps(chat))
     return json.dumps(chat)
 
 
 def get_message_list(thread_id: str):
     message_list = client.beta.threads.messages.list(thread_id, limit=100)
-    all_messages = deque()
+    all_messages: deque[dict[str, str]] = deque()
     for message in message_list.data:
         if message.content:
             for msg_content in message.content:
-                all_messages.appendleft(
-                    {
-                        "role": message.role,
-                        "text": msg_content.text.value,
-                    }
-                )
+                if isinstance(msg_content, TextContentBlock):
+                    all_messages.appendleft(
+                        {
+                            "role": message.role,
+                            "text": msg_content.text.value,
+                        }
+                    )
+                else:
+                    print("Unhandled msg_content type")
     return list(all_messages)
 
 
 eos_str = "␆␄"
 
 
-@app.route("/chat", methods=["GET", "POST"])
+@app.route("/chat", methods=["GET", "POST"])  # type: ignore
 def converse():
     if "username" not in session:
         return redirect(url_for("login"))
@@ -662,9 +722,14 @@ def converse():
     # Need to change how we fetch the thread_id depending on if POST or GET.
     thread_id = (
         request.json.get("thread_id")
-        if request.method == "POST"
+        if request.method == "POST" and request.json
         else request.args.get("thread_id")
     )
+
+    if not app.static_folder:
+        raise ValueError("Flask static folder not defined")
+    if not thread_id:
+        raise ValueError("thread_id was empty")
     user_file = os.path.join(app.static_folder, "chats", f"{session['username']}.json")
 
     # Load existing conversation or start a new one
@@ -673,13 +738,16 @@ def converse():
             chat = json.load(file)
     else:
         with open(user_file, "a") as file:
-            chat = dict()
+            chat: dict[Any, Any] = dict()
             file.write(json.dumps(chat))
     if request.method == "GET":
         return json.dumps(
             {"threadId": thread_id, "messages": get_message_list(thread_id)}
         )
     elif request.method == "POST":
+        if not request.json:
+            raise ValueError("Expected valid request json in POST Request")
+
         user_input = request.json.get("user_input")
         if not user_input:
             return {"error": "No input provided"}, 400
@@ -692,7 +760,7 @@ def converse():
             thread = client.beta.threads.create()
             thread_id = thread.id
             chat_name = re.sub(r"[^\w_. -]", "_", request.json.get("chat_name"))
-            thread_data = {
+            thread_data: dict[str, str | int | Metadata | None] = {
                 "id": thread.id,
                 "created_at": thread.created_at,
                 "metadata": thread.metadata,
@@ -707,16 +775,14 @@ def converse():
         assistant_id = "asst_FX4sCfRsD6G3Vvc84ozABA8N"
         # StoryGPT
         # assistant_id = "asst_aGGDp8e82QjnbkLk4kgXzBT1"
-        assistant = client.beta.assistants.retrieve(assistant_id=assistant_id)
+        client.beta.assistants.retrieve(assistant_id=assistant_id)
 
-        thread_message = client.beta.threads.messages.create(
-            thread_id, role="user", content=user_input
-        )
+        client.beta.threads.messages.create(thread_id, role="user", content=user_input)
         message_list = get_message_list(thread_id)
 
-        event_queue = Queue()
-
-        def start_stream_thread(event_queue, thread_id, assistant_id):
+        def start_stream_thread(
+            event_queue: Queue[str], thread_id: str, assistant_id: str
+        ):
             event_handler = StreamingEventHandler(event_queue)
             with client.beta.threads.runs.stream(
                 thread_id=thread_id,
@@ -725,9 +791,11 @@ def converse():
             ) as stream:
                 stream.until_done()
 
-        def stream_events(thread_id, assistant_id, message_list):
+        def stream_events(
+            thread_id: str, assistant_id: str, message_list: dict[str, str]
+        ) -> Generator[Any | AnyStr]:
             yield f"{json.dumps(json.dumps({'type': 'message_list', 'threadId': thread_id, 'messages': message_list}))}{eos_str}"
-            event_queue = Queue()
+            event_queue: Queue[Any] = Queue()
             # Start the stream in a separate thread
             threading.Thread(
                 target=start_stream_thread, args=(event_queue, thread_id, assistant_id)
@@ -744,17 +812,17 @@ def converse():
             json.dump(chat, file)
 
         return Response(
-            stream_with_context(stream_events(thread_id, assistant_id, message_list)),
+            stream_with_context(stream_events(thread_id, assistant_id, message_list)),  # type: ignore
             mimetype="text/plain",
         )
 
 
 class StreamingEventHandler(AssistantEventHandler):
-    def __init__(self, event_queue):
+    def __init__(self, event_queue: Queue[Any]):
         self.event_queue = event_queue
         super().__init__()
 
-    def on_text_created(self, text) -> None:
+    def on_text_created(self, text: Text) -> None:
         self.event_queue.put(json.dumps({"type": "text_created", "text": text.value}))
 
     def on_text_delta(
@@ -764,16 +832,16 @@ class StreamingEventHandler(AssistantEventHandler):
     ):
         self.event_queue.put(json.dumps({"type": "text_delta", "delta": delta.value}))
 
-    def on_text_done(self, text) -> None:
+    def on_text_done(self, text: Text) -> None:
         self.event_queue.put(json.dumps({"type": "text_done", "text": text.value}))
 
-    def on_tool_call_created(self, tool_call):
+    def on_tool_call_created(self, tool_call: ToolCall):
         # TODO: Need to hook this up properly
         self.event_queue.put(
             json.dumps({"type": "tool_call_created", "tool_call": tool_call})
         )
 
-    def on_tool_call_delta(self, delta, snapshot):
+    def on_tool_call_delta(self, delta: ToolCallDelta, snapshot: ToolCall):
         self.event_queue.put(
             json.dumps(
                 {"type": "tool_call_delta", "delta": delta, "snapshot": snapshot}
@@ -786,11 +854,15 @@ class StreamingEventHandler(AssistantEventHandler):
 #################################
 
 
-def process_tool_output(username: str, run_id: str, thread_id: str, tool_calls):
-    tool_outputs = []
+def process_tool_output(
+    username: str, run_id: str, thread_id: str, tool_calls: list[ToolCall]
+):  # type: ignore
+    tool_outputs: list[ToolOutput] = []
     for call in tool_calls:
-        tool_output = {"tool_call_id": call.id}
-        output_result = dict()
+        tool_output = ToolOutput(tool_call_id=call.id)
+        if not isinstance(call, FunctionToolCall):
+            continue
+        output_result: dict[str, str] = dict()
         if call.function.name == "generate_dalle_image":
             print(call.function.name)
             arguments = json.loads(call.function.arguments)
@@ -824,7 +896,7 @@ def process_tool_output(username: str, run_id: str, thread_id: str, tool_calls):
                 output_result["error_message"] = error_message
         tool_output["output"] = json.dumps(output_result)
         tool_outputs.append(tool_output)
-    run = client.beta.threads.runs.submit_tool_outputs(
+    client.beta.threads.runs.submit_tool_outputs(
         run_id=run_id, thread_id=thread_id, tool_outputs=tool_outputs
     )
 
@@ -835,10 +907,14 @@ def process_tool_output(username: str, run_id: str, thread_id: str, tool_calls):
 
 
 @app.route("/get-total-pages")
-def get_total_pages():
+def get_total_pages() -> str:
     if "username" not in session:
-        return None
-    image_directory = os.path.join(app.static_folder, "images", session["username"])
+        abort(404, description="Username not in session")
+    if not app.static_folder:
+        raise ValueError("Flask static folder not defined")
+    image_directory: str = os.path.join(
+        app.static_folder, "images", session["username"]
+    )
     images = sorted(
         [
             os.path.join("images", file)
@@ -851,10 +927,14 @@ def get_total_pages():
 
 
 @app.route("/get-images/<int:page>")
-def get_images(page):
+def get_images(page: int) -> str:
     if "username" not in session:
-        return None
-    image_directory = os.path.join(app.static_folder, "images", session["username"])
+        abort(404, description="Username not in session")
+    if not app.static_folder:
+        raise ValueError("Flask static folder not defined")
+    image_directory: str = os.path.join(
+        app.static_folder, "images", session["username"]
+    )
     images = sorted(
         [
             os.path.join("static/images/", session["username"], file)
@@ -865,7 +945,6 @@ def get_images(page):
     )
 
     total_images = len(images)
-    total_pages = (total_images + images_per_page - 1) // images_per_page
 
     # Calculate how many images are on the final page (which is displayed first)
     images_on_first_page = total_images % images_per_page or images_per_page
@@ -885,14 +964,16 @@ def get_images(page):
 
 
 @app.route("/get-image-metadata/<filename>")
-def get_image_metadata(filename):
+def get_image_metadata(filename: str):
     if "username" not in session:
-        return None
+        abort(404, description="Username not in session")
+    if not app.static_folder:
+        raise ValueError("Flask static folder not defined")
     image_path = os.path.join(
         app.static_folder, "images", session["username"], filename
     )
     image = Image.open(image_path)
-    image.load()
+    image.load()  # type: ignore
     # Extract metadata
     metadata = image.info
     if metadata:

@@ -1,4 +1,4 @@
-def remove_stop_words(input_string):
+def remove_stop_words(input_string: str) -> str:
     # List of stop words
     stop_words = set(
         [

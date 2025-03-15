@@ -1,0 +1,8 @@
+exclude = [".venv"]
+target-version = "py313"
+
+[lint.flake8-type-checking]
+strict = true
+
+[lint.flake8-unused-arguments]
+ignore-variadic-names = true
