@@ -3,7 +3,7 @@ import re
 import random
 
 def make_prompt_dynamic(prompt: str, username: str, static_folder: str, seed: int) -> str:
-    random.seed(seed)
+    dyanamicRandom = random.Random(seed)
     prompts = dict()
     dynamic_prompts_path = os.path.join(static_folder, "prompts", username)
     os.makedirs(dynamic_prompts_path, exist_ok=True)
@@ -21,7 +21,7 @@ def make_prompt_dynamic(prompt: str, username: str, static_folder: str, seed: in
         
         if content not in prompts:
             raise ValueError(f"Error: Could not find matching dynamic prompt file for keyword: {content}")
-        replaced_section = re.sub(r'__(.+?)__', replace_section, random.choice(prompts[content]))
+        replaced_section = re.sub(r'__(.+?)__', replace_section, dyanamicRandom.choice(prompts[content]))
         return replaced_section
     
     revised_prompt = re.sub(r'__(.+?)__', replace_section, prompt)
