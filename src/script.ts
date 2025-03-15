@@ -261,54 +261,76 @@ function openGenModal(evt: Event): void {
 }
 
 function openGridModal(evt: Event): void {
-    // Get the clicked image and its index
+    // Get the clicked image and determine its index
     const clickedImg = evt.currentTarget as HTMLImageElement;
     const indexAttr = clickedImg.getAttribute("data-index");
-    if (indexAttr) {
-        currentGridImageIndex = parseInt(indexAttr, 10);
-    } else {
-        currentGridImageIndex = 0;
-    }
+    currentGridImageIndex = indexAttr ? parseInt(indexAttr, 10) : 0;
     updateGridModalImage();
     $("#grid-image-modal").show();
 }
 
 function updateGridModalImage(): void {
-    // Get the list of grid images from the current grid DOM
+    // Get the list of grid images from the current grid DOM.
     const gridImages = $(".image-grid img");
     if (gridImages.length === 0) {
         console.warn("No grid images found.");
         return;
     }
-    // Wrap-around if needed
+    // Wrap-around logic.
     if (currentGridImageIndex < 0) {
         currentGridImageIndex = gridImages.length - 1;
     } else if (currentGridImageIndex >= gridImages.length) {
         currentGridImageIndex = 0;
     }
     const newImgElement = gridImages.get(currentGridImageIndex) as HTMLImageElement;
-
-    // The following logic re-uses your previous logic to convert thumbnail src to full image source.
     const filePath = newImgElement.src;
     const thumbFileName = filePath.split("/").pop();
     const pathDir = filePath.slice(0, -(thumbFileName?.length ?? 0));
     const fileName = thumbFileName?.slice(0, -".thumb.jpg".length).concat(".png");
+
+    // Update the modal image.
     (document.getElementById("grid-modal-image") as HTMLImageElement).src = pathDir + fileName;
 
-    // Optionally, you can update the metadata for the new image here
+    // Fetch and update the metadata.
     $.getJSON("/get-image-metadata/" + fileName, function (metadata) {
         const metadataDiv = document.getElementById("grid-info-panel") as HTMLElement;
         metadataDiv.innerHTML = ""; // Clear previous metadata
+
+        // Display each metadata key–value pair.
         for (const key in metadata) {
             const infoItem = document.createElement("div");
             infoItem.className = "info-item";
             infoItem.textContent = key + ":";
             metadataDiv.appendChild(infoItem);
+
             const infoValue = document.createElement("div");
             infoValue.className = "prompt-value";
             infoValue.textContent = metadata[key];
             metadataDiv.appendChild(infoValue);
         }
+
+        // Create (or update) the "Copy Prompt" button.
+        let copyPromptButton = document.getElementById("copy-prompt-btn") as HTMLButtonElement;
+        if (!copyPromptButton) {
+            copyPromptButton = document.createElement("button");
+            copyPromptButton.id = "copy-prompt-btn";
+            copyPromptButton.textContent = "Copy Prompt";
+            metadataDiv.appendChild(copyPromptButton);
+        }
+
+        // Add listener (or rebind) for the copy action.
+        copyPromptButton.onclick = () => {
+            console.log("Metadata received:", metadata);
+            const promptTextarea = document.getElementById("prompt") as HTMLTextAreaElement;
+            const negativePromptTextarea = document.getElementById("negative_prompt") as HTMLTextAreaElement;
+            // Try various key cases in case the keys are not lowercase.
+            const promptText = metadata["Prompt"];
+            const negativePromptText = metadata["Negative Prompt"] || "";
+            promptTextarea.value = promptText;
+            negativePromptTextarea.value = negativePromptText;
+            // Switch to the Generation tab.
+            document.getElementById("generationTab")?.click();
+        };
     });
 }
 

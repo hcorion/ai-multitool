@@ -432,4 +432,18 @@ button#send-chat:hover {
   right: 10px;
 }
 
+#copy-prompt-btn {
+  background-color: #0a84ff;
+  color: #fff;
+  border: none;
+  padding: 10px 20px;
+  font-size: 1rem;
+  cursor: pointer;
+  border-radius: 4px;
+  margin-top: 10px;
+}
+#copy-prompt-btn:hover {
+  background-color: #006edc;
+}
+
 /*# sourceMappingURL=style.css.map */

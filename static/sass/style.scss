@@ -476,3 +476,18 @@ button#send-chat {
 #grid-next {
     right: 10px;
 }
+
+#copy-prompt-btn {
+    background-color: $submit-btn-color;
+    color: $text-color;
+    border: none;
+    padding: 10px 20px;
+    font-size: 1rem;
+    cursor: pointer;
+    border-radius: 4px;
+    margin-top: 10px;
+
+    &:hover {
+        background-color: $submit-btn-hover-color;
+    }
+}
