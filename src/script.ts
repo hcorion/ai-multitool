@@ -320,7 +320,6 @@ function updateGridModalImage(): void {
 
         // Add listener (or rebind) for the copy action.
         copyPromptButton.onclick = () => {
-            console.log("Metadata received:", metadata);
             const promptTextarea = document.getElementById("prompt") as HTMLTextAreaElement;
             const negativePromptTextarea = document.getElementById("negative_prompt") as HTMLTextAreaElement;
             // Try various key cases in case the keys are not lowercase.
