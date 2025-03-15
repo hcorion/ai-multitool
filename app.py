@@ -728,8 +728,6 @@ def converse():
 
     if not app.static_folder:
         raise ValueError("Flask static folder not defined")
-    if not thread_id:
-        raise ValueError("thread_id was empty")
     user_file = os.path.join(app.static_folder, "chats", f"{session['username']}.json")
 
     # Load existing conversation or start a new one
@@ -741,6 +739,8 @@ def converse():
             chat: dict[Any, Any] = dict()
             file.write(json.dumps(chat))
     if request.method == "GET":
+        if not thread_id:
+            raise ValueError("thread_id was empty")
         return json.dumps(
             {"threadId": thread_id, "messages": get_message_list(thread_id)}
         )
