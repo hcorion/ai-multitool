@@ -441,7 +441,7 @@ def process_image_response(
         file_path = os.path.join(image_path, path)
         if file_path.endswith(".png") and os.path.isfile(file_path):
             file_count += 1
-    cleaned_prompt = before_prompt.strip().lower()
+    cleaned_prompt = after_prompt.strip().lower()
     cleaned_prompt = (
         utils.remove_stop_words(
             cleaned_prompt.replace(".", " ")

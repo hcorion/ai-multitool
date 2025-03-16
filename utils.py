@@ -172,6 +172,12 @@ def remove_stop_words(input_string: str) -> str:
             "realistic",
             "depict",
             "depiction",
+            "1girl",
+            "contrapposto",
+            "skindentation",
+            "artist",
+            "dynamic",
+            "pose"
         ]
     )
 
