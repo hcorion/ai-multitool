@@ -46,10 +46,19 @@ document.addEventListener("DOMContentLoaded", () => {
     addEventListenerToElement("grid-image-close", "click", closeGridModal);
     addEventListenerToElement("grid-prev", "click", previousGridImage);
     addEventListenerToElement("grid-next", "click", nextGridImage);
+    addEventListener("keydown", keyDownEvent);
     document.getElementById("generationTab").click();
     // Just refresh the image gen provider
     providerChanged();
 });
+function keyDownEvent(evt) {
+    if (evt.code == "ArrowRight") {
+        nextGridImage();
+    }
+    else if (evt.code == "ArrowLeft") {
+        previousGridImage();
+    }
+}
 // Function to add an event listener to an element
 function addEventListenerToElement(elementId, eventType, handler) {
     const element = document.getElementById(elementId);
@@ -256,9 +265,19 @@ function updateGridModalImage() {
     }
     // Wrap-around logic.
     if (currentGridImageIndex < 0) {
+        if (currentPage <= 1) {
+            currentGridImageIndex = 0;
+            return;
+        }
+        previousGrid();
         currentGridImageIndex = gridImages.length - 1;
     }
     else if (currentGridImageIndex >= gridImages.length) {
+        if (currentPage >= totalPages) {
+            currentGridImageIndex = gridImages.length - 1;
+            return;
+        }
+        nextGrid();
         currentGridImageIndex = 0;
     }
     const newImgElement = gridImages.get(currentGridImageIndex);
