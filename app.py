@@ -288,7 +288,7 @@ def generate_stability_image(
     upscale: bool = False,
 ) -> GeneratedImageData:
     if seed <= 0:
-        seed = random.getrandbits(64)
+        seed = random.getrandbits(32)
 
     if not app.static_folder:
         raise ValueError("Flask static folder not defined")
