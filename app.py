@@ -192,7 +192,7 @@ def generate_novelai_image(
             "legacy": False,
             "legacy_v3_extend": False,
             "n_samples": 1,
-            "noise": 0.2,
+            "noise": 0.2, # Does nothing if no base image
             "noise_schedule": "karras",
             "extra_noise_seed": 0,
             "params_version": 3,
@@ -201,7 +201,7 @@ def generate_novelai_image(
             "sampler": "k_dpmpp_2m_sde",
             "sm": False,
             "sm_dyn": False,
-            "steps": 28,
+            "steps": 28, # Max steps before Opus users have to pay money
             "strength": 0.7,
             "scale": 6,
             "ucPreset": 4,

@@ -88,6 +88,7 @@ function providerChanged() {
         $(".stabilityai").hide();
         $(".novelai").hide();
         $(".openai").show();
+        (document.getElementById("size") as HTMLSelectElement).selectedIndex = 0;
     } else if ((selection.value == "stabilityai")) {
         $(".openai").hide();
         $(".novelai").hide();
@@ -97,6 +98,8 @@ function providerChanged() {
         $(".openai").hide();
         $(".stabilityai").hide();
         $(".novelai").show();
+        // This is ugly, but index #3 is where the novelai size options start
+        (document.getElementById("size") as HTMLSelectElement).selectedIndex = 3;
         modelChanged(selection.value);
     } else {
         throw new Error(`Tried to switch to unsupported provider ${selection}`);
@@ -109,8 +112,8 @@ function modelButtonChanged() {
 }
 
 function modelChanged(provider: string) {
-    const selection = document.getElementById("model") as HTMLSelectElement;
     if (provider == "stabilityai") {
+        const selection = document.getElementById("model") as HTMLSelectElement;
         if (selection && !selection.hidden) {
             if (selection.value == "sd3-turbo") {
                 $(".negativeprompt").hide();
@@ -125,7 +128,7 @@ function modelChanged(provider: string) {
     } else if (provider == "openai") {
         $(".negativeprompt").hide();
     } else {
-        throw new Error(`modelChanged called with unsupported provider ${selection}`);
+        throw new Error(`modelChanged called with unsupported provider ${provider}`);
     }
 
 }
