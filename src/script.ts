@@ -603,7 +603,6 @@ showdown.extension("highlight", function () {
                     flags = "g";
                 var replacement = function (_wholeMatch: string, match: string, left: string, right: string) {
                     var lang = (left.match(/class=\"([^ \"]+)/) || [])[1];
-                    left = left.slice(0, 18) + "hljs " + left.slice(18);
                     if (lang) {
                         left = left.slice(0, 18) + "hljs " + left.slice(18);
                         if (hljs.getLanguage(lang)) {

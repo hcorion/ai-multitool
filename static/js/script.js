@@ -525,7 +525,6 @@ showdown.extension("highlight", function () {
                 var left = "<pre><code\\b[^>]*>", right = "</code></pre>", flags = "g";
                 var replacement = function (_wholeMatch, match, left, right) {
                     var lang = (left.match(/class=\"([^ \"]+)/) || [])[1];
-                    left = left.slice(0, 18) + "hljs " + left.slice(18);
                     if (lang) {
                         left = left.slice(0, 18) + "hljs " + left.slice(18);
                         if (hljs.getLanguage(lang)) {

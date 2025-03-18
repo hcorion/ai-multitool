@@ -3,7 +3,7 @@ import re
 import random
 
 def make_prompt_dynamic(prompt: str, username: str, static_folder: str, seed: int) -> str:
-    dyanamicRandom = random.Random(seed)
+    dynamicRandom = random.Random(seed)
     prompts: dict[str, list[str]] = dict()
     dynamic_prompts_path = os.path.join(static_folder, "prompts", username)
     os.makedirs(dynamic_prompts_path, exist_ok=True)
@@ -25,7 +25,7 @@ def make_prompt_dynamic(prompt: str, username: str, static_folder: str, seed: in
 
         if "-" in bracket_count:
             range = bracket_count.split('-')
-            bracket_count = dyanamicRandom.randrange(int(range[0]), int(range[1])+1)
+            bracket_count = dynamicRandom.randrange(int(range[0]), int(range[1])+1)
         
         left_brackets = bracket_left*int(bracket_count)
         right_brackets = bracket_right*int(bracket_count)
@@ -43,7 +43,7 @@ def make_prompt_dynamic(prompt: str, username: str, static_folder: str, seed: in
         
         if content not in prompts:
             raise ValueError(f"Error: Could not find matching dynamic prompt file for keyword: {content}")
-        replaced_section = re.sub(r'__(.+?)__', replace_dynamic_prompt_section, dyanamicRandom.choice(prompts[content]))
+        replaced_section = re.sub(r'__(.+?)__', replace_dynamic_prompt_section, dynamicRandom.choice(prompts[content]))
         replaced_section = re.sub(r'{(.+?):(\d+-?\d*)}', replace_brackets_section_positive, replaced_section)
         replaced_section = re.sub(r'\[(.+?):(\d+-?\d*)\]', replace_brackets_section_negative, replaced_section)
         return replaced_section

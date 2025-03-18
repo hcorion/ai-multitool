@@ -1,3 +1,3 @@
 export function unescapeHTML(escapedHTML) {
-    return escapedHTML.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+    return escapedHTML.replace(/&lt;/g, "&lt").replace(/&gt;/g, "&gt").replace(/&amp;/g, "&");
 }
