@@ -66,6 +66,9 @@ def login():
         return redirect(url_for("index"))
     return render_template("login.html")
 
+@app.route("/share")
+def share():
+    return render_template("share.html")
 
 @app.route("/logout")
 def logout():

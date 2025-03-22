@@ -1,4 +1,5 @@
 import * as utils from "./utils.js";
+import * as chat from "./chat.js";
 
 document.addEventListener("DOMContentLoaded", () => {
     $("#loading-spinner").hide();
@@ -427,36 +428,12 @@ function onConversationSelected(this: HTMLDivElement, ev: MouseEvent) {
     console.log(`conversation: ${conversationId}`);
     const chatInput = document.getElementById("chat-input") as HTMLTextAreaElement;
 
-    $.ajax({
-        type: "GET",
-        url: "/chat?thread_id=" + encodeURIComponent(conversationId),
-        contentType: "application/json",
-        scriptCharset: "utf-8",
-        success: (response: string) => {
-            let chatData: MessageHistory = JSON.parse(response);
-            chatInput.value = ""; // Clear input field
-            refreshChatMessages(chatData.messages);
-            currentThreadId = chatData.threadId;
-        },
-        error: (error) => {
-            console.error("Error:", error);
-        },
-    });
+    chat.onConversationSelected(conversationId, (chatData: chat.MessageHistory) => {
+        chatInput.value = ""; // Clear input field
+        chat.refreshChatMessages(chatData.messages);
+        currentThreadId = chatData.threadId;
+    })
 }
-
-type ChatMessage = {
-    role: string;
-    text: string;
-};
-type MessageHistory = {
-    type: string;
-    text: string;
-    delta: string;
-    snapshot: string;
-    threadId: string;
-    status: string;
-    messages: ChatMessage[];
-};
 
 async function fetchWithStreaming(url: string, data: any, processChunk: (chunkData: any) => void) {
     try {
@@ -507,7 +484,7 @@ let prettyStatuses: { [key: string]: string } = {
     requires_action: "processing action...",
 };
 
-var cachedMessageList: ChatMessage[];
+var cachedMessageList: chat.ChatMessage[];
 var progressNum = 0;
 
 function sendChatMessage(): void {
@@ -525,7 +502,15 @@ function sendChatMessage(): void {
     const sendChatButton = document.getElementById("send-chat") as HTMLInputElement;
     const chatStatusText = document.getElementById("chat-current-status") as HTMLDivElement;
     const userMessage = chatInput.value.trim();
-    if (!userMessage) return;
+    if (!userMessage) {
+        // If now user message, then copy the url for sharing
+        if (currentThreadId) {
+            const shareUrl = `${document.baseURI}/share?id=${currentThreadId}`;
+            utils.copyToClipboard(shareUrl);
+            console.log(shareUrl);
+        }
+        return;
+    }
 
     // Send the message to the server
     sendChatButton.disabled = true;
@@ -540,14 +525,14 @@ function sendChatMessage(): void {
             console.log("succeess");
             var parsedData = JSON.parse(chunkData);
             // Weird hack to prevent "too stringified" json blobs getting converted to just strings.
-            let chatData: MessageHistory = typeof parsedData === "string" ? JSON.parse(parsedData) : parsedData;
+            let chatData: chat.MessageHistory = typeof parsedData === "string" ? JSON.parse(parsedData) : parsedData;
 
             if (chatData.type == "message_list") {
                 chatStatusText.textContent = "In queue...";
                 currentThreadId = chatData.threadId;
                 cachedMessageList = chatData.messages;
                 chatInput.value = ""; // Clear input field
-                refreshChatMessages(cachedMessageList);
+                chat.refreshChatMessages(cachedMessageList);
                 // Just populate it with dummy data so that we have data in case the refresh takes too long
                 let currentTimeEpoch = new Date(Date.now()).getUTCSeconds();
                 allConversations[chatData.threadId] = {
@@ -561,7 +546,7 @@ function sendChatMessage(): void {
                     last_update: currentTimeEpoch,
                 };
             } else if (chatData.type == "text_created") {
-                cachedMessageList.push({ role: "assistant", text: "" } as ChatMessage);
+                cachedMessageList.push({ role: "assistant", text: "" } as chat.ChatMessage);
                 chatStatusText.textContent = "In progress...";
             } else if (chatData.type == "text_delta") {
                 cachedMessageList[cachedMessageList.length - 1].text += chatData.delta;
@@ -593,35 +578,7 @@ function sendChatMessage(): void {
     );
 }
 
-showdown.extension("highlight", function () {
-    return [
-        {
-            type: "output",
-            filter: function (text, converter, options) {
-                var left = "<pre><code\\b[^>]*>",
-                    right = "</code></pre>",
-                    flags = "g";
-                var replacement = function (_wholeMatch: string, match: string, left: string, right: string) {
-                    var lang = (left.match(/class=\"([^ \"]+)/) || [])[1];
-                    if (lang) {
-                        left = left.slice(0, 18) + "hljs " + left.slice(18);
-                        if (hljs.getLanguage(lang)) {
-                            return left + hljs.highlight(lang, utils.unescapeHTML(match)).value + right;
-                        } else {
-                            return left + hljs.highlightAuto(utils.unescapeHTML(match)).value + right;
-                        }
-                    } else {
-                        left = left.slice(0, 10) + ' class="hljs" ' + left.slice(10);
-                        return left + hljs.highlightAuto(utils.unescapeHTML(match)).value + right;
-                    }
-                };
-                return showdown.helper.replaceRecursiveRegExp(text, replacement, left, right, flags);
-            },
-        },
-    ];
-});
-
-function updateMostRecentChatMessage(messages: ChatMessage[]): void {
+function updateMostRecentChatMessage(messages: chat.ChatMessage[]): void {
     const chatHistory = document.getElementById("chat-history") as HTMLDivElement;
     var message = messages[messages.length - 1];
     var converter = new showdown.Converter({
@@ -641,25 +598,5 @@ function updateMostRecentChatMessage(messages: ChatMessage[]): void {
         var lastChildDiv = chatHistory.lastChild as HTMLDivElement;
         lastChildDiv.innerHTML = utils.unescapeHTML(html);
     }
-    chatHistory.scrollTop = chatHistory.scrollHeight; // Scroll to bottom
-}
-
-function refreshChatMessages(messages: ChatMessage[]): void {
-    const chatHistory = document.getElementById("chat-history") as HTMLDivElement;
-    chatHistory.innerHTML = "";
-    // Display AI response in chat history
-    messages.forEach((message) => {
-        console.log(message.text);
-        var converter = new showdown.Converter({
-            strikethrough: true,
-            smoothLivePreview: true,
-            tasklists: true,
-            extensions: ["highlight"],
-        }),
-            text = message.text,
-            html = converter.makeHtml(text);
-        console.log(html);
-        chatHistory.innerHTML += `<div class="ai-message">${utils.unescapeHTML(html)}</div>`;
-    });
     chatHistory.scrollTop = chatHistory.scrollHeight; // Scroll to bottom
 }

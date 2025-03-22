@@ -1,13 +1,5 @@
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 import * as utils from "./utils.js";
+import * as chat from "./chat.js";
 document.addEventListener("DOMContentLoaded", () => {
     $("#loading-spinner").hide();
     $("#prompt-form").on("submit", (event) => {
@@ -256,7 +248,6 @@ function openGridModal(evt) {
     $("#grid-image-modal").show();
 }
 function updateGridModalImage() {
-    var _a;
     // Get the list of grid images from the current grid DOM.
     const gridImages = $(".image-grid img");
     if (gridImages.length === 0) {
@@ -283,8 +274,8 @@ function updateGridModalImage() {
     const newImgElement = gridImages.get(currentGridImageIndex);
     const filePath = newImgElement.src;
     const thumbFileName = filePath.split("/").pop();
-    const pathDir = filePath.slice(0, -((_a = thumbFileName === null || thumbFileName === void 0 ? void 0 : thumbFileName.length) !== null && _a !== void 0 ? _a : 0));
-    const fileName = thumbFileName === null || thumbFileName === void 0 ? void 0 : thumbFileName.slice(0, -".thumb.jpg".length).concat(".png");
+    const pathDir = filePath.slice(0, -(thumbFileName?.length ?? 0));
+    const fileName = thumbFileName?.slice(0, -".thumb.jpg".length).concat(".png");
     // Update the modal image.
     document.getElementById("grid-modal-image").src = pathDir + fileName;
     // Fetch and update the metadata.
@@ -312,7 +303,6 @@ function updateGridModalImage() {
         }
         // Add listener (or rebind) for the copy action.
         copyPromptButton.onclick = () => {
-            var _a;
             const promptTextarea = document.getElementById("prompt");
             const negativePromptTextarea = document.getElementById("negative_prompt");
             // Try various key cases in case the keys are not lowercase.
@@ -321,7 +311,7 @@ function updateGridModalImage() {
             promptTextarea.value = promptText;
             negativePromptTextarea.value = negativePromptText;
             // Switch to the Generation tab.
-            (_a = document.getElementById("generationTab")) === null || _a === void 0 ? void 0 : _a.click();
+            document.getElementById("generationTab")?.click();
         };
     });
 }
@@ -370,64 +360,52 @@ function onConversationSelected(ev) {
     let conversationId = this.getAttribute("data-conversation-id");
     console.log(`conversation: ${conversationId}`);
     const chatInput = document.getElementById("chat-input");
-    $.ajax({
-        type: "GET",
-        url: "/chat?thread_id=" + encodeURIComponent(conversationId),
-        contentType: "application/json",
-        scriptCharset: "utf-8",
-        success: (response) => {
-            let chatData = JSON.parse(response);
-            chatInput.value = ""; // Clear input field
-            refreshChatMessages(chatData.messages);
-            currentThreadId = chatData.threadId;
-        },
-        error: (error) => {
-            console.error("Error:", error);
-        },
+    chat.onConversationSelected(conversationId, (chatData) => {
+        chatInput.value = ""; // Clear input field
+        chat.refreshChatMessages(chatData.messages);
+        currentThreadId = chatData.threadId;
     });
 }
-function fetchWithStreaming(url, data, processChunk) {
-    return __awaiter(this, void 0, void 0, function* () {
-        try {
-            const response = yield fetch(url, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify(data),
-            });
-            if (response.body) {
-                const reader = response.body.getReader();
-                const decoder = new TextDecoder();
-                let resultString = "";
-                while (true) {
-                    const { value, done } = yield reader.read();
-                    if (done)
-                        break;
-                    const chunk = decoder.decode(value, { stream: true });
-                    resultString += chunk;
-                    const parts = resultString.split("␆␄");
-                    resultString = parts.pop(); // Handle the rest in the next iteration.
-                    parts.forEach((part) => {
-                        if (part) {
-                            try {
-                                processChunk(part);
-                            }
-                            catch (e) {
-                                console.error("Error parsing JSON chunk:", e);
-                            }
+async function fetchWithStreaming(url, data, processChunk) {
+    try {
+        const response = await fetch(url, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify(data),
+        });
+        if (response.body) {
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let resultString = "";
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done)
+                    break;
+                const chunk = decoder.decode(value, { stream: true });
+                resultString += chunk;
+                const parts = resultString.split("␆␄");
+                resultString = parts.pop(); // Handle the rest in the next iteration.
+                parts.forEach((part) => {
+                    if (part) {
+                        try {
+                            processChunk(part);
                         }
-                    });
-                }
-            }
-            else {
-                console.log("Response body is not readable");
+                        catch (e) {
+                            console.error("Error parsing JSON chunk:", e);
+                        }
+                    }
+                });
             }
         }
-        catch (error) {
-            console.error("Fetch error:", error);
+        else {
+            console.log("Response body is not readable");
         }
-    });
+    }
+    catch (error) {
+        console.error("Fetch error:", error);
+    }
 }
 // "queued", "in_progress", "requires_action", "cancelling", "cancelled", "failed", "completed", "expired"
 let prettyStatuses = {
@@ -452,8 +430,15 @@ function sendChatMessage() {
     const sendChatButton = document.getElementById("send-chat");
     const chatStatusText = document.getElementById("chat-current-status");
     const userMessage = chatInput.value.trim();
-    if (!userMessage)
+    if (!userMessage) {
+        // If now user message, then copy the url for sharing
+        if (currentThreadId) {
+            const shareUrl = `${document.baseURI}/share?id=${currentThreadId}`;
+            utils.copyToClipboard(shareUrl);
+            console.log(shareUrl);
+        }
         return;
+    }
     // Send the message to the server
     sendChatButton.disabled = true;
     fetchWithStreaming("/chat", {
@@ -470,7 +455,7 @@ function sendChatMessage() {
             currentThreadId = chatData.threadId;
             cachedMessageList = chatData.messages;
             chatInput.value = ""; // Clear input field
-            refreshChatMessages(cachedMessageList);
+            chat.refreshChatMessages(cachedMessageList);
             // Just populate it with dummy data so that we have data in case the refresh takes too long
             let currentTimeEpoch = new Date(Date.now()).getUTCSeconds();
             allConversations[chatData.threadId] = {
@@ -517,33 +502,6 @@ function sendChatMessage() {
         // TODO: Hook up the tool-based outputs
     });
 }
-showdown.extension("highlight", function () {
-    return [
-        {
-            type: "output",
-            filter: function (text, converter, options) {
-                var left = "<pre><code\\b[^>]*>", right = "</code></pre>", flags = "g";
-                var replacement = function (_wholeMatch, match, left, right) {
-                    var lang = (left.match(/class=\"([^ \"]+)/) || [])[1];
-                    if (lang) {
-                        left = left.slice(0, 18) + "hljs " + left.slice(18);
-                        if (hljs.getLanguage(lang)) {
-                            return left + hljs.highlight(lang, utils.unescapeHTML(match)).value + right;
-                        }
-                        else {
-                            return left + hljs.highlightAuto(utils.unescapeHTML(match)).value + right;
-                        }
-                    }
-                    else {
-                        left = left.slice(0, 10) + ' class="hljs" ' + left.slice(10);
-                        return left + hljs.highlightAuto(utils.unescapeHTML(match)).value + right;
-                    }
-                };
-                return showdown.helper.replaceRecursiveRegExp(text, replacement, left, right, flags);
-            },
-        },
-    ];
-});
 function updateMostRecentChatMessage(messages) {
     const chatHistory = document.getElementById("chat-history");
     var message = messages[messages.length - 1];
@@ -563,22 +521,5 @@ function updateMostRecentChatMessage(messages) {
         var lastChildDiv = chatHistory.lastChild;
         lastChildDiv.innerHTML = utils.unescapeHTML(html);
     }
-    chatHistory.scrollTop = chatHistory.scrollHeight; // Scroll to bottom
-}
-function refreshChatMessages(messages) {
-    const chatHistory = document.getElementById("chat-history");
-    chatHistory.innerHTML = "";
-    // Display AI response in chat history
-    messages.forEach((message) => {
-        console.log(message.text);
-        var converter = new showdown.Converter({
-            strikethrough: true,
-            smoothLivePreview: true,
-            tasklists: true,
-            extensions: ["highlight"],
-        }), text = message.text, html = converter.makeHtml(text);
-        console.log(html);
-        chatHistory.innerHTML += `<div class="ai-message">${utils.unescapeHTML(html)}</div>`;
-    });
     chatHistory.scrollTop = chatHistory.scrollHeight; // Scroll to bottom
 }

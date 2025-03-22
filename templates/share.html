@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <script src="{{ url_for('static', filename='js/jquery.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/showdown.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/highlight.min.js') }}"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/atom-one-dark-reasonable.min.css') }}">
+    <link rel="shortcut icon" href="{{ url_for('static', filename='assets/favicon.ico') }}">
+    <script type="module" src="{{ url_for('static', filename='js/chat.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/share.js') }}"></script>
+    <title>AI Multi-tool</title>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-content">
+            <div id="chat-history"><!-- Populated in TypeScript at runtime --></div>
+        </div>
+    </div>
+</body>
