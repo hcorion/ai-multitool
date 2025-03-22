@@ -68,6 +68,8 @@ def login():
 
 @app.route("/share")
 def share():
+    if "username" not in session:
+        return redirect(url_for("login"))
     return render_template("share.html")
 
 @app.route("/logout")
