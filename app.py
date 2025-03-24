@@ -1,5 +1,7 @@
+import base64
 import io
 import json
+import math
 import os
 import random
 import re
@@ -66,11 +68,13 @@ def login():
         return redirect(url_for("index"))
     return render_template("login.html")
 
+
 @app.route("/share")
 def share():
     if "username" not in session:
         return redirect(url_for("login"))
     return render_template("share.html")
+
 
 @app.route("/logout")
 def logout():
@@ -168,6 +172,57 @@ def upscale_stability_creative(
         raise Exception(error_message)
 
 
+def upscale_novelai(
+    lowres_response_bytes: io.BytesIO,
+    starting_width: int,
+    starting_height: int,
+    novelai_headers: Mapping[str, str | bytes | None],
+) -> io.BytesIO:
+    # 640x640 images cost 0 Anlas with Opus, so resize down to that res before sending it to upscale
+    max_resolution = 640 * 640
+    if starting_width * starting_height > max_resolution:
+        resized_image = Image.open(lowres_response_bytes)
+        resized_width = int(
+            math.floor(math.sqrt(max_resolution * (starting_width / starting_height)))
+        )
+        resized_height = int(
+            math.floor(math.sqrt(max_resolution * (starting_height / starting_width)))
+        )
+
+        resized_image.thumbnail(
+            (resized_width, resized_height), Image.Resampling.LANCZOS
+        )
+        image_bytes = io.BytesIO()
+        resized_image.save(image_bytes, format="PNG")
+    else:
+        image_bytes = lowres_response_bytes
+        resized_height = starting_height
+        resized_width = starting_width
+
+    data: dict[str, int | str] = {
+        "scale": 4,
+        "width": resized_width,
+        "height": resized_height,
+        "image": base64.b64encode(image_bytes.getbuffer()).decode("ascii"),
+    }
+    # print(json.dumps(data))
+    upscale_response = requests.post(
+        "https://api.novelai.net/ai/upscale",
+        headers=novelai_headers,
+        json=data,
+    )
+    if upscale_response.status_code == 200:
+        zipped_file = zipfile.ZipFile(io.BytesIO(upscale_response.content))
+        file_bytes = io.BytesIO(zipped_file.read(zipped_file.infolist()[0]))
+        return file_bytes
+    else:
+        body = upscale_response.json()
+        error_message = (
+            f"NovelAI Upscale {upscale_response.status_code}: {body['message']}"
+        )
+        raise Exception(error_message)
+
+
 def generate_novelai_image(
     prompt: str,
     negative_prompt: str | None,
@@ -184,6 +239,9 @@ def generate_novelai_image(
 
     revised_prompt = make_prompt_dynamic(prompt, username, app.static_folder, seed)
 
+    width = size[0]
+    height = size[1]
+
     data = {  # type: ignore
         "action": "generate",
         "model": "nai-diffusion-4-full",
@@ -192,12 +250,12 @@ def generate_novelai_image(
             "cfg_rescale": 0,
             "deliberate_euler_ancestral_bug": False,
             "dynamic_thresholding": True,
-            "width": size[0],
-            "height": size[1],
+            "width": width,
+            "height": height,
             "legacy": False,
             "legacy_v3_extend": False,
             "n_samples": 1,
-            "noise": 0.2, # Does nothing if no base image
+            "noise": 0.2,  # Does nothing if no base image
             "noise_schedule": "karras",
             "extra_noise_seed": 0,
             "params_version": 3,
@@ -206,7 +264,7 @@ def generate_novelai_image(
             "sampler": "k_dpmpp_2m_sde",
             "sm": False,
             "sm_dyn": False,
-            "steps": 28, # Max steps before Opus users have to pay money
+            "steps": 28,  # Max steps before Opus users have to pay money
             "strength": 0.7,
             "scale": 6,
             "ucPreset": 4,
@@ -258,13 +316,8 @@ def generate_novelai_image(
         file_bytes = io.BytesIO(zipped_file.read(zipped_file.infolist()[0]))
 
         if upscale:
-            stability_headers = {
-                "authorization": f"Bearer {stability_api_key}",
-                "accept": "image/*",
-                "stability-client-id": "ai-toolkit",
-                "stability-client-user-id": username,
-            }
-            response = upscale_stability_creative(file_bytes, prompt, stability_headers)
+            file_bytes = upscale_novelai(file_bytes, width, height, novelai_headers)
+
         saved_data = process_image_response(
             file_bytes, prompt, revised_prompt, username, image_metadata
         )
@@ -472,7 +525,7 @@ def process_image_response(
     thumb_image = image.copy()
     aspect_ratio = image.height / image.width
     new_height = int(256 * aspect_ratio)
-    thumb_image.thumbnail((256, new_height))
+    thumb_image.thumbnail((256, new_height), Image.Resampling.LANCZOS)
     thumb_image = thumb_image.convert("RGB")
 
     # Create metadata
