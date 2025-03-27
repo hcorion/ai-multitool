@@ -30,6 +30,10 @@ def make_prompt_dynamic(prompt: str, username: str, static_folder: str, seed: in
         left_brackets = bracket_left*int(bracket_count)
         right_brackets = bracket_right*int(bracket_count)
 
+        if "|" in content:
+            rand_options = content.split('|')
+            content = dynamicRandom.choice(rand_options)
+
         replaced_section = f"{left_brackets}{content}{right_brackets}"
         return replaced_section
     
