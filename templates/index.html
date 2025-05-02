@@ -21,15 +21,15 @@
         <button id="chatTab" class="tablinks">Chat</button>
 
         {% if 'username' in session %}
-            <div class="user-info">
-                <p>Logged in as: {{ session['username'] }} <a href="{{ url_for('logout') }}">Logout</a></p>
-            </div>
+        <div class="user-info">
+            <p>Logged in as: {{ session['username'] }} <a href="{{ url_for('logout') }}">Logout</a></p>
+        </div>
         {% endif %}
     </div>
-    
+
     <div id="Generation" class="tabcontent">
         <form id="prompt-form">
-            <label for="provider" >Select Provider:</label>
+            <label for="provider">Select Provider:</label>
             <select name="provider" id="provider">
                 <option value="openai">OpenAI (DALL-E 3)</option>
                 <option value="stabilityai">Stability AI (Stable Diffusion 3)</option>
@@ -60,15 +60,16 @@
                 <option value="9:16">9:16 (Portrait)</option>
                 <option value="9:21">9:21 (Portrait)</option>
             </select><br class="stabilityai"><br class="stabilityai">
-    
+
             <label for="quality" class="openai">Select Quality:</label>
             <select name="quality" id="quality" class="openai">
                 <option value="standard">standard</option>
                 <option value="hd">HD</option>
             </select><br class="openai"><br class="openai">
-    
+
             <label for="style" class="openai">Select Style:</label>
-            <div id="styleDescription" style="font-size: medium;" class="openai">(Vivid causes the model to lean towards generating hyper-real and dramatic images.)</div>
+            <div id="styleDescription" style="font-size: medium;" class="openai">(Vivid causes the model to lean towards
+                generating hyper-real and dramatic images.)</div>
             <select name="style" id="style" class="openai">
                 <option value="vivid">Vivid</option>
                 <option value="natural">Natural</option>
@@ -76,28 +77,46 @@
             <br class="openai"><br class="openai">
 
             <label for="seed" class="stabilityai">Select Seed (0 means random):</label>
-            <input name="seed" id="seed" type="number" value="0" min="0" max="18446744073709551615" step="1" class="stabilityai novelai"/>
+            <input name="seed" id="seed" type="number" value="0" min="0" max="18446744073709551615" step="1"
+                class="stabilityai novelai" />
             <div class="prompt-checkbox-group stabilityai novelai">
                 <input type="checkbox" id="upscale" class="prompt-checkbox stabilityai novelai" name="upscale">
                 <label class="prompt-checkbox-label stabilityai novelai" for="upscale" id="upscale">Upscale</label>
             </div>
             <br class="stabilityai"><br class="stabilityai novelai">
-
+            <!-- Advanced Options Block -->
+            <div class="advanced-options">
+                <div class="advanced-header" id="advanced-toggle">
+                <span>Show Advanced Options ⮟</span>
+                </div>
+                <div id="advanced-dropdown" class="advanced-dropdown" style="display: none;">
+                <div class="advanced-input-group">
+                    <input type="checkbox" id="advanced-generate-grid" name="advanced-generate-grid">
+                    <label for="advanced-generate-grid">Generate Grid</label>
+                    <div class="advanced-input-container" style="display: none;">
+                    <input type="text" id="grid-prompt-file" name="grid-prompt-file" placeholder="file_name" disabled>
+                    </div>
+                </div>
+                </div>
+            </div>
             <!-- TODO: Need to fix, the Stability AI max length is 10,000 characters, not 4000 -->
             <div>Enter Prompt:</div>
             <textarea name="prompt" id="prompt" maxlength="4000" rows="8" cols="50" spellcheck="true"></textarea>
             <div id="charCount">0 / 4000</div>
             <div class="stabilityai novelai">Enter Negative Prompt:</div>
-            <textarea name="negative_prompt" id="negative_prompt" class="stabilityai novelai negativeprompt" maxlength="4000" rows="8" cols="50" spellcheck="true"></textarea>
+            <textarea name="negative_prompt" id="negative_prompt" class="stabilityai novelai negativeprompt"
+                maxlength="4000" rows="8" cols="50" spellcheck="true"></textarea>
             <div class="prompt-checkbox-group openai">
                 <input type="checkbox" id="add-follow-prompt" class="prompt-checkbox openai" name="add-follow-prompt">
-                <label class="prompt-checkbox-label openai" for="add-follow-prompt" id="add-follow-prompt">Strictly follow prompt</label>
+                <label class="prompt-checkbox-label openai" for="add-follow-prompt" id="add-follow-prompt">Strictly
+                    follow prompt</label>
             </div>
             <br><br>
             <input class="submit-button" type="submit" value="Generate Image">
-            <img id="loading-spinner" width="80" height="80" src="{{ url_for('static', filename='assets/Chunk-4s-200px.png') }}">
+            <img id="loading-spinner" width="80" height="80"
+                src="{{ url_for('static', filename='assets/Chunk-4s-200px.png') }}">
         </form>
-    
+
         <!--Filled in at runtime see result-section.html template-->
         <div id="result-section"></div>
     </div>
@@ -138,7 +157,8 @@
             </div>
         </div>
     </div>
-    <a href="https://loading.io/icon/" target="_blank" rel="noopener noreferrer">Loading icon 'chunk' from loading.io</a>
+    <a href="https://loading.io/icon/" target="_blank" rel="noopener noreferrer">Loading icon 'chunk' from
+        loading.io</a>
 </body>
 
 </html>

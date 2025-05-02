@@ -48,6 +48,8 @@ document.addEventListener("DOMContentLoaded", () => {
     addEventListenerToElement("grid-image-close", "click", closeGridModal);
     addEventListenerToElement("grid-prev", "click", previousGridImage);
     addEventListenerToElement("grid-next", "click", nextGridImage);
+    addEventListenerToElement("advanced-toggle", "click", toggleShowAdvanced);
+    addEventListenerToElement("advanced-generate-grid", "change", toggleAdvancedInput);
 
     addEventListener("keydown", keyDownEvent);
 
@@ -310,6 +312,7 @@ function updateGridModalImage(): void {
     const filePath = newImgElement.src;
     const thumbFileName = filePath.split("/").pop();
     const pathDir = filePath.slice(0, -(thumbFileName?.length ?? 0));
+    // This works with .thumb.png as well since we just trim the length regardless of the contents
     const fileName = thumbFileName?.slice(0, -".thumb.jpg".length).concat(".png");
 
     // Update the modal image.
@@ -373,6 +376,40 @@ function closeGridModal(): void {
 
 function closeGenModal(): void {
     document.getElementById("image-modal")!.style.display = "none";
+}
+
+function toggleShowAdvanced(event: Event): void {
+    console.log("show advanced")
+    const advancedDropdown = document.getElementById("advanced-dropdown") as HTMLElement;
+    // Toggle visibility based on current state.
+    if (advancedDropdown.style.display === "none") {
+      advancedDropdown.style.display = "block";
+    } else {
+      advancedDropdown.style.display = "none";
+      // Also reset the custom input toggle and hide its container when closing.
+      const inputToggle = document.getElementById("advanced-generate-grid") as HTMLInputElement;
+      if (inputToggle) {
+        inputToggle.checked = false;
+      }
+      const inputContainer = document.querySelector(".advanced-input-container") as HTMLElement;
+      if (inputContainer) {
+        inputContainer.style.display = "none";
+      }
+    }
+}
+
+function toggleAdvancedInput(event: Event): void {
+    const inputToggle = event.target as HTMLInputElement;
+    const inputContainer = document.querySelector(".advanced-input-container") as HTMLElement;
+    const advancedOption = document.getElementById("grid-prompt-file") as HTMLInputElement;
+  
+    if (inputToggle.checked) {
+      inputContainer.style.display = "block";
+      advancedOption.disabled = false;
+    } else {
+      inputContainer.style.display = "none";
+      advancedOption.disabled = true;
+    }
 }
 
 //////////////////////

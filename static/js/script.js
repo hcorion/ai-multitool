@@ -38,6 +38,8 @@ document.addEventListener("DOMContentLoaded", () => {
     addEventListenerToElement("grid-image-close", "click", closeGridModal);
     addEventListenerToElement("grid-prev", "click", previousGridImage);
     addEventListenerToElement("grid-next", "click", nextGridImage);
+    addEventListenerToElement("advanced-toggle", "click", toggleShowAdvanced);
+    addEventListenerToElement("advanced-generate-grid", "change", toggleAdvancedInput);
     addEventListener("keydown", keyDownEvent);
     document.getElementById("generationTab").click();
     // Just refresh the image gen provider
@@ -275,6 +277,7 @@ function updateGridModalImage() {
     const filePath = newImgElement.src;
     const thumbFileName = filePath.split("/").pop();
     const pathDir = filePath.slice(0, -(thumbFileName?.length ?? 0));
+    // This works with .thumb.png as well since we just trim the length regardless of the contents
     const fileName = thumbFileName?.slice(0, -".thumb.jpg".length).concat(".png");
     // Update the modal image.
     document.getElementById("grid-modal-image").src = pathDir + fileName;
@@ -328,6 +331,39 @@ function closeGridModal() {
 }
 function closeGenModal() {
     document.getElementById("image-modal").style.display = "none";
+}
+function toggleShowAdvanced(event) {
+    console.log("show advanced");
+    const advancedDropdown = document.getElementById("advanced-dropdown");
+    // Toggle visibility based on current state.
+    if (advancedDropdown.style.display === "none") {
+        advancedDropdown.style.display = "block";
+    }
+    else {
+        advancedDropdown.style.display = "none";
+        // Also reset the custom input toggle and hide its container when closing.
+        const inputToggle = document.getElementById("advanced-generate-grid");
+        if (inputToggle) {
+            inputToggle.checked = false;
+        }
+        const inputContainer = document.querySelector(".advanced-input-container");
+        if (inputContainer) {
+            inputContainer.style.display = "none";
+        }
+    }
+}
+function toggleAdvancedInput(event) {
+    const inputToggle = event.target;
+    const inputContainer = document.querySelector(".advanced-input-container");
+    const advancedOption = document.getElementById("grid-prompt-file");
+    if (inputToggle.checked) {
+        inputContainer.style.display = "block";
+        advancedOption.disabled = false;
+    }
+    else {
+        inputContainer.style.display = "none";
+        advancedOption.disabled = true;
+    }
 }
 let allConversations = {};
 var currentThreadId = "";

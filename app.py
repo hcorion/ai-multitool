@@ -1,4 +1,5 @@
 import base64
+from importlib import metadata
 import io
 import json
 import math
@@ -13,12 +14,13 @@ import time
 import zipfile
 from collections import deque
 from queue import Queue
-from typing import Any, AnyStr, Generator, Mapping
+from typing import Any, AnyStr, Dict, Generator, Mapping
 
 import openai
 import requests
 from flask import (
     Flask,
+    Request,
     Response,
     abort,
     jsonify,
@@ -34,11 +36,18 @@ from openai.types.beta.threads import Text, TextContentBlock, TextDelta
 from openai.types.beta.threads.run_submit_tool_outputs_params import ToolOutput
 from openai.types.beta.threads.runs import FunctionToolCall, ToolCall, ToolCallDelta
 from openai.types.shared.metadata import Metadata
-from PIL import Image
+from PIL import Image as PILImage
 from PIL.PngImagePlugin import PngInfo
+import wand
+import wand.font
+from wand.image import Image as WandImage
 
 import utils
-from dynamic_prompts import make_prompt_dynamic
+from dynamic_prompts import (
+    GridDynamicPromptInfo,
+    get_prompts_for_name,
+    make_prompt_dynamic,
+)
 
 app = Flask(__name__)
 
@@ -130,7 +139,7 @@ def upscale_stability_creative(
     prompt: str,
     stability_headers: Mapping[str, str | bytes | None],
 ) -> requests.Response:
-    lowres_image = Image.open(lowres_response_bytes)
+    lowres_image = PILImage.open(lowres_response_bytes)
     with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp_file:
         lowres_image.save(tmp_file.name, "PNG")
 
@@ -181,7 +190,7 @@ def upscale_novelai(
     # 640x640 images cost 0 Anlas with Opus, so resize down to that res before sending it to upscale
     max_resolution = 640 * 640
     if starting_width * starting_height > max_resolution:
-        resized_image = Image.open(lowres_response_bytes)
+        resized_image = PILImage.open(lowres_response_bytes)
         resized_width = int(
             math.floor(math.sqrt(max_resolution * (starting_width / starting_height)))
         )
@@ -190,7 +199,7 @@ def upscale_novelai(
         )
 
         resized_image.thumbnail(
-            (resized_width, resized_height), Image.Resampling.LANCZOS
+            (resized_width, resized_height), PILImage.Resampling.LANCZOS
         )
         image_bytes = io.BytesIO()
         resized_image.save(image_bytes, format="PNG")
@@ -230,14 +239,14 @@ def generate_novelai_image(
     size: tuple[int, int],
     seed: int = 0,
     upscale: bool = False,
+    grid_dynamic_prompt: GridDynamicPromptInfo | None = None,
 ) -> GeneratedImageData:
-    if seed <= 0:
-        seed = random.getrandbits(64)
-
     if not app.static_folder:
         raise ValueError("Flask static folder not defined")
 
-    revised_prompt = make_prompt_dynamic(prompt, username, app.static_folder, seed)
+    revised_prompt = make_prompt_dynamic(
+        prompt, username, app.static_folder, seed, grid_dynamic_prompt
+    )
 
     width = size[0]
     height = size[1]
@@ -345,9 +354,6 @@ def generate_stability_image(
     seed: int = 0,
     upscale: bool = False,
 ) -> GeneratedImageData:
-    if seed <= 0:
-        seed = random.getrandbits(32)
-
     if not app.static_folder:
         raise ValueError("Flask static folder not defined")
 
@@ -448,9 +454,9 @@ def generate_dalle_image(
         quality=quality,  # type: ignore
         n=1,
     )
-    image_url = response.data[0].url
-    if not image_url:
+    if not response.data or not response.data[0].url:
         raise DownloadError("Was not able to get image url")
+    image_url = response.data[0].url
     print(f"url: {image_url}")
     revised_prompt = response.data[0].revised_prompt
 
@@ -479,6 +485,15 @@ def generate_dalle_image(
     else:
         raise DownloadError(f"Error downloading image {image_response.status_code}")
 
+def get_file_count(username: str, static_folder: str) -> int:
+    image_path = os.path.join(static_folder, "images", username)
+
+    file_count = 0
+    for path in os.listdir(image_path):
+        file_path = os.path.join(image_path, path)
+        if file_path.endswith(".png") and not file_path.endswith(".thumb.png") and os.path.isfile(file_path):
+            file_count += 1
+    return file_count
 
 def process_image_response(
     image_response_bytes: io.BytesIO,
@@ -494,11 +509,6 @@ def process_image_response(
     # Make sure the path directory exists first
     os.makedirs(image_path, exist_ok=True)
 
-    file_count = 0
-    for path in os.listdir(image_path):
-        file_path = os.path.join(image_path, path)
-        if file_path.endswith(".png") and os.path.isfile(file_path):
-            file_count += 1
     cleaned_prompt = after_prompt.strip().lower()
     cleaned_prompt = (
         utils.remove_stop_words(
@@ -513,19 +523,22 @@ def process_image_response(
         .replace("  ", " ")
         .replace(" ", "_")[:30]
     )
+
+    file_count = get_file_count(username, app.static_folder)
+
     image_name = f"{str(file_count).zfill(10)}-{cleaned_prompt}.png"
     image_thumb_name = f"{str(file_count).zfill(10)}-{cleaned_prompt}.thumb.jpg"
     image_filename = os.path.join(image_path, image_name)
     image_thumb_filename = os.path.join(image_path, image_thumb_name)
 
     # Create an in-memory image from the downloaded content
-    image = Image.open(image_response_bytes)
+    image = PILImage.open(image_response_bytes)
 
     # Create a thumbnail
     thumb_image = image.copy()
     aspect_ratio = image.height / image.width
     new_height = int(256 * aspect_ratio)
-    thumb_image.thumbnail((256, new_height), Image.Resampling.LANCZOS)
+    thumb_image.thumbnail((256, new_height), PILImage.Resampling.LANCZOS)
     thumb_image = thumb_image.convert("RGB")
 
     # Create metadata
@@ -542,6 +555,173 @@ def process_image_response(
     return SavedImageData(local_image_path, image_name)
 
 
+def generate_seed_for_provider(provider: str) -> int | None:
+    if provider == "stabilityai":
+        return random.getrandbits(32)
+    elif provider == "novelai":
+        return random.getrandbits(64)
+    return
+
+
+def generate_image(
+    provider: str,
+    prompt: str,
+    size: str | None,
+    request: Request,
+    seed: int | None,
+    grid_dynamic_prompt: GridDynamicPromptInfo | None = None,
+) -> GeneratedImageData:
+    if not seed or seed <= 0:
+        seed = generate_seed_for_provider(provider)
+    if provider == "openai":
+        quality = request.form.get("quality")
+        style = request.form.get("style")
+        strict_follow_prompt = request.form.get("add-follow-prompt")
+
+        if not size:
+            raise ValueError("Unable to get 'size' field.")
+        if not quality:
+            raise ValueError("Unable to get 'quality' field.")
+        if not style:
+            raise ValueError("Unable to get 'style' field.")
+
+        return generate_dalle_image(
+            prompt,
+            session["username"],
+            size,
+            quality,
+            style,
+            bool(strict_follow_prompt),
+        )
+    elif provider == "stabilityai":
+        negative_prompt = request.form.get("negative_prompt")
+        aspect_ratio = request.form.get("aspect_ratio")
+        upscale = bool(request.form.get("upscale"))
+
+        if not seed:
+            raise ValueError("Unable to get 'seed' field.")
+        if not aspect_ratio:
+            raise ValueError("Unable to get 'aspect_ratio' field.")
+
+        return generate_stability_image(
+            prompt=prompt,
+            negative_prompt=negative_prompt,
+            username=session["username"],
+            aspect_ratio=aspect_ratio,
+            seed=seed,
+            upscale=upscale,
+        )
+
+    elif provider == "novelai":
+        negative_prompt = request.form.get("negative_prompt")
+        aspect_ratio = request.form.get("aspect_ratio")
+        upscale = bool(request.form.get("upscale"))
+
+        if not seed:
+            raise ValueError("Unable to get 'seed' field.")
+        if not size:
+            raise ValueError("Unable to get 'size' field.")
+
+        split_size = size.split("x")
+
+        return generate_novelai_image(
+            prompt=prompt,
+            negative_prompt=negative_prompt,
+            username=session["username"],
+            size=(int(split_size[0]), int(split_size[1])),
+            seed=seed,
+            upscale=upscale,
+            grid_dynamic_prompt=grid_dynamic_prompt,
+        )
+
+    else:
+        raise ValueError(f"Unsupported provider selected: '{provider}'")
+
+
+def generate_image_grid(
+    provider: str,
+    prompt: str,
+    size: str | None,
+    seed: int | None,
+    grid_prompt_file: str,
+    request: Request,
+) -> GeneratedImageData:
+    if not app.static_folder:
+        raise ValueError("Static folder is undefined!")
+    username = session["username"]
+    dynamic_prompts = get_prompts_for_name(
+        username, app.static_folder, grid_prompt_file
+    )
+
+    # Remove duplicates from list
+    dynamic_prompts = list(dict.fromkeys(dynamic_prompts))
+
+    if len(dynamic_prompts) == 0:
+        raise ValueError("No prompts available in file!")
+    
+    if not seed:
+        seed = generate_seed_for_provider(provider)
+
+    image_data_list: Dict[str, GeneratedImageData] = dict()
+    for dynamic_prompt in dynamic_prompts:
+        image_data_list[dynamic_prompt] = generate_image(
+            provider,
+            prompt,
+            size,
+            request,
+            seed,
+            GridDynamicPromptInfo(
+                str_to_replace_with=dynamic_prompt, prompt_file=grid_prompt_file
+            ),
+        )
+        print("Image generated!")
+        # Don't hammer the API servers
+        time.sleep(random.randrange(5, 15))
+    
+    file_count = get_file_count(username, app.static_folder)
+
+    image_name = f"{str(file_count).zfill(10)}-grid_{grid_prompt_file}.png"
+    image_thumb_name = f"{str(file_count).zfill(10)}-grid_{grid_prompt_file}.thumb.png"
+    image_path = os.path.join(app.static_folder, "images", username)
+    image_filename = os.path.join(image_path, image_name)
+    image_thumb_filename = os.path.join(image_path, image_thumb_name)
+    image_thumb_filename_apng = image_thumb_filename.replace(".thumb.png", ".thumb.apng")
+
+    with WandImage() as img:
+        for dynamic_prompt, image_data in image_data_list.items():
+            with WandImage() as wand_image: # type: ignore
+                wand_image.options['label'] =  dynamic_prompt # type: ignore
+                wand_image.read(filename=image_data.local_image_path) # type: ignore
+                img.image_add(wand_image) # type: ignore
+        style = wand.font.Font("Roboto-Light.ttf", 65, 'black')
+        img.montage(mode="concatenate", font=style) # type: ignore
+        img.save(filename=image_filename) # type: ignore
+    
+    image_to_copy = PILImage.open(image_data_list[dynamic_prompts[0]].local_image_path)
+    png_info = PngInfo()
+    for key, value in image_to_copy.info.items():
+        if isinstance(key, str):
+            png_info.add_text(key, value)
+    target_image = PILImage.open(image_filename)
+    target_image.save(image_filename, pnginfo=png_info)
+
+
+    with WandImage() as animated_img:
+        for dynamic_prompt, image_data in image_data_list.items():
+            with WandImage(filename=image_data.local_image_path.replace(".png", ".thumb.jpg")) as frame_image: # type: ignore
+                frame_image.delay = 100
+                animated_img.sequence.append(frame_image) # type: ignore
+        animated_img.coalesce()
+        animated_img.optimize_layers()
+        animated_img.format = "apng"
+        animated_img.save(filename=image_thumb_filename_apng) # type: ignore
+    # This is really weird but ImageMagick refuses to write an animated apng if it doesn't end in .apng
+    # So we have to do this song and dance to get our animated .thumb.png
+    os.rename(image_thumb_filename_apng, image_thumb_filename)
+
+    return GeneratedImageData(image_url="none", local_image_path=image_filename, revised_prompt=image_data_list[dynamic_prompts[0]].revised_prompt, prompt=prompt, image_name=image_name)
+
+
 @app.route("/", methods=["GET", "POST"])
 def index():
     if "username" not in session:
@@ -556,99 +736,26 @@ def index():
         provider = request.form.get("provider")
         size = request.form.get("size")
         prompt = request.form.get("prompt")
+        seed = request.form.get("seed")
+        if seed and seed.strip():
+            seed = int(seed)
+        else:
+            seed = None
 
-        if not prompt or not prompt.strip():
-            print("No prompt provided, not doing anything.")
-            return render_template("index.html")
         try:
-            if provider == "openai":
-                quality = request.form.get("quality")
-                style = request.form.get("style")
-                strict_follow_prompt = request.form.get("add-follow-prompt")
-
-                if not size:
-                    raise ValueError("Unable to get 'size' field.")
-                if not quality:
-                    raise ValueError("Unable to get 'quality' field.")
-                if not style:
-                    raise ValueError("Unable to get 'style' field.")
-
-                generated_image_data = generate_dalle_image(
-                    prompt,
-                    session["username"],
-                    size,
-                    quality,
-                    style,
-                    bool(strict_follow_prompt),
-                )
-                image_url = generated_image_data.image_url
-                local_image_path = generated_image_data.local_image_path
-                image_name = generated_image_data.image_name
-                prompt = generated_image_data.prompt
-                revised_prompt = generated_image_data.revised_prompt
-                return render_template(
-                    "result-section.html",
-                    image_url=image_url,
-                    local_image_path=local_image_path,
-                    revised_prompt=revised_prompt,
-                    prompt=prompt,
-                    image_name=image_name,
-                    error_message=error_message,
-                )
-            elif provider == "stabilityai":
-                negative_prompt = request.form.get("negative_prompt")
-                aspect_ratio = request.form.get("aspect_ratio")
-                seed = request.form.get("seed")
-                upscale = bool(request.form.get("upscale"))
-
-                if not seed:
-                    raise ValueError("Unable to get 'seed' field.")
-                if not aspect_ratio:
-                    raise ValueError("Unable to get 'aspect_ratio' field.")
-
-                generated_image_data = generate_stability_image(
-                    prompt=prompt,
-                    negative_prompt=negative_prompt,
-                    username=session["username"],
-                    aspect_ratio=aspect_ratio,
-                    seed=int(seed),
-                    upscale=upscale,
-                )
-
-                image_url = generated_image_data.image_url
-                local_image_path = generated_image_data.local_image_path
-                image_name = generated_image_data.image_name
-                prompt = generated_image_data.prompt
-                revised_prompt = generated_image_data.revised_prompt
-                return render_template(
-                    "result-section.html",
-                    image_url=image_url,
-                    local_image_path=local_image_path,
-                    revised_prompt=prompt,
-                    prompt=prompt,
-                    image_name=image_name,
-                    error_message=error_message,
-                )
-            elif provider == "novelai":
-                negative_prompt = request.form.get("negative_prompt")
-                aspect_ratio = request.form.get("aspect_ratio")
-                seed = request.form.get("seed")
-                upscale = bool(request.form.get("upscale"))
-
-                if not seed:
-                    raise ValueError("Unable to get 'seed' field.")
-                if not size:
-                    raise ValueError("Unable to get 'size' field.")
-
-                split_size = size.split("x")
-
-                generated_image_data = generate_novelai_image(
-                    prompt=prompt,
-                    negative_prompt=negative_prompt,
-                    username=session["username"],
-                    size=(int(split_size[0]), int(split_size[1])),
-                    seed=int(seed),
-                    upscale=upscale,
+            if not prompt or not prompt.strip():
+                raise ValueError("Please provide a prompt!")
+            if not provider:
+                raise ValueError("Unable to get provider filed from form!")
+            advanced_generate_grid = bool(request.form.get("advanced-generate-grid"))
+            if advanced_generate_grid:
+                grid_prompt_file = request.form.get("grid-prompt-file")
+                if not grid_prompt_file:
+                    raise ValueError(
+                        f"Generate grid enabled, but no prompt file provided! {grid_prompt_file}"
+                    )
+                generated_image_data = generate_image_grid(
+                    provider, prompt, size, seed, grid_prompt_file, request
                 )
                 image_url = generated_image_data.image_url
                 local_image_path = generated_image_data.local_image_path
@@ -665,7 +772,23 @@ def index():
                     error_message=error_message,
                 )
             else:
-                raise ValueError(f"Unsupported provider selected: '{provider}'")
+                generated_image_data = generate_image(
+                    provider, prompt, size, request, seed
+                )
+                image_url = generated_image_data.image_url
+                local_image_path = generated_image_data.local_image_path
+                image_name = generated_image_data.image_name
+                prompt = generated_image_data.prompt
+                revised_prompt = generated_image_data.revised_prompt
+                return render_template(
+                    "result-section.html",
+                    image_url=image_url,
+                    local_image_path=local_image_path,
+                    revised_prompt=revised_prompt,
+                    prompt=prompt,
+                    image_name=image_name,
+                    error_message=error_message,
+                )
         except ModerationException as e:
             error_message = f"Your prompt doesn't pass OpenAI moderation. It triggers the following flags: {e.message}. Please adjust your prompt."
             return render_template(
@@ -977,7 +1100,7 @@ def get_total_pages() -> str:
         [
             os.path.join("images", file)
             for file in os.listdir(image_directory)
-            if file.endswith(".png")
+            if file.endswith(".png") and not file.endswith(".thumb.png")
         ]
     )
 
@@ -997,7 +1120,7 @@ def get_images(page: int) -> str:
         [
             os.path.join("static/images/", session["username"], file)
             for file in os.listdir(image_directory)
-            if file.endswith(".jpg")
+            if file.endswith(".thumb.jpg") or file.endswith(".thumb.png")
         ],
         reverse=True,
     )
@@ -1030,7 +1153,7 @@ def get_image_metadata(filename: str):
     image_path = os.path.join(
         app.static_folder, "images", session["username"], filename
     )
-    image = Image.open(image_path)
+    image = PILImage.open(image_path)
     image.load()  # type: ignore
     # Extract metadata
     metadata = image.info

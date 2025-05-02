@@ -199,6 +199,61 @@ img {
   background-color: rgba(0, 110, 220, 0.2);
 }
 
+.advanced-options {
+  margin: 20px 0;
+  padding: 10px;
+  background-color: #333;
+  border: 1px solid #666666;
+  border-radius: 4px;
+}
+.advanced-options .advanced-header {
+  cursor: pointer;
+  font-family: "Roboto", sans-serif;
+  font-size: medium;
+  padding: 5px;
+  user-select: none;
+}
+.advanced-options .advanced-dropdown {
+  margin-top: 10px;
+}
+.advanced-options .advanced-dropdown .advanced-input-group input[type=checkbox] {
+  margin-right: 8px;
+  cursor: pointer;
+  display: inline;
+  width: auto;
+}
+.advanced-options .advanced-dropdown .advanced-input-group label {
+  font-family: "Roboto", sans-serif;
+  font-size: medium;
+  cursor: pointer;
+  display: inline;
+}
+.advanced-options .advanced-dropdown .advanced-input-group .advanced-input-container {
+  margin-top: 10px;
+}
+.advanced-options .advanced-dropdown .advanced-input-group .advanced-input-container label {
+  display: block;
+  margin-bottom: 5px;
+  font-size: medium;
+}
+.advanced-options .advanced-dropdown .advanced-input-group .advanced-input-container input[type=text] {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #666666;
+  border-radius: 4px;
+  background-color: rgba(51, 51, 51, 0.5);
+  color: #fff;
+  /* Blue selection highlight */
+}
+.advanced-options .advanced-dropdown .advanced-input-group .advanced-input-container input[type=text]::selection {
+  background-color: #0a84ff;
+  color: #fff;
+}
+.advanced-options .advanced-dropdown .advanced-input-group .advanced-input-container input[type=text]::-moz-selection {
+  background-color: #0a84ff;
+  color: #fff;
+}
+
 .tabcontent {
   display: none;
   padding: 6px 12px;

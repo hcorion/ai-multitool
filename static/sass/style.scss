@@ -1,3 +1,7 @@
+@use "sass:map";
+@use "sass:color";
+@use "sass:string";
+
 $background-color: #121212;
 $text-color: #fff;
 $modal-bg-color: rgba(0, 0, 0, 0.9);
@@ -65,7 +69,7 @@ select {
     background-size: 15px;
 
     &:hover {
-        background-color: darken($input-bg-color, 10%); // Darken on hover
+        background-color: color.adjust($input-bg-color, $lightness: -10%); // Darken on hover
     }
 
     &:focus {
@@ -220,6 +224,76 @@ img {
     }
 }
 
+//////////////////////
+/// GENERATION TAB ///
+//////////////////////
+
+.advanced-options {
+    margin: 20px 0;
+    padding: 10px;
+    background-color: $input-bg-color;
+    border: 1px solid $border-color;
+    border-radius: 4px;
+
+    .advanced-header {
+        cursor: pointer;
+        font-family: 'Roboto', sans-serif;
+        font-size: medium;
+        padding: 5px;
+        user-select: none;
+    }
+
+    .advanced-dropdown {
+        margin-top: 10px;
+
+        .advanced-input-group {
+            input[type="checkbox"] {
+                margin-right: 8px;
+                cursor: pointer;
+                display: inline;
+                width: auto;
+            }
+
+            label {
+                font-family: 'Roboto', sans-serif;
+                font-size: medium;
+                cursor: pointer;
+                display: inline;
+            }
+
+            .advanced-input-container {
+                margin-top: 10px;
+
+                label {
+                    display: block;
+                    margin-bottom: 5px;
+                    font-size: medium;
+                }
+
+                input[type="text"] {
+                    width: 100%;
+                    padding: 10px;
+                    border: 1px solid $border-color;
+                    border-radius: 4px;
+                    background-color: rgba($color: $input-bg-color, $alpha: 0.5);
+                    color: $text-color;
+
+                    /* Blue selection highlight */
+                    &::selection {
+                        background-color: $submit-btn-color;
+                        color: $text-color;
+                    }
+
+                    &::-moz-selection {
+                        background-color: $submit-btn-color;
+                        color: $text-color;
+                    }
+                }
+            }
+        }
+    }
+}
+
 .tabcontent {
     display: none;
     padding: 6px 12px;
@@ -254,7 +328,9 @@ img {
     }
 }
 
-// Info list
+/////////////////
+/// Info list ///
+/////////////////
 
 .grid-modal {
     .modal-content-wrapper {
@@ -345,6 +421,10 @@ img {
         font-family: 'Roboto', sans-serif; // Consistent with the theme
     }
 }
+
+//////////////
+/// LOGIN ////
+//////////////
 
 .login-form {
     max-width: 300px;

@@ -10,6 +10,7 @@ requests = "*"
 flask = "*"
 pygments = "*"
 markdown = "*"
+wand = "*"
 
 [dev-packages]
 

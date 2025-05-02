@@ -27,5 +27,7 @@ showdown.min.js under MIT License from [showdownjs/showdown](https://github.com/
 
 highlight.min.js under BSD 3-Clause License from [highlightjs/highlight.js](https://github.com/highlightjs/highlight.js)
 
+Roboto-Light.ttf licensed under the SIL Open Font License, Version 1.1 . This license is available with a FAQ at: https://openfontlicense.org
+
 The loading spinner 'chunk' is from loading.io under the Loading.io BY License:
 Assets relesed under Loading.io BY License ( LD-BY / BY / BY License ) are free to use if you attribute to loading.io properly. To attribute, just add a link ( for using in websites ) or credit text ( for using in slide or video ) to loading.io.
