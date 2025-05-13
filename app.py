@@ -73,7 +73,7 @@ def resource_not_found(e: Response):
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        session["username"] = request.form["username"]
+        session["username"] = request.form["username"].strip()
         return redirect(url_for("index"))
     return render_template("login.html")
 
@@ -253,7 +253,7 @@ def generate_novelai_image(
 
     data = {  # type: ignore
         "action": "generate",
-        "model": "nai-diffusion-4-full",
+        "model": "nai-diffusion-4-5-curated",
         "parameters": {
             "add_original_image": False,
             "cfg_rescale": 0,
@@ -519,6 +519,10 @@ def process_image_response(
             .replace("}", " ")
             .replace("[", " ")
             .replace("]", " ")
+            .replace("/", " ")
+            .replace("\\", " ")
+            .replace(">", " ")
+            .replace("<", " ")
         )
         .replace("  ", " ")
         .replace(" ", "_")[:30]

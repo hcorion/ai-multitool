@@ -28,6 +28,7 @@ def get_prompts_for_name(username: str, static_folder: str, name: str) -> List[s
 def make_prompt_dynamic(prompt: str, username: str, static_folder: str, seed: int, grid_prompt: GridDynamicPromptInfo | None = None) -> str:
     dynamicRandom = random.Random(seed)
     prompts = get_prompt_dict(username, static_folder)
+    used_grid_prompt = False
     
     def replace_brackets_section_positive(match: re.Match[str]) -> str:
         return replace_brackets_section(match, "{", "}")
@@ -68,6 +69,8 @@ def make_prompt_dynamic(prompt: str, username: str, static_folder: str, seed: in
         # This is to keep prompt consistency when generating grids
         prompt_text = dynamicRandom.choice(prompts[content])
         if grid_prompt and content == grid_prompt.prompt_file:
+            nonlocal used_grid_prompt
+            used_grid_prompt = True
             prompt_text = grid_prompt.str_to_replace_with
         
         replaced_section = re.sub(r'__(.+?)__', replace_dynamic_prompt_section, prompt_text)
@@ -78,6 +81,8 @@ def make_prompt_dynamic(prompt: str, username: str, static_folder: str, seed: in
     revised_prompt = re.sub(r'__(.+?)__', replace_dynamic_prompt_section, prompt)
     revised_prompt = re.sub(r'{(.+?):(\d+-?\d*)}', replace_brackets_section_positive, revised_prompt)
     revised_prompt = re.sub(r'\[(.+?):(\d+-?\d*)\]', replace_brackets_section_negative, revised_prompt)
-    
+
+    if grid_prompt and not used_grid_prompt:
+        raise LookupError(f"Tried to use grid prompt but no prompt file matching {grid_prompt.prompt_file} was found in the prompt!")
 
     return revised_prompt
