@@ -253,10 +253,10 @@ def generate_novelai_image(
 
     data = {  # type: ignore
         "action": "generate",
-        "model": "nai-diffusion-4-5-curated",
+        "model": "nai-diffusion-4-5-full",
         "parameters": {
             "add_original_image": False,
-            "cfg_rescale": 0,
+            "cfg_rescale": 0.2,
             "deliberate_euler_ancestral_bug": False,
             "dynamic_thresholding": True,
             "width": width,
@@ -270,11 +270,11 @@ def generate_novelai_image(
             "params_version": 3,
             "prefer_brownian": True,
             "qualityToggle": True,
-            "sampler": "k_dpmpp_2m_sde",
+            "sampler": "k_euler_ancestral",
             "sm": False,
             "sm_dyn": False,
             "steps": 28,  # Max steps before Opus users have to pay money
-            "strength": 0.7,
+            "strength": 0.4,
             "scale": 6,
             "ucPreset": 4,
             "seed": seed,
