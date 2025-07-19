@@ -447,10 +447,11 @@ class ResponsesAPIClient:
             event_processor.process_stream(stream)
         except Exception as e:
             print(f"Error in process_stream_with_processor: {e}")
-            event_processor.event_queue.put(json.dumps({
-                "type": "error", 
-                "message": "Error processing response stream"
-            }))
+            event_processor.event_queue.put(
+                json.dumps(
+                    {"type": "error", "message": "Error processing response stream"}
+                )
+            )
 
     def process_stream_events(
         self, stream: Any
@@ -1234,20 +1235,11 @@ def get_all_conversations() -> str:
     if "username" not in session:
         abort(404, description="Username not in session")
 
-    if not app.static_folder:
-        raise ValueError("Flask static folder not defined")
+    username = session["username"]
 
-    user_file: str = os.path.join(
-        app.static_folder, "chats", f"{session['username']}.json"
-    )
-    if os.path.exists(user_file):  # type: ignore
-        with open(user_file, "r") as file:  # type: ignore
-            chat = json.load(file)
-    else:
-        with open(user_file, "a") as file:  # type: ignore
-            chat: dict[Any, Any] = dict()
-            file.write(json.dumps(chat))
-    return json.dumps(chat)
+    # Use ConversationManager to get all conversations
+    conversations = conversation_manager.list_conversations(username)
+    return json.dumps(conversations)
 
 
 def get_message_list(thread_id: str):
@@ -1276,31 +1268,23 @@ def converse():
     if "username" not in session:
         return redirect(url_for("login"))
 
-    # Need to change how we fetch the thread_id depending on if POST or GET.
-    thread_id = (
-        request.json.get("thread_id")
+    username = session["username"]
+
+    # Get conversation_id from request (replaces thread_id)
+    conversation_id = (
+        request.json.get("thread_id")  # Keep thread_id for frontend compatibility
         if request.method == "POST" and request.json
         else request.args.get("thread_id")
     )
 
-    if not app.static_folder:
-        raise ValueError("Flask static folder not defined")
-    user_file = os.path.join(app.static_folder, "chats", f"{session['username']}.json")
-
-    # Load existing conversation or start a new one
-    if os.path.exists(user_file):
-        with open(user_file, "r") as file:
-            chat = json.load(file)
-    else:
-        with open(user_file, "a") as file:
-            chat: dict[Any, Any] = dict()
-            file.write(json.dumps(chat))
     if request.method == "GET":
-        if not thread_id:
-            raise ValueError("thread_id was empty")
-        return json.dumps(
-            {"threadId": thread_id, "messages": get_message_list(thread_id)}
-        )
+        if not conversation_id:
+            raise ValueError("conversation_id was empty")
+
+        # Use ConversationManager to get message list
+        message_list = conversation_manager.get_message_list(username, conversation_id)
+        return json.dumps({"threadId": conversation_id, "messages": message_list})
+
     elif request.method == "POST":
         if not request.json:
             raise ValueError("Expected valid request json in POST Request")
@@ -1309,53 +1293,106 @@ def converse():
         if not user_input:
             return {"error": "No input provided"}, 400
 
-        if thread_id and thread_id in chat:
-            print("Have thread")
-            thread = client.beta.threads.retrieve(thread_id)
+        # Handle existing conversation or create new one
+        if conversation_id:
+            # Check if conversation exists
+            conversation = conversation_manager.get_conversation(
+                username, conversation_id
+            )
+            if not conversation:
+                return {"error": "Conversation not found"}, 404
+            print(f"Using existing conversation: {conversation_id}")
         else:
-            print("Need to create thread")
-            thread = client.beta.threads.create()
-            thread_id = thread.id
-            chat_name = re.sub(r"[^\w_. -]", "_", request.json.get("chat_name"))
-            thread_data: dict[str, str | int | Metadata | None] = {
-                "id": thread.id,
-                "created_at": thread.created_at,
-                "metadata": thread.metadata,
-                "object": thread.object,
-            }
-            chat[thread_id] = {"data": thread_data, "chat_name": chat_name}
+            # Create new conversation
+            chat_name = request.json.get("chat_name", "New Chat")
+            conversation_id = conversation_manager.create_conversation(
+                username, chat_name
+            )
+            print(f"Created new conversation: {conversation_id}")
 
-        # TODO: Allow listing assistants
-        # Regular ChatGPT-like ID
-        # assistant_id = "asst_nYZeL982wB4AgoX4M7lfq7Qv"
-        # CodeGPT
-        assistant_id = "asst_FX4sCfRsD6G3Vvc84ozABA8N"
-        # StoryGPT
-        # assistant_id = "asst_aGGDp8e82QjnbkLk4kgXzBT1"
-        client.beta.assistants.retrieve(assistant_id=assistant_id)
+        # Add user message to conversation
+        conversation_manager.add_message(username, conversation_id, "user", user_input)
 
-        client.beta.threads.messages.create(thread_id, role="user", content=user_input)
-        message_list = get_message_list(thread_id)
+        # Get previous response ID for conversation continuity
+        previous_response_id = conversation_manager.get_last_response_id(
+            username, conversation_id
+        )
 
-        def start_stream_thread(
-            event_queue: Queue[str], thread_id: str, assistant_id: str
+        # Get current message list for frontend
+        message_list = conversation_manager.get_message_list(username, conversation_id)
+
+        def start_responses_stream_thread(
+            event_queue: Queue[str],
+            user_input: str,
+            previous_response_id: str | None,
+            username: str,
+            conversation_id: str,
         ):
-            event_handler = StreamingEventHandler(event_queue)
-            with client.beta.threads.runs.stream(
-                thread_id=thread_id,
-                assistant_id=assistant_id,
-                event_handler=event_handler,
-            ) as stream:
-                stream.until_done()
+            """Start streaming thread using Responses API."""
+            event_processor = StreamEventProcessor(event_queue)
+
+            try:
+                # Create response using Responses API
+                stream = responses_client.create_response(
+                    input_text=user_input,
+                    previous_response_id=previous_response_id,
+                    stream=True,
+                    username=username,
+                )
+
+                # Check if we got an error response
+                if isinstance(stream, dict) and "error" in stream:
+                    event_queue.put(
+                        json.dumps({"type": "error", "message": stream["message"]})
+                    )
+                    return
+
+                # Process the stream
+                event_processor.process_stream(stream)
+
+                # Get the response ID and final text for storage
+                response_id = event_processor.get_response_id()
+                final_text = event_processor.accumulated_text
+
+                if final_text and response_id:
+                    # Store assistant response in conversation
+                    conversation_manager.add_message(
+                        username, conversation_id, "assistant", final_text, response_id
+                    )
+
+            except Exception as e:
+                print(f"Error in responses stream thread: {e}")
+                event_queue.put(
+                    json.dumps(
+                        {
+                            "type": "error",
+                            "message": "An error occurred while processing your request.",
+                        }
+                    )
+                )
 
         def stream_events(
-            thread_id: str, assistant_id: str, message_list: dict[str, str]
+            conversation_id: str,
+            user_input: str,
+            previous_response_id: str | None,
+            message_list: list[dict[str, str]],
         ) -> Generator[Any | AnyStr]:
-            yield f"{json.dumps(json.dumps({'type': 'message_list', 'threadId': thread_id, 'messages': message_list}))}{eos_str}"
+            """Stream events to frontend using new Responses API."""
+            # Send initial message list
+            yield f"{json.dumps(json.dumps({'type': 'message_list', 'threadId': conversation_id, 'messages': message_list}))}{eos_str}"
+
             event_queue: Queue[Any] = Queue()
-            # Start the stream in a separate thread
+
+            # Start the Responses API stream in a separate thread
             threading.Thread(
-                target=start_stream_thread, args=(event_queue, thread_id, assistant_id)
+                target=start_responses_stream_thread,
+                args=(
+                    event_queue,
+                    user_input,
+                    previous_response_id,
+                    username,
+                    conversation_id,
+                ),
             ).start()
 
             # Yield from queue as events come
@@ -1363,25 +1400,24 @@ def converse():
                 event = event_queue.get()  # This will block until an item is available
                 yield event + eos_str
 
-        chat[thread_id]["last_update"] = time.time()
-        chat[thread_id]["assistant_id"] = assistant_id
-        with open(user_file, "w") as file:
-            json.dump(chat, file)
-
         return Response(
-            stream_with_context(stream_events(thread_id, assistant_id, message_list)),  # type: ignore
+            stream_with_context(
+                stream_events(
+                    conversation_id, user_input, previous_response_id, message_list
+                )
+            ),  # type: ignore
             mimetype="text/plain",
         )
 
 
 class StreamEventProcessor:
     """Process streaming responses from the Responses API to replace AssistantEventHandler."""
-    
+
     def __init__(self, event_queue: Queue[Any]):
         self.event_queue = event_queue
         self.current_response_id: str | None = None
         self.accumulated_text = ""
-    
+
     def process_stream(self, stream: Any) -> None:
         """Process the entire stream of ResponseStreamEvent objects."""
         try:
@@ -1389,86 +1425,137 @@ class StreamEventProcessor:
                 self._handle_stream_event(event)
         except Exception as e:
             print(f"Error processing stream: {e}")
-            self.event_queue.put(json.dumps({
-                "type": "error", 
-                "message": "Error processing response stream"
-            }))
-    
+            self.event_queue.put(
+                json.dumps(
+                    {"type": "error", "message": "Error processing response stream"}
+                )
+            )
+
     def _handle_stream_event(self, event: Any) -> None:
         """Handle individual ResponseStreamEvent objects."""
-        if not hasattr(event, 'type'):
+        if not hasattr(event, "type"):
             return
-            
+
         event_type = event.type
-        
-        if event_type == "response.text.created":
-            self._handle_text_created(event)
-        elif event_type == "response.text.delta":
-            self._handle_text_delta(event)
-        elif event_type == "response.text.done":
-            self._handle_text_done(event)
-        elif event_type == "response.done":
-            self._handle_response_done(event)
+
+        # Handle actual Responses API event types
+        if event_type == "response.created":
+            self._handle_response_created(event)
+        elif event_type == "response.in_progress":
+            self._handle_response_in_progress(event)
+        elif event_type == "response.output_item.added":
+            self._handle_output_item_added(event)
+        elif event_type == "response.content_part.added":
+            self._handle_content_part_added(event)
+        elif event_type == "response.output_text.delta":
+            self._handle_output_text_delta(event)
+        elif event_type == "response.output_text.done":
+            self._handle_output_text_done(event)
+        elif event_type == "response.content_part.done":
+            self._handle_content_part_done(event)
+        elif event_type == "response.output_item.done":
+            self._handle_output_item_done(event)
+        elif event_type == "response.completed":
+            self._handle_response_completed(event)
         else:
             # Handle other event types if needed
             print(f"Unhandled event type: {event_type}")
-    
-    def _handle_text_created(self, event: Any) -> None:
-        """Handle text_created event - equivalent to on_text_created."""
+
+    def _handle_response_created(self, event: Any) -> None:
+        """Handle response.created event - response has been created."""
         self.accumulated_text = ""
-        self.event_queue.put(json.dumps({
-            "type": "text_created", 
-            "text": ""
-        }))
-    
-    def _handle_text_delta(self, event: Any) -> None:
-        """Handle text_delta event - equivalent to on_text_delta."""
-        delta_text = ""
-        
-        # Extract delta text from the event
-        if hasattr(event, 'delta'):
-            delta_text = str(event.delta)
-        elif hasattr(event, 'text'):
-            delta_text = str(event.text)
-        
-        self.accumulated_text += delta_text
-        
-        self.event_queue.put(json.dumps({
-            "type": "text_delta", 
-            "delta": delta_text
-        }))
-    
-    def _handle_text_done(self, event: Any) -> None:
-        """Handle text_done event - equivalent to on_text_done."""
-        final_text = self.accumulated_text
-        
-        # Try to get final text from event if available
-        if hasattr(event, 'text'):
-            final_text = str(event.text)
-        
         # Extract response ID if available
-        if hasattr(event, 'response_id'):
-            self.current_response_id = event.response_id
-        
-        self.event_queue.put(json.dumps({
-            "type": "text_done", 
-            "text": final_text,
-            "response_id": self.current_response_id
-        }))
-    
-    def _handle_response_done(self, event: Any) -> None:
-        """Handle response_done event - final event with complete response information."""
-        # Extract response ID for conversation continuity
-        if hasattr(event, 'response_id'):
-            self.current_response_id = event.response_id
-        elif hasattr(event, 'id'):
+        if hasattr(event, "response") and hasattr(event.response, "id"):
+            self.current_response_id = event.response.id
+        elif hasattr(event, "id"):
             self.current_response_id = event.id
-        
-        self.event_queue.put(json.dumps({
-            "type": "response_done",
-            "response_id": self.current_response_id
-        }))
-    
+
+        self.event_queue.put(json.dumps({"type": "text_created", "text": ""}))
+
+    def _handle_response_in_progress(self, event: Any) -> None:
+        """Handle response.in_progress event - response is being generated."""
+        # This event doesn't need specific handling, just indicates progress
+        pass
+
+    def _handle_output_item_added(self, event: Any) -> None:
+        """Handle response.output_item.added event - new output item added."""
+        # This event indicates a new output item (like text) has been added
+        pass
+
+    def _handle_content_part_added(self, event: Any) -> None:
+        """Handle response.content_part.added event - new content part added."""
+        # This event indicates a new content part has been added
+        pass
+
+    def _handle_output_text_delta(self, event: Any) -> None:
+        """Handle response.output_text.delta event - equivalent to on_text_delta."""
+        delta_text = ""
+
+        # Extract delta text from the event - try multiple possible locations
+        if hasattr(event, "delta"):
+            if isinstance(event.delta, str):
+                delta_text = event.delta
+            elif hasattr(event.delta, "text"):
+                delta_text = str(event.delta.text)
+            else:
+                delta_text = str(event.delta)
+        elif hasattr(event, "text"):
+            delta_text = str(event.text)
+        elif hasattr(event, "content_part") and hasattr(event.content_part, "text"):
+            delta_text = str(event.content_part.text)
+        elif hasattr(event, "output_text") and hasattr(event.output_text, "delta"):
+            delta_text = str(event.output_text.delta)
+
+        self.accumulated_text += delta_text
+
+        self.event_queue.put(json.dumps({"type": "text_delta", "delta": delta_text}))
+
+    def _handle_output_text_done(self, event: Any) -> None:
+        """Handle response.output_text.done event - text output is complete."""
+        final_text = self.accumulated_text
+
+        # Try to get final text from event if available
+        if hasattr(event, "text"):
+            final_text = str(event.text)
+        elif hasattr(event, "content_part") and hasattr(event.content_part, "text"):
+            final_text = str(event.content_part.text)
+
+        self.event_queue.put(
+            json.dumps(
+                {
+                    "type": "text_done",
+                    "text": final_text,
+                    "response_id": self.current_response_id,
+                }
+            )
+        )
+
+    def _handle_content_part_done(self, event: Any) -> None:
+        """Handle response.content_part.done event - content part is complete."""
+        # This event indicates a content part is complete
+        pass
+
+    def _handle_output_item_done(self, event: Any) -> None:
+        """Handle response.output_item.done event - output item is complete."""
+        # This event indicates an output item is complete
+        pass
+
+    def _handle_response_completed(self, event: Any) -> None:
+        """Handle response.completed event - final event with complete response information."""
+        # Extract response ID for conversation continuity
+        if hasattr(event, "response") and hasattr(event.response, "id"):
+            self.current_response_id = event.response.id
+        elif hasattr(event, "response_id"):
+            self.current_response_id = event.response_id
+        elif hasattr(event, "id"):
+            self.current_response_id = event.id
+
+        self.event_queue.put(
+            json.dumps(
+                {"type": "response_done", "response_id": self.current_response_id}
+            )
+        )
+
     def get_response_id(self) -> str | None:
         """Get the response ID from the processed stream for conversation continuity."""
         return self.current_response_id
