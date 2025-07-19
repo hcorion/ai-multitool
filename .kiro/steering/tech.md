@@ -2,7 +2,8 @@
 
 ## Backend
 - **Python 3.13** with Flask web framework
-- **OpenAI Python SDK** for DALL-E 3 and Assistant API integration
+- **OpenAI Python SDK** for DALL-E 3 and Responses API integration
+- **Pydantic** for data validation and serialization with type safety
 - **Requests** library for StabilityAI and NovelAI API calls
 - **Pillow (PIL)** for image processing and metadata handling
 - **Wand (ImageMagick)** for advanced image operations and grid generation

@@ -19,6 +19,7 @@ from typing import Any, AnyStr, Dict, Generator, Mapping
 
 import openai
 import requests
+from pydantic import BaseModel, Field
 from flask import (
     Flask,
     Request,
@@ -136,6 +137,86 @@ class SavedImageData:
         self.image_name = image_name
 
 
+# Pydantic models for conversation data structures
+class ConversationData(BaseModel):
+    """Pydantic model for conversation metadata."""
+
+    id: str
+    created_at: int
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    object: str = "conversation"
+
+
+class ChatMessage(BaseModel):
+    """Pydantic model for individual chat messages."""
+
+    role: str = Field(..., description="Message role: 'user' or 'assistant'")
+    text: str = Field(..., description="Message content")
+    timestamp: int = Field(..., description="Unix timestamp when message was created")
+    response_id: str | None = Field(
+        None, description="OpenAI response ID for assistant messages"
+    )
+
+
+class Conversation(BaseModel):
+    """Pydantic model for complete conversation structure."""
+
+    data: ConversationData
+    chat_name: str = Field(..., description="User-friendly name for the conversation")
+    last_update: int = Field(..., description="Unix timestamp of last update")
+    messages: list[ChatMessage] = Field(
+        default_factory=list, description="List of messages in conversation"
+    )
+    last_response_id: str | None = Field(
+        None, description="Last response ID for conversation continuity"
+    )
+
+    def add_message(
+        self, role: str, content: str, response_id: str | None = None
+    ) -> None:
+        """Add a message to the conversation."""
+        message = ChatMessage(
+            role=role, text=content, timestamp=int(time.time()), response_id=response_id
+        )
+        self.messages.append(message)
+        self.last_update = int(time.time())
+
+        # Update last_response_id if this is an assistant message with a response_id
+        if role == "assistant" and response_id:
+            self.last_response_id = response_id
+
+    def get_message_list(self) -> list[dict[str, str]]:
+        """Get formatted message list for frontend compatibility."""
+        return [{"role": msg.role, "text": msg.text} for msg in self.messages]
+
+
+class UserConversations(BaseModel):
+    """Pydantic model for all conversations belonging to a user."""
+
+    conversations: dict[str, Conversation] = Field(default_factory=dict)
+
+    def add_conversation(
+        self, conversation_id: str, conversation: Conversation
+    ) -> None:
+        """Add a conversation to the user's conversations."""
+        self.conversations[conversation_id] = conversation
+
+    def get_conversation(self, conversation_id: str) -> Conversation | None:
+        """Get a specific conversation by ID."""
+        return self.conversations.get(conversation_id)
+
+    def list_conversations(self) -> dict[str, Any]:
+        """List all conversations in the format expected by the frontend."""
+        return {
+            conv_id: {
+                "data": conv.data.model_dump(),
+                "chat_name": conv.chat_name,
+                "last_update": conv.last_update,
+            }
+            for conv_id, conv in self.conversations.items()
+        }
+
+
 class ConversationManager:
     """Manages local conversation storage and response ID tracking for the Responses API migration."""
 
@@ -148,26 +229,32 @@ class ConversationManager:
         """Get the file path for a user's conversation data."""
         return os.path.join(self.chats_dir, f"{username}.json")
 
-    def _load_user_conversations(self, username: str) -> dict[str, Any]:
-        """Load all conversations for a user from their JSON file."""
+    def _load_user_conversations(self, username: str) -> UserConversations:
+        """Load all conversations for a user from their JSON file using Pydantic models."""
         user_file = self._get_user_file_path(username)
         if os.path.exists(user_file):
             try:
                 with open(user_file, "r") as file:
-                    return json.load(file)
-            except (json.JSONDecodeError, IOError) as e:
+                    data = json.load(file)
+                    # Use Pydantic's parse_obj to create UserConversations directly
+                    return UserConversations.model_validate({"conversations": data})
+            except (json.JSONDecodeError, IOError, ValueError) as e:
                 print(f"Error loading conversations for {username}: {e}")
-                return {}
-        return {}
+                return UserConversations()
+        return UserConversations()
 
     def _save_user_conversations(
-        self, username: str, conversations: dict[str, Any]
+        self, username: str, user_conversations: UserConversations
     ) -> None:
-        """Save all conversations for a user to their JSON file."""
+        """Save all conversations for a user to their JSON file using Pydantic models."""
         user_file = self._get_user_file_path(username)
         try:
             with open(user_file, "w") as file:
-                json.dump(conversations, file, indent=2)
+                # Convert Pydantic models to JSON-serializable format
+                data = {}
+                for conv_id, conversation in user_conversations.conversations.items():
+                    data[conv_id] = conversation.model_dump()
+                json.dump(data, file, indent=2)
         except IOError as e:
             print(f"Error saving conversations for {username}: {e}")
             raise
@@ -177,33 +264,37 @@ class ConversationManager:
         conversation_id = str(uuid.uuid4())
         current_time = int(time.time())
 
-        conversations = self._load_user_conversations(username)
+        user_conversations = self._load_user_conversations(username)
 
         # Clean chat name for storage
         clean_chat_name = re.sub(r"[^\w_. -]", "_", chat_name)
 
-        conversations[conversation_id] = {
-            "data": {
-                "id": conversation_id,
-                "created_at": current_time,
-                "metadata": {},
-                "object": "conversation",
-            },
-            "chat_name": clean_chat_name,
-            "last_update": current_time,
-            "messages": [],
-            "last_response_id": None,
-        }
+        # Create new conversation using Pydantic models
+        conversation_data = ConversationData(
+            id=conversation_id,
+            created_at=current_time,
+            metadata={},
+            object="conversation",
+        )
 
-        self._save_user_conversations(username, conversations)
+        new_conversation = Conversation(
+            data=conversation_data,
+            chat_name=clean_chat_name,
+            last_update=current_time,
+            messages=[],
+            last_response_id=None,
+        )
+
+        user_conversations.add_conversation(conversation_id, new_conversation)
+        self._save_user_conversations(username, user_conversations)
         return conversation_id
 
     def get_conversation(
         self, username: str, conversation_id: str
-    ) -> dict[str, Any] | None:
+    ) -> Conversation | None:
         """Get a specific conversation by ID."""
-        conversations = self._load_user_conversations(username)
-        return conversations.get(conversation_id)
+        user_conversations = self._load_user_conversations(username)
+        return user_conversations.get_conversation(conversation_id)
 
     def add_message(
         self,
@@ -214,70 +305,59 @@ class ConversationManager:
         response_id: str | None = None,
     ) -> None:
         """Add a message to a conversation."""
-        conversations = self._load_user_conversations(username)
+        user_conversations = self._load_user_conversations(username)
 
-        if conversation_id not in conversations:
+        conversation = user_conversations.get_conversation(conversation_id)
+        if not conversation:
             raise ValueError(
                 f"Conversation {conversation_id} not found for user {username}"
             )
 
-        message = {
-            "role": role,
-            "text": content,
-            "timestamp": int(time.time()),
-            "response_id": response_id,
-        }
+        # Use the Pydantic model's add_message method
+        conversation.add_message(role, content, response_id)
 
-        conversations[conversation_id]["messages"].append(message)
-        conversations[conversation_id]["last_update"] = int(time.time())
-
-        # Update last_response_id if this is an assistant message with a response_id
-        if role == "assistant" and response_id:
-            conversations[conversation_id]["last_response_id"] = response_id
-
-        self._save_user_conversations(username, conversations)
+        self._save_user_conversations(username, user_conversations)
 
     def get_last_response_id(self, username: str, conversation_id: str) -> str | None:
         """Get the last response ID for conversation continuity."""
         conversation = self.get_conversation(username, conversation_id)
         if conversation:
-            return conversation.get("last_response_id")
+            return conversation.last_response_id
         return None
 
     def update_conversation_metadata(
         self, username: str, conversation_id: str, **kwargs
     ) -> None:
         """Update conversation metadata."""
-        conversations = self._load_user_conversations(username)
+        user_conversations = self._load_user_conversations(username)
 
-        if conversation_id not in conversations:
+        conversation = user_conversations.get_conversation(conversation_id)
+        if not conversation:
             raise ValueError(
                 f"Conversation {conversation_id} not found for user {username}"
             )
 
         for key, value in kwargs.items():
-            conversations[conversation_id][key] = value
+            setattr(conversation, key, value)
 
-        conversations[conversation_id]["last_update"] = int(time.time())
-        self._save_user_conversations(username, conversations)
+        conversation.last_update = int(time.time())
+        self._save_user_conversations(username, user_conversations)
 
     def list_conversations(self, username: str) -> dict[str, Any]:
         """List all conversations for a user."""
-        return self._load_user_conversations(username)
+        user_conversations = self._load_user_conversations(username)
+        return user_conversations.list_conversations()
 
     def get_message_list(
         self, username: str, conversation_id: str
     ) -> list[dict[str, str]]:
         """Get formatted message list for frontend compatibility."""
         conversation = self.get_conversation(username, conversation_id)
-        if not conversation or "messages" not in conversation:
+        if not conversation:
             return []
 
-        # Return messages in the format expected by the frontend
-        return [
-            {"role": msg["role"], "text": msg["text"]}
-            for msg in conversation["messages"]
-        ]
+        # Use the Pydantic model's get_message_list method
+        return conversation.get_message_list()
 
 
 class ResponsesAPIClient:
@@ -389,11 +469,13 @@ class ResponsesAPIClient:
             print(f"Error processing stream events: {e}")
             yield {"type": "error", "message": "Error processing response stream"}
 
+
 # Initialize the conversation manager
 conversation_manager = ConversationManager(app.static_folder or "static")
 
 # Initialize the Responses API client
 responses_client = ResponsesAPIClient(client)
+
 
 def upscale_stability_creative(
     lowres_response_bytes: io.BytesIO,
