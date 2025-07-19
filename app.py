@@ -55,8 +55,6 @@ app = Flask(__name__)
 # Initialize the OpenAI client
 client = openai.OpenAI()
 
-# Initialize the conversation manager
-conversation_manager = ConversationManager(app.static_folder or "static")
 
 stability_api_key = os.environ.get("STABILITY_API_KEY")
 novelai_api_key = os.environ.get("NOVELAI_API_KEY")
@@ -281,6 +279,121 @@ class ConversationManager:
             for msg in conversation["messages"]
         ]
 
+
+class ResponsesAPIClient:
+    """Client wrapper for OpenAI Responses API with o4-mini model."""
+
+    def __init__(self, openai_client: openai.OpenAI):
+        self.client = openai_client
+        self.model = "o4-mini"
+
+    def create_response(
+        self,
+        input_text: str,
+        previous_response_id: str | None = None,
+        stream: bool = True,
+        username: str | None = None,
+    ) -> Any:
+        """Create a response using the Responses API with o4-mini model."""
+        try:
+            params = {
+                "model": self.model,
+                "input": input_text,
+                "stream": stream,
+                "store": True,  # Store responses for conversation continuity
+            }
+
+            # Add previous response ID for conversation continuity
+            if previous_response_id:
+                params["previous_response_id"] = previous_response_id
+
+            # Add user identifier for better caching and abuse detection
+            if username:
+                params["user"] = username
+
+            return self.client.responses.create(**params)
+
+        except openai.RateLimitError as e:
+            return self._handle_rate_limit_error(e)
+        except openai.APIError as e:
+            return self._handle_api_error(e)
+        except Exception as e:
+            return self._handle_general_error(e)
+
+    def _handle_rate_limit_error(self, error: openai.RateLimitError) -> dict[str, str]:
+        """Handle rate limiting errors."""
+        print(f"Rate limit exceeded: {error}")
+        return {
+            "error": "rate_limit",
+            "message": "Too many requests. Please wait a moment before trying again.",
+        }
+
+    def _handle_api_error(self, error: openai.APIError) -> dict[str, str]:
+        """Handle OpenAI API errors."""
+        print(f"OpenAI API error: {error}")
+
+        # Handle specific error types
+        if hasattr(error, "code"):
+            if error.code == "model_not_found":
+                return {
+                    "error": "model_unavailable",
+                    "message": "The o4-mini model is currently unavailable. Please try again later.",
+                }
+            elif error.code == "insufficient_quota":
+                return {
+                    "error": "quota_exceeded",
+                    "message": "API quota exceeded. Please check your OpenAI account.",
+                }
+
+        return {
+            "error": "api_error",
+            "message": "An error occurred while processing your request. Please try again.",
+        }
+
+    def _handle_general_error(self, error: Exception) -> dict[str, str]:
+        """Handle general errors."""
+        print(f"General error in ResponsesAPIClient: {error}")
+        return {
+            "error": "general_error",
+            "message": "An unexpected error occurred. Please try again.",
+        }
+
+    def process_stream_events(
+        self, stream: Any
+    ) -> Generator[dict[str, Any], None, None]:
+        """Process streaming responses from the Responses API."""
+        try:
+            for event in stream:
+                # Extract event data based on the Responses API stream format
+                if hasattr(event, "type"):
+                    if event.type == "response.text.created":
+                        yield {"type": "text_created", "text": ""}
+                    elif event.type == "response.text.delta":
+                        yield {
+                            "type": "text_delta",
+                            "delta": getattr(event, "delta", ""),
+                        }
+                    elif event.type == "response.text.done":
+                        yield {
+                            "type": "text_done",
+                            "text": getattr(event, "text", ""),
+                            "response_id": getattr(event, "response_id", None),
+                        }
+                    elif event.type == "response.done":
+                        # Final event with complete response information
+                        yield {
+                            "type": "response_done",
+                            "response_id": getattr(event, "response_id", None),
+                        }
+        except Exception as e:
+            print(f"Error processing stream events: {e}")
+            yield {"type": "error", "message": "Error processing response stream"}
+
+# Initialize the conversation manager
+conversation_manager = ConversationManager(app.static_folder or "static")
+
+# Initialize the Responses API client
+responses_client = ResponsesAPIClient(client)
 
 def upscale_stability_creative(
     lowres_response_bytes: io.BytesIO,

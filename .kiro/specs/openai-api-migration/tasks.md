@@ -7,11 +7,14 @@
   - Implement ConversationManager class to handle local conversation storage and response ID tracking
   - Create methods for conversation CRUD operations, message storage, and metadata management
   - Ensure compatibility with existing JSON file structure in static/chats/{username}.json
+
+
+
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8_
 
 - [ ] 2. Implement Responses API client wrapper
   - Create ResponsesAPIClient class to interface with OpenAI Responses API
-  - Implement create_response method using client.responses.create() with o1-mini model
+  - Implement create_response method using client.responses.create() with o4-mini model
   - Add proper parameter handling for input, previous_response_id, and streaming
   - Include comprehensive error handling for API failures and rate limiting
   - _Requirements: 1.1, 1.2, 1.5, 1.6, 6.1, 6.2, 6.8_
@@ -34,7 +37,7 @@
   - Update conversation flow to use previous_response_id parameter for context
   - Modify message handling to store and retrieve response IDs from local storage
   - Ensure proper conversation state management across multiple message exchanges
-  - Test conversation context preservation with the o1-mini model
+  - Test conversation context preservation with the o4-mini model
   - _Requirements: 1.4, 2.5, 2.6, 3.7_
 
 - [ ] 6. Update conversation retrieval and listing

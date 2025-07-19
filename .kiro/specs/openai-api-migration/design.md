@@ -2,7 +2,7 @@
 
 ## Overview
 
-This design document outlines the migration from the OpenAI Assistants API to the new OpenAI Responses API with the o1-mini model. The migration involves replacing the current thread-based conversation management with a stateless approach using response IDs for conversation continuity, while maintaining all existing functionality and user experience.
+This design document outlines the migration from the OpenAI Assistants API to the new OpenAI Responses API with the o4-mini model. The migration involves replacing the current thread-based conversation management with a stateless approach using response IDs for conversation continuity, while maintaining all existing functionality and user experience.
 
 The current system relies on OpenAI's built-in thread persistence, but the Responses API requires us to manage conversation state locally using the `previous_response_id` parameter to maintain context between messages.
 
@@ -27,7 +27,7 @@ User Message → Flask Route → Local Thread Management → Responses API → S
 1. **State Management**: Move from OpenAI-managed threads to local conversation storage
 2. **API Interface**: Replace Assistants API calls with Responses API calls
 3. **Conversation Continuity**: Use `previous_response_id` instead of thread context
-4. **Model Selection**: Switch from assistant-based model to direct o1-mini model usage
+4. **Model Selection**: Switch from assistant-based model to direct o4-mini model usage
 
 ## Components and Interfaces
 
@@ -65,7 +65,7 @@ class ResponsesAPIClient:
 ```
 
 **Implementation Details**:
-- Uses `client.responses.create()` with o1-mini model
+- Uses `client.responses.create()` with o4-mini model
 - Handles streaming with `ResponseStreamEvent` processing
 - Manages `previous_response_id` parameter for conversation continuity
 - Implements proper error handling for new API
@@ -162,7 +162,7 @@ class CompatibilityLayer:
 
 1. **Rate Limiting**: Implement exponential backoff and user notification
 2. **Network Errors**: Provide retry mechanisms and offline indicators
-3. **Model Unavailability**: Handle o1-mini specific errors gracefully
+3. **Model Unavailability**: Handle o4-mini specific errors gracefully
 4. **Streaming Interruptions**: Recover partial responses and allow continuation
 
 ### Data Consistency
@@ -210,7 +210,7 @@ class CompatibilityLayer:
 ### Phase 3: API Migration
 - Replace all Assistants API calls with Responses API calls
 - Update chat route to use new conversation management
-- Implement o1-mini model integration
+- Implement o4-mini model integration
 - Remove deprecated API dependencies
 
 ### Phase 4: Compatibility and Testing

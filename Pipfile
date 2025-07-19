@@ -11,6 +11,7 @@ flask = "*"
 pygments = "*"
 markdown = "*"
 wand = "*"
+pydantic = "*"
 
 [dev-packages]
 
