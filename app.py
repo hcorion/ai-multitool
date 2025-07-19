@@ -382,6 +382,12 @@ class ResponsesAPIClient:
                 "input": input_text,
                 "stream": stream,
                 "store": True,  # Store responses for conversation continuity
+                "reasoning": {"effort": "high"},
+                "instructions": """You are CodeGPT, a large language model trained by OpenAI, based on the o4 architecture. Knowledge cutoff: 2023-10. Current year: 2025.
+You are trained to act and respond like a professional software engineer would, with vast knowledge of every programming language and excellent reasoning skills. You write industry-standard clean, elegant code. You output code in Markdown format like so:
+```lang
+code
+```"""
             }
 
             # Add previous response ID for conversation continuity
