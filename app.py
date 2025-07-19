@@ -11,6 +11,7 @@ import sys
 import tempfile
 import threading
 import time
+import uuid
 import zipfile
 from collections import deque
 from queue import Queue
@@ -53,6 +54,9 @@ app = Flask(__name__)
 
 # Initialize the OpenAI client
 client = openai.OpenAI()
+
+# Initialize the conversation manager
+conversation_manager = ConversationManager(app.static_folder or "static")
 
 stability_api_key = os.environ.get("STABILITY_API_KEY")
 novelai_api_key = os.environ.get("NOVELAI_API_KEY")
@@ -132,6 +136,150 @@ class SavedImageData:
     def __init__(self, local_image_path: str, image_name: str):
         self.local_image_path = local_image_path
         self.image_name = image_name
+
+
+class ConversationManager:
+    """Manages local conversation storage and response ID tracking for the Responses API migration."""
+
+    def __init__(self, static_folder: str):
+        self.static_folder = static_folder
+        self.chats_dir = os.path.join(static_folder, "chats")
+        os.makedirs(self.chats_dir, exist_ok=True)
+
+    def _get_user_file_path(self, username: str) -> str:
+        """Get the file path for a user's conversation data."""
+        return os.path.join(self.chats_dir, f"{username}.json")
+
+    def _load_user_conversations(self, username: str) -> dict[str, Any]:
+        """Load all conversations for a user from their JSON file."""
+        user_file = self._get_user_file_path(username)
+        if os.path.exists(user_file):
+            try:
+                with open(user_file, "r") as file:
+                    return json.load(file)
+            except (json.JSONDecodeError, IOError) as e:
+                print(f"Error loading conversations for {username}: {e}")
+                return {}
+        return {}
+
+    def _save_user_conversations(
+        self, username: str, conversations: dict[str, Any]
+    ) -> None:
+        """Save all conversations for a user to their JSON file."""
+        user_file = self._get_user_file_path(username)
+        try:
+            with open(user_file, "w") as file:
+                json.dump(conversations, file, indent=2)
+        except IOError as e:
+            print(f"Error saving conversations for {username}: {e}")
+            raise
+
+    def create_conversation(self, username: str, chat_name: str) -> str:
+        """Create a new conversation and return its ID."""
+        conversation_id = str(uuid.uuid4())
+        current_time = int(time.time())
+
+        conversations = self._load_user_conversations(username)
+
+        # Clean chat name for storage
+        clean_chat_name = re.sub(r"[^\w_. -]", "_", chat_name)
+
+        conversations[conversation_id] = {
+            "data": {
+                "id": conversation_id,
+                "created_at": current_time,
+                "metadata": {},
+                "object": "conversation",
+            },
+            "chat_name": clean_chat_name,
+            "last_update": current_time,
+            "messages": [],
+            "last_response_id": None,
+        }
+
+        self._save_user_conversations(username, conversations)
+        return conversation_id
+
+    def get_conversation(
+        self, username: str, conversation_id: str
+    ) -> dict[str, Any] | None:
+        """Get a specific conversation by ID."""
+        conversations = self._load_user_conversations(username)
+        return conversations.get(conversation_id)
+
+    def add_message(
+        self,
+        username: str,
+        conversation_id: str,
+        role: str,
+        content: str,
+        response_id: str | None = None,
+    ) -> None:
+        """Add a message to a conversation."""
+        conversations = self._load_user_conversations(username)
+
+        if conversation_id not in conversations:
+            raise ValueError(
+                f"Conversation {conversation_id} not found for user {username}"
+            )
+
+        message = {
+            "role": role,
+            "text": content,
+            "timestamp": int(time.time()),
+            "response_id": response_id,
+        }
+
+        conversations[conversation_id]["messages"].append(message)
+        conversations[conversation_id]["last_update"] = int(time.time())
+
+        # Update last_response_id if this is an assistant message with a response_id
+        if role == "assistant" and response_id:
+            conversations[conversation_id]["last_response_id"] = response_id
+
+        self._save_user_conversations(username, conversations)
+
+    def get_last_response_id(self, username: str, conversation_id: str) -> str | None:
+        """Get the last response ID for conversation continuity."""
+        conversation = self.get_conversation(username, conversation_id)
+        if conversation:
+            return conversation.get("last_response_id")
+        return None
+
+    def update_conversation_metadata(
+        self, username: str, conversation_id: str, **kwargs
+    ) -> None:
+        """Update conversation metadata."""
+        conversations = self._load_user_conversations(username)
+
+        if conversation_id not in conversations:
+            raise ValueError(
+                f"Conversation {conversation_id} not found for user {username}"
+            )
+
+        for key, value in kwargs.items():
+            conversations[conversation_id][key] = value
+
+        conversations[conversation_id]["last_update"] = int(time.time())
+        self._save_user_conversations(username, conversations)
+
+    def list_conversations(self, username: str) -> dict[str, Any]:
+        """List all conversations for a user."""
+        return self._load_user_conversations(username)
+
+    def get_message_list(
+        self, username: str, conversation_id: str
+    ) -> list[dict[str, str]]:
+        """Get formatted message list for frontend compatibility."""
+        conversation = self.get_conversation(username, conversation_id)
+        if not conversation or "messages" not in conversation:
+            return []
+
+        # Return messages in the format expected by the frontend
+        return [
+            {"role": msg["role"], "text": msg["text"]}
+            for msg in conversation["messages"]
+        ]
 
 
 def upscale_stability_creative(
@@ -485,15 +633,21 @@ def generate_dalle_image(
     else:
         raise DownloadError(f"Error downloading image {image_response.status_code}")
 
+
 def get_file_count(username: str, static_folder: str) -> int:
     image_path = os.path.join(static_folder, "images", username)
 
     file_count = 0
     for path in os.listdir(image_path):
         file_path = os.path.join(image_path, path)
-        if file_path.endswith(".png") and not file_path.endswith(".thumb.png") and os.path.isfile(file_path):
+        if (
+            file_path.endswith(".png")
+            and not file_path.endswith(".thumb.png")
+            and os.path.isfile(file_path)
+        ):
             file_count += 1
     return file_count
+
 
 def process_image_response(
     image_response_bytes: io.BytesIO,
@@ -662,7 +816,7 @@ def generate_image_grid(
 
     if len(dynamic_prompts) == 0:
         raise ValueError("No prompts available in file!")
-    
+
     if not seed:
         seed = generate_seed_for_provider(provider)
 
@@ -681,7 +835,7 @@ def generate_image_grid(
         print("Image generated!")
         # Don't hammer the API servers
         time.sleep(random.randrange(5, 15))
-    
+
     file_count = get_file_count(username, app.static_folder)
 
     image_name = f"{str(file_count).zfill(10)}-grid_{grid_prompt_file}.png"
@@ -689,18 +843,20 @@ def generate_image_grid(
     image_path = os.path.join(app.static_folder, "images", username)
     image_filename = os.path.join(image_path, image_name)
     image_thumb_filename = os.path.join(image_path, image_thumb_name)
-    image_thumb_filename_apng = image_thumb_filename.replace(".thumb.png", ".thumb.apng")
+    image_thumb_filename_apng = image_thumb_filename.replace(
+        ".thumb.png", ".thumb.apng"
+    )
 
     with WandImage() as img:
         for dynamic_prompt, image_data in image_data_list.items():
-            with WandImage() as wand_image: # type: ignore
-                wand_image.options['label'] =  dynamic_prompt # type: ignore
-                wand_image.read(filename=image_data.local_image_path) # type: ignore
-                img.image_add(wand_image) # type: ignore
-        style = wand.font.Font("Roboto-Light.ttf", 65, 'black')
-        img.montage(mode="concatenate", font=style) # type: ignore
-        img.save(filename=image_filename) # type: ignore
-    
+            with WandImage() as wand_image:  # type: ignore
+                wand_image.options["label"] = dynamic_prompt  # type: ignore
+                wand_image.read(filename=image_data.local_image_path)  # type: ignore
+                img.image_add(wand_image)  # type: ignore
+        style = wand.font.Font("Roboto-Light.ttf", 65, "black")
+        img.montage(mode="concatenate", font=style)  # type: ignore
+        img.save(filename=image_filename)  # type: ignore
+
     image_to_copy = PILImage.open(image_data_list[dynamic_prompts[0]].local_image_path)
     png_info = PngInfo()
     for key, value in image_to_copy.info.items():
@@ -709,21 +865,28 @@ def generate_image_grid(
     target_image = PILImage.open(image_filename)
     target_image.save(image_filename, pnginfo=png_info)
 
-
     with WandImage() as animated_img:
         for dynamic_prompt, image_data in image_data_list.items():
-            with WandImage(filename=image_data.local_image_path.replace(".png", ".thumb.jpg")) as frame_image: # type: ignore
+            with WandImage(
+                filename=image_data.local_image_path.replace(".png", ".thumb.jpg")
+            ) as frame_image:  # type: ignore
                 frame_image.delay = 100
-                animated_img.sequence.append(frame_image) # type: ignore
+                animated_img.sequence.append(frame_image)  # type: ignore
         animated_img.coalesce()
         animated_img.optimize_layers()
         animated_img.format = "apng"
-        animated_img.save(filename=image_thumb_filename_apng) # type: ignore
+        animated_img.save(filename=image_thumb_filename_apng)  # type: ignore
     # This is really weird but ImageMagick refuses to write an animated apng if it doesn't end in .apng
     # So we have to do this song and dance to get our animated .thumb.png
     os.rename(image_thumb_filename_apng, image_thumb_filename)
 
-    return GeneratedImageData(image_url="none", local_image_path=image_filename, revised_prompt=image_data_list[dynamic_prompts[0]].revised_prompt, prompt=prompt, image_name=image_name)
+    return GeneratedImageData(
+        image_url="none",
+        local_image_path=image_filename,
+        revised_prompt=image_data_list[dynamic_prompts[0]].revised_prompt,
+        prompt=prompt,
+        image_name=image_name,
+    )
 
 
 @app.route("/", methods=["GET", "POST"])
