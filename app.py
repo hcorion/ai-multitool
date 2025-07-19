@@ -1248,22 +1248,7 @@ def get_all_conversations() -> str:
     return json.dumps(conversations)
 
 
-def get_message_list(thread_id: str):
-    message_list = client.beta.threads.messages.list(thread_id, limit=100)
-    all_messages: deque[dict[str, str]] = deque()
-    for message in message_list.data:
-        if message.content:
-            for msg_content in message.content:
-                if isinstance(msg_content, TextContentBlock):
-                    all_messages.appendleft(
-                        {
-                            "role": message.role,
-                            "text": msg_content.text.value,
-                        }
-                    )
-                else:
-                    print("Unhandled msg_content type")
-    return list(all_messages)
+# Old get_message_list function removed - now using ConversationManager.get_message_list()
 
 
 eos_str = "␆␄"
