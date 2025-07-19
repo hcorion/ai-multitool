@@ -38,6 +38,7 @@ from openai.types.beta.threads import Text, TextContentBlock, TextDelta
 from openai.types.beta.threads.run_submit_tool_outputs_params import ToolOutput
 from openai.types.beta.threads.runs import FunctionToolCall, ToolCall, ToolCallDelta
 from openai.types.shared.metadata import Metadata
+from openai.types.responses.response_stream_event import ResponseStreamEvent
 from PIL import Image as PILImage
 from PIL.PngImagePlugin import PngInfo
 import wand
@@ -438,10 +439,23 @@ class ResponsesAPIClient:
             "message": "An unexpected error occurred. Please try again.",
         }
 
+    def process_stream_with_processor(
+        self, stream: Any, event_processor: "StreamEventProcessor"
+    ) -> None:
+        """Process streaming responses using the StreamEventProcessor."""
+        try:
+            event_processor.process_stream(stream)
+        except Exception as e:
+            print(f"Error in process_stream_with_processor: {e}")
+            event_processor.event_queue.put(json.dumps({
+                "type": "error", 
+                "message": "Error processing response stream"
+            }))
+
     def process_stream_events(
         self, stream: Any
     ) -> Generator[dict[str, Any], None, None]:
-        """Process streaming responses from the Responses API."""
+        """Process streaming responses from the Responses API (legacy method)."""
         try:
             for event in stream:
                 # Extract event data based on the Responses API stream format
@@ -1360,6 +1374,107 @@ def converse():
         )
 
 
+class StreamEventProcessor:
+    """Process streaming responses from the Responses API to replace AssistantEventHandler."""
+    
+    def __init__(self, event_queue: Queue[Any]):
+        self.event_queue = event_queue
+        self.current_response_id: str | None = None
+        self.accumulated_text = ""
+    
+    def process_stream(self, stream: Any) -> None:
+        """Process the entire stream of ResponseStreamEvent objects."""
+        try:
+            for event in stream:
+                self._handle_stream_event(event)
+        except Exception as e:
+            print(f"Error processing stream: {e}")
+            self.event_queue.put(json.dumps({
+                "type": "error", 
+                "message": "Error processing response stream"
+            }))
+    
+    def _handle_stream_event(self, event: Any) -> None:
+        """Handle individual ResponseStreamEvent objects."""
+        if not hasattr(event, 'type'):
+            return
+            
+        event_type = event.type
+        
+        if event_type == "response.text.created":
+            self._handle_text_created(event)
+        elif event_type == "response.text.delta":
+            self._handle_text_delta(event)
+        elif event_type == "response.text.done":
+            self._handle_text_done(event)
+        elif event_type == "response.done":
+            self._handle_response_done(event)
+        else:
+            # Handle other event types if needed
+            print(f"Unhandled event type: {event_type}")
+    
+    def _handle_text_created(self, event: Any) -> None:
+        """Handle text_created event - equivalent to on_text_created."""
+        self.accumulated_text = ""
+        self.event_queue.put(json.dumps({
+            "type": "text_created", 
+            "text": ""
+        }))
+    
+    def _handle_text_delta(self, event: Any) -> None:
+        """Handle text_delta event - equivalent to on_text_delta."""
+        delta_text = ""
+        
+        # Extract delta text from the event
+        if hasattr(event, 'delta'):
+            delta_text = str(event.delta)
+        elif hasattr(event, 'text'):
+            delta_text = str(event.text)
+        
+        self.accumulated_text += delta_text
+        
+        self.event_queue.put(json.dumps({
+            "type": "text_delta", 
+            "delta": delta_text
+        }))
+    
+    def _handle_text_done(self, event: Any) -> None:
+        """Handle text_done event - equivalent to on_text_done."""
+        final_text = self.accumulated_text
+        
+        # Try to get final text from event if available
+        if hasattr(event, 'text'):
+            final_text = str(event.text)
+        
+        # Extract response ID if available
+        if hasattr(event, 'response_id'):
+            self.current_response_id = event.response_id
+        
+        self.event_queue.put(json.dumps({
+            "type": "text_done", 
+            "text": final_text,
+            "response_id": self.current_response_id
+        }))
+    
+    def _handle_response_done(self, event: Any) -> None:
+        """Handle response_done event - final event with complete response information."""
+        # Extract response ID for conversation continuity
+        if hasattr(event, 'response_id'):
+            self.current_response_id = event.response_id
+        elif hasattr(event, 'id'):
+            self.current_response_id = event.id
+        
+        self.event_queue.put(json.dumps({
+            "type": "response_done",
+            "response_id": self.current_response_id
+        }))
+    
+    def get_response_id(self) -> str | None:
+        """Get the response ID from the processed stream for conversation continuity."""
+        return self.current_response_id
+
+
+# Keep the old StreamingEventHandler for backward compatibility during migration
 class StreamingEventHandler(AssistantEventHandler):
     def __init__(self, event_queue: Queue[Any]):
         self.event_queue = event_queue
