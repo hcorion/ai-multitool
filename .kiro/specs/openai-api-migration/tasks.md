@@ -27,17 +27,13 @@
   - _Requirements: 2.1, 2.2, 2.3, 2.5, 4.2, 4.6_
 
 - [x] 4. Build stream event processing system
-
-
-
-
   - Create StreamEventProcessor class to replace AssistantEventHandler
   - Implement handlers for ResponseStreamEvent types (text_created, text_delta, text_done)
   - Maintain existing event queue mechanism for frontend compatibility
   - Extract and store response IDs from completed streams for conversation continuity
   - _Requirements: 3.1, 3.2, 3.6, 3.7_
 
-- [ ] 5. Update chat route for Responses API integration
+- [x] 5. Update chat route for Responses API integration
   - Modify /chat POST route to use ConversationManager instead of OpenAI threads
   - Replace client.beta.threads calls with ResponsesAPIClient methods
   - Implement conversation creation and message storage using local management
