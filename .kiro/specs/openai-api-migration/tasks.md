@@ -60,7 +60,10 @@
   - Maintain existing JSON response format for frontend compatibility
   - _Requirements: 2.4, 4.1, 4.2, 4.3, 4.6, 4.7_
 
-- [ ] 8. Remove Assistants API dependencies
+
+- [x] 8. Remove Assistants API dependencies
+
+
   - Remove all imports related to AssistantEventHandler and thread management
   - Delete AssistantEventHandler class and related streaming code
   - Remove client.beta.threads, client.beta.messages, and client.beta.runs usage
@@ -74,7 +77,7 @@
   - Include proper logging for debugging and monitoring purposes
   - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7_
 
-- [ ] 11. Optimize performance and finalize implementation
+- [ ] 10. Optimize performance and finalize implementation
   - Optimize conversation loading and message processing performance
   - Implement efficient file I/O operations for conversation storage
   - Add monitoring and logging for API usage and system performance

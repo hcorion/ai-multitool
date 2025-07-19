@@ -33,11 +33,6 @@ from flask import (
     stream_with_context,
     url_for,
 )
-from openai import AssistantEventHandler
-from openai.types.beta.threads import Text, TextContentBlock, TextDelta
-from openai.types.beta.threads.run_submit_tool_outputs_params import ToolOutput
-from openai.types.beta.threads.runs import FunctionToolCall, ToolCall, ToolCallDelta
-from openai.types.shared.metadata import Metadata
 from openai.types.responses.response_stream_event import ResponseStreamEvent
 from PIL import Image as PILImage
 from PIL.PngImagePlugin import PngInfo
@@ -1552,37 +1547,7 @@ class StreamEventProcessor:
         return self.current_response_id
 
 
-# Keep the old StreamingEventHandler for backward compatibility during migration
-class StreamingEventHandler(AssistantEventHandler):
-    def __init__(self, event_queue: Queue[Any]):
-        self.event_queue = event_queue
-        super().__init__()
-
-    def on_text_created(self, text: Text) -> None:
-        self.event_queue.put(json.dumps({"type": "text_created", "text": text.value}))
-
-    def on_text_delta(
-        self,
-        delta: TextDelta,
-        snapshot: Text,
-    ):
-        self.event_queue.put(json.dumps({"type": "text_delta", "delta": delta.value}))
-
-    def on_text_done(self, text: Text) -> None:
-        self.event_queue.put(json.dumps({"type": "text_done", "text": text.value}))
-
-    def on_tool_call_created(self, tool_call: ToolCall):
-        # TODO: Need to hook this up properly
-        self.event_queue.put(
-            json.dumps({"type": "tool_call_created", "tool_call": tool_call})
-        )
-
-    def on_tool_call_delta(self, delta: ToolCallDelta, snapshot: ToolCall):
-        self.event_queue.put(
-            json.dumps(
-                {"type": "tool_call_delta", "delta": delta, "snapshot": snapshot}
-            )
-        )
+# StreamingEventHandler removed - now using StreamEventProcessor for Responses API
 
 
 #################################
@@ -1590,51 +1555,7 @@ class StreamingEventHandler(AssistantEventHandler):
 #################################
 
 
-def process_tool_output(
-    username: str, run_id: str, thread_id: str, tool_calls: list[ToolCall]
-):  # type: ignore
-    tool_outputs: list[ToolOutput] = []
-    for call in tool_calls:
-        tool_output = ToolOutput(tool_call_id=call.id)
-        if not isinstance(call, FunctionToolCall):
-            continue
-        output_result: dict[str, str] = dict()
-        if call.function.name == "generate_dalle_image":
-            print(call.function.name)
-            arguments = json.loads(call.function.arguments)
-            if "prompt" not in arguments:
-                raise Exception(
-                    "'prompt' has not been passed to the generate_dalle_image argument!"
-                )
-            try:
-                generated_image_data = generate_dalle_image(
-                    arguments["prompt"], username, strict_follow_prompt=True
-                )
-                output_result["image_url"] = url_for(
-                    "static",
-                    filename="images/"
-                    + username
-                    + "/"
-                    + generated_image_data.image_name,
-                )
-                print(output_result["image_url"])
-                output_result["revised_prompt"] = generated_image_data.revised_prompt
-            except ModerationException as e:
-                output_result["error_message"] = (
-                    f"Your prompt doesn't pass OpenAI moderation. It triggers the following flags: {e.message}. Please adjust your prompt."
-                )
-            except openai.BadRequestError as e:
-                error = json.loads(e.response.content)
-                error_message = error["error"]["message"]
-                error_code = error["error"]["code"]
-                if error_code == "content_policy_violation":
-                    error_message = "DALL-E 3 has generated an image that doesn't pass it's own moderation filters. You may want to adjust your prompt slightly."
-                output_result["error_message"] = error_message
-        tool_output["output"] = json.dumps(output_result)
-        tool_outputs.append(tool_output)
-    client.beta.threads.runs.submit_tool_outputs(
-        run_id=run_id, thread_id=thread_id, tool_outputs=tool_outputs
-    )
+# process_tool_output function removed - tool calling now handled by Responses API
 
 
 #################################
