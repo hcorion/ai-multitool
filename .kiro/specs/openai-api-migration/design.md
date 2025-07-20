@@ -233,9 +233,87 @@ class CompatibilityLayer:
 3. **File I/O**: Optimize JSON file operations for conversation storage
 4. **Concurrent Requests**: Handle multiple simultaneous chat requests efficiently
 
+## Development Tools and Environment
+
+### Dependency Management
+
+**Pipenv**: Used for Python dependency management and virtual environment handling
+- **Purpose**: Manages project dependencies and ensures consistent development environments
+- **Configuration**: Dependencies defined in `Pipfile` with separate dev dependencies
+- **Usage**: 
+  - `pipenv install` - Install production dependencies
+  - `pipenv install --dev` - Install development dependencies
+  - `pipenv run <command>` - Run commands in the virtual environment
+  - `pipenv shell` - Activate the virtual environment
+
+**Key Dependencies**:
+- **Production**: `openai`, `flask`, `pydantic`, `requests`, `pillow`, `wand`, `pygments`, `markdown`
+- **Development**: `ruff` for code linting and formatting
+
+### Code Quality and Linting
+
+**Ruff**: Modern Python linter and code formatter
+- **Purpose**: Ensures code quality, consistency, and adherence to Python best practices
+- **Features**:
+  - Fast linting with comprehensive rule coverage
+  - Automatic fixing of common issues
+  - Import sorting and unused import removal
+  - Code style enforcement
+- **Configuration**: Uses `ruff.toml` for project-specific settings
+- **Usage**:
+  - `pipenv run ruff check .` - Check for lint errors
+  - `pipenv run ruff check --fix .` - Auto-fix fixable issues
+  - `pipenv run ruff format .` - Format code
+
+**Lint Rules Enforced**:
+- **Import Management**: Remove unused imports, proper import ordering
+- **Error Handling**: Avoid bare `except` statements, use specific exceptions
+- **Code Style**: Proper boolean comparisons, variable naming conventions
+- **Type Safety**: Ensure proper type usage and annotations
+
+### Development Workflow
+
+1. **Environment Setup**:
+   ```bash
+   pipenv install --dev  # Install all dependencies
+   pipenv shell          # Activate virtual environment
+   ```
+
+2. **Code Quality Checks**:
+   ```bash
+   pipenv run ruff check .        # Check for issues
+   pipenv run ruff check --fix .  # Auto-fix issues
+   ```
+
+3. **Testing**:
+   ```bash
+   pipenv run python test_*.py    # Run specific tests
+   ```
+
+4. **Development Server**:
+   ```bash
+   pipenv run python app.py       # Run Flask application
+   ```
+
+### Code Quality Standards
+
+**Enforced Standards**:
+- **Import Hygiene**: All imports must be used, properly ordered
+- **Exception Handling**: Specific exception types, no bare except statements
+- **Boolean Logic**: Use `is True/False` instead of `== True/False`
+- **Variable Usage**: No unused variables or assignments
+- **Type Safety**: Proper type annotations where applicable
+
+**Benefits**:
+- **Consistency**: Uniform code style across the project
+- **Maintainability**: Easier to read and maintain code
+- **Error Prevention**: Catch common mistakes before runtime
+- **Performance**: Optimized imports and code structure
+
 ## Monitoring and Observability
 
 1. **API Usage Tracking**: Monitor Responses API usage and costs
 2. **Error Logging**: Comprehensive logging of API errors and system issues
 3. **Performance Metrics**: Track response times and system performance
 4. **User Experience**: Monitor chat functionality and user satisfaction
+5. **Code Quality Metrics**: Track lint compliance and code health
