@@ -1,5 +1,4 @@
 import base64
-from importlib import metadata
 import io
 import json
 import math
@@ -13,13 +12,13 @@ import threading
 import time
 import uuid
 import zipfile
-from collections import deque
 from queue import Queue
 from typing import Any, AnyStr, Dict, Generator, Mapping
 
 import openai
 import requests
-from pydantic import BaseModel, Field
+import wand
+import wand.font
 from flask import (
     Flask,
     Request,
@@ -36,8 +35,7 @@ from flask import (
 from openai.types.responses.response_stream_event import ResponseStreamEvent
 from PIL import Image as PILImage
 from PIL.PngImagePlugin import PngInfo
-import wand
-import wand.font
+from pydantic import BaseModel, Field
 from wand.image import Image as WandImage
 
 import utils
@@ -227,120 +225,183 @@ class ConversationManager:
         self.chats_dir = os.path.join(static_folder, "chats")
         os.makedirs(self.chats_dir, exist_ok=True)
 
+        # Add thread locks for concurrent access protection
+        self._user_locks = {}
+        self._locks_lock = threading.Lock()
+
+        # Add conversation cache for performance optimization
+        self._conversation_cache = {}
+        self._cache_timestamps = {}
+        self._cache_ttl = 300  # 5 minutes cache TTL
+
+    def _get_user_lock(self, username: str) -> threading.Lock:
+        """Get or create a thread lock for a specific user."""
+        with self._locks_lock:
+            if username not in self._user_locks:
+                self._user_locks[username] = threading.Lock()
+            return self._user_locks[username]
+
     def _get_user_file_path(self, username: str) -> str:
         """Get the file path for a user's conversation data."""
         return os.path.join(self.chats_dir, f"{username}.json")
 
+    def _is_cache_valid(self, username: str) -> bool:
+        """Check if cached data is still valid."""
+        if username not in self._cache_timestamps:
+            return False
+        return (time.time() - self._cache_timestamps[username]) < self._cache_ttl
+
+    def _update_cache(
+        self, username: str, user_conversations: UserConversations
+    ) -> None:
+        """Update the conversation cache for a user."""
+        self._conversation_cache[username] = user_conversations
+        self._cache_timestamps[username] = time.time()
+
+    def _get_from_cache(self, username: str) -> UserConversations | None:
+        """Get conversations from cache if valid."""
+        if self._is_cache_valid(username):
+            return self._conversation_cache.get(username)
+        return None
+
     def _load_user_conversations(self, username: str) -> UserConversations:
-        """Load all conversations for a user from their JSON file using Pydantic models with comprehensive error handling."""
-        user_file = self._get_user_file_path(username)
-        if os.path.exists(user_file):
-            try:
-                with open(user_file, "r", encoding="utf-8") as file:
-                    data = json.load(file)
-                    # Use Pydantic's model_validate to create UserConversations directly
-                    return UserConversations.model_validate({"conversations": data})
-            except json.JSONDecodeError as e:
-                import logging
+        """Load all conversations for a user from their JSON file using Pydantic models with comprehensive error handling and caching."""
+        # Check cache first
+        cached_conversations = self._get_from_cache(username)
+        if cached_conversations:
+            return cached_conversations
 
-                logging.error(
-                    f"JSON decode error loading conversations for {username}: {e}"
-                )
-                # Try to create backup of corrupted file
+        # Use thread lock for file operations
+        with self._get_user_lock(username):
+            # Double-check cache after acquiring lock
+            cached_conversations = self._get_from_cache(username)
+            if cached_conversations:
+                return cached_conversations
+
+            user_file = self._get_user_file_path(username)
+            if os.path.exists(user_file):
                 try:
-                    backup_file = f"{user_file}.backup.{int(time.time())}"
-                    import shutil
+                    with open(user_file, "r", encoding="utf-8") as file:
+                        data = json.load(file)
+                        # Use Pydantic's model_validate to create UserConversations directly
+                        user_conversations = UserConversations.model_validate(
+                            {"conversations": data}
+                        )
+                        # Update cache
+                        self._update_cache(username, user_conversations)
+                        return user_conversations
+                except json.JSONDecodeError as e:
+                    import logging
 
-                    shutil.copy2(user_file, backup_file)
-                    logging.info(f"Created backup of corrupted file: {backup_file}")
-                except Exception as backup_error:
-                    logging.error(f"Failed to create backup: {backup_error}")
-                return UserConversations()
-            except IOError as e:
-                import logging
+                    logging.error(
+                        f"JSON decode error loading conversations for {username}: {e}"
+                    )
+                    # Try to create backup of corrupted file
+                    try:
+                        backup_file = f"{user_file}.backup.{int(time.time())}"
+                        import shutil
 
-                logging.error(f"IO error loading conversations for {username}: {e}")
-                return UserConversations()
-            except ValueError as e:
-                import logging
+                        shutil.copy2(user_file, backup_file)
+                        logging.info(f"Created backup of corrupted file: {backup_file}")
+                    except Exception as backup_error:
+                        logging.error(f"Failed to create backup: {backup_error}")
+                    return UserConversations()
+                except IOError as e:
+                    import logging
 
-                logging.error(
-                    f"Validation error loading conversations for {username}: {e}"
-                )
-                return UserConversations()
-            except Exception as e:
-                import logging
+                    logging.error(f"IO error loading conversations for {username}: {e}")
+                    return UserConversations()
+                except ValueError as e:
+                    import logging
 
-                logging.error(
-                    f"Unexpected error loading conversations for {username}: {e}",
-                    exc_info=True,
-                )
-                return UserConversations()
-        return UserConversations()
+                    logging.error(
+                        f"Validation error loading conversations for {username}: {e}"
+                    )
+                    return UserConversations()
+                except Exception as e:
+                    import logging
+
+                    logging.error(
+                        f"Unexpected error loading conversations for {username}: {e}",
+                        exc_info=True,
+                    )
+                    return UserConversations()
+            return UserConversations()
 
     def _save_user_conversations(
         self, username: str, user_conversations: UserConversations
     ) -> None:
-        """Save all conversations for a user to their JSON file using Pydantic models with comprehensive error handling."""
-        user_file = self._get_user_file_path(username)
-        temp_file = f"{user_file}.tmp"
+        """Save all conversations for a user to their JSON file using Pydantic models with comprehensive error handling and thread safety."""
+        # Use thread lock for file operations
+        with self._get_user_lock(username):
+            user_file = self._get_user_file_path(username)
+            # Use unique temp file name to avoid conflicts
+            temp_file = f"{user_file}.tmp.{threading.current_thread().ident}.{int(time.time() * 1000000)}"
 
-        try:
-            # Write to temporary file first for atomic operation
-            with open(temp_file, "w", encoding="utf-8") as file:
-                # Convert Pydantic models to JSON-serializable format
-                data = {}
-                for conv_id, conversation in user_conversations.conversations.items():
-                    data[conv_id] = conversation.model_dump()
-                json.dump(data, file, indent=2, ensure_ascii=False)
-
-            # Atomic move to final location
-            import shutil
-
-            shutil.move(temp_file, user_file)
-
-        except IOError as e:
-            import logging
-
-            logging.error(f"IO error saving conversations for {username}: {e}")
-            # Clean up temp file if it exists
             try:
-                if os.path.exists(temp_file):
-                    os.remove(temp_file)
-            except:
-                pass
-            raise ConversationStorageError(
-                f"Failed to save conversations for {username}: {e}"
-            )
-        except json.JSONEncodeError as e:
-            import logging
+                # Write to temporary file first for atomic operation
+                with open(temp_file, "w", encoding="utf-8") as file:
+                    # Convert Pydantic models to JSON-serializable format
+                    data = {}
+                    for (
+                        conv_id,
+                        conversation,
+                    ) in user_conversations.conversations.items():
+                        data[conv_id] = conversation.model_dump()
+                    json.dump(data, file, indent=2, ensure_ascii=False)
 
-            logging.error(f"JSON encode error saving conversations for {username}: {e}")
-            # Clean up temp file if it exists
-            try:
-                if os.path.exists(temp_file):
-                    os.remove(temp_file)
-            except:
-                pass
-            raise ConversationStorageError(
-                f"Failed to encode conversations for {username}: {e}"
-            )
-        except Exception as e:
-            import logging
+                # Atomic move to final location
+                import shutil
 
-            logging.error(
-                f"Unexpected error saving conversations for {username}: {e}",
-                exc_info=True,
-            )
-            # Clean up temp file if it exists
-            try:
-                if os.path.exists(temp_file):
-                    os.remove(temp_file)
-            except:
-                pass
-            raise ConversationStorageError(
-                f"Unexpected error saving conversations for {username}: {e}"
-            )
+                shutil.move(temp_file, user_file)
+
+                # Update cache after successful save
+                self._update_cache(username, user_conversations)
+
+            except IOError as e:
+                import logging
+
+                logging.error(f"IO error saving conversations for {username}: {e}")
+                # Clean up temp file if it exists
+                try:
+                    if os.path.exists(temp_file):
+                        os.remove(temp_file)
+                except:
+                    pass
+                raise ConversationStorageError(
+                    f"Failed to save conversations for {username}: {e}"
+                )
+            except json.JSONEncodeError as e:
+                import logging
+
+                logging.error(
+                    f"JSON encode error saving conversations for {username}: {e}"
+                )
+                # Clean up temp file if it exists
+                try:
+                    if os.path.exists(temp_file):
+                        os.remove(temp_file)
+                except:
+                    pass
+                raise ConversationStorageError(
+                    f"Failed to encode conversations for {username}: {e}"
+                )
+            except Exception as e:
+                import logging
+
+                logging.error(
+                    f"Unexpected error saving conversations for {username}: {e}",
+                    exc_info=True,
+                )
+                # Clean up temp file if it exists
+                try:
+                    if os.path.exists(temp_file):
+                        os.remove(temp_file)
+                except:
+                    pass
+                raise ConversationStorageError(
+                    f"Unexpected error saving conversations for {username}: {e}"
+                )
 
     def create_conversation(self, username: str, chat_name: str) -> str:
         """Create a new conversation and return its ID."""
