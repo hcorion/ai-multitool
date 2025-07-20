@@ -102,6 +102,12 @@ class DownloadError(Exception):
         self.message = message
 
 
+class ConversationStorageError(Exception):
+    def __init__(self, message: str):
+        super().__init__(message)
+        self.message = message
+
+
 class GeneratedImageData:
     image_url: str
     local_image_path: str
@@ -226,34 +232,115 @@ class ConversationManager:
         return os.path.join(self.chats_dir, f"{username}.json")
 
     def _load_user_conversations(self, username: str) -> UserConversations:
-        """Load all conversations for a user from their JSON file using Pydantic models."""
+        """Load all conversations for a user from their JSON file using Pydantic models with comprehensive error handling."""
         user_file = self._get_user_file_path(username)
         if os.path.exists(user_file):
             try:
-                with open(user_file, "r") as file:
+                with open(user_file, "r", encoding="utf-8") as file:
                     data = json.load(file)
-                    # Use Pydantic's parse_obj to create UserConversations directly
+                    # Use Pydantic's model_validate to create UserConversations directly
                     return UserConversations.model_validate({"conversations": data})
-            except (json.JSONDecodeError, IOError, ValueError) as e:
-                print(f"Error loading conversations for {username}: {e}")
+            except json.JSONDecodeError as e:
+                import logging
+
+                logging.error(
+                    f"JSON decode error loading conversations for {username}: {e}"
+                )
+                # Try to create backup of corrupted file
+                try:
+                    backup_file = f"{user_file}.backup.{int(time.time())}"
+                    import shutil
+
+                    shutil.copy2(user_file, backup_file)
+                    logging.info(f"Created backup of corrupted file: {backup_file}")
+                except Exception as backup_error:
+                    logging.error(f"Failed to create backup: {backup_error}")
+                return UserConversations()
+            except IOError as e:
+                import logging
+
+                logging.error(f"IO error loading conversations for {username}: {e}")
+                return UserConversations()
+            except ValueError as e:
+                import logging
+
+                logging.error(
+                    f"Validation error loading conversations for {username}: {e}"
+                )
+                return UserConversations()
+            except Exception as e:
+                import logging
+
+                logging.error(
+                    f"Unexpected error loading conversations for {username}: {e}",
+                    exc_info=True,
+                )
                 return UserConversations()
         return UserConversations()
 
     def _save_user_conversations(
         self, username: str, user_conversations: UserConversations
     ) -> None:
-        """Save all conversations for a user to their JSON file using Pydantic models."""
+        """Save all conversations for a user to their JSON file using Pydantic models with comprehensive error handling."""
         user_file = self._get_user_file_path(username)
+        temp_file = f"{user_file}.tmp"
+
         try:
-            with open(user_file, "w") as file:
+            # Write to temporary file first for atomic operation
+            with open(temp_file, "w", encoding="utf-8") as file:
                 # Convert Pydantic models to JSON-serializable format
                 data = {}
                 for conv_id, conversation in user_conversations.conversations.items():
                     data[conv_id] = conversation.model_dump()
-                json.dump(data, file, indent=2)
+                json.dump(data, file, indent=2, ensure_ascii=False)
+
+            # Atomic move to final location
+            import shutil
+
+            shutil.move(temp_file, user_file)
+
         except IOError as e:
-            print(f"Error saving conversations for {username}: {e}")
-            raise
+            import logging
+
+            logging.error(f"IO error saving conversations for {username}: {e}")
+            # Clean up temp file if it exists
+            try:
+                if os.path.exists(temp_file):
+                    os.remove(temp_file)
+            except:
+                pass
+            raise ConversationStorageError(
+                f"Failed to save conversations for {username}: {e}"
+            )
+        except json.JSONEncodeError as e:
+            import logging
+
+            logging.error(f"JSON encode error saving conversations for {username}: {e}")
+            # Clean up temp file if it exists
+            try:
+                if os.path.exists(temp_file):
+                    os.remove(temp_file)
+            except:
+                pass
+            raise ConversationStorageError(
+                f"Failed to encode conversations for {username}: {e}"
+            )
+        except Exception as e:
+            import logging
+
+            logging.error(
+                f"Unexpected error saving conversations for {username}: {e}",
+                exc_info=True,
+            )
+            # Clean up temp file if it exists
+            try:
+                if os.path.exists(temp_file):
+                    os.remove(temp_file)
+            except:
+                pass
+            raise ConversationStorageError(
+                f"Unexpected error saving conversations for {username}: {e}"
+            )
 
     def create_conversation(self, username: str, chat_name: str) -> str:
         """Create a new conversation and return its ID."""
@@ -382,7 +469,7 @@ class ResponsesAPIClient:
 You are trained to act and respond like a professional software engineer would, with vast knowledge of every programming language and excellent reasoning skills. You write industry-standard clean, elegant code. You output code in Markdown format like so:
 ```lang
 code
-```"""
+```""",
             }
 
             # Add previous response ID for conversation continuity
@@ -403,41 +490,115 @@ code
             return self._handle_general_error(e)
 
     def _handle_rate_limit_error(self, error: openai.RateLimitError) -> dict[str, str]:
-        """Handle rate limiting errors."""
-        print(f"Rate limit exceeded: {error}")
+        """Handle rate limiting errors with detailed logging and user guidance."""
+        import logging
+
+        logging.error(f"Rate limit exceeded: {error}")
+
+        # Extract retry information if available
+        retry_after = getattr(error, "retry_after", None)
+        if retry_after:
+            message = f"Too many requests. Please wait {retry_after} seconds before trying again."
+        else:
+            message = "Too many requests. Please wait a moment before trying again."
+
         return {
             "error": "rate_limit",
-            "message": "Too many requests. Please wait a moment before trying again.",
+            "message": message,
+            "retry_after": retry_after,
+            "user_action": "Please wait before sending another message.",
         }
 
     def _handle_api_error(self, error: openai.APIError) -> dict[str, str]:
-        """Handle OpenAI API errors."""
-        print(f"OpenAI API error: {error}")
+        """Handle OpenAI API errors with comprehensive error mapping."""
+        import logging
 
-        # Handle specific error types
+        logging.error(f"OpenAI API error: {error}")
+
+        # Handle specific error types with user-friendly messages
         if hasattr(error, "code"):
-            if error.code == "model_not_found":
+            if error.code == "model_not_found" or error.code == "model_unavailable":
                 return {
                     "error": "model_unavailable",
-                    "message": "The o4-mini model is currently unavailable. Please try again later.",
+                    "message": "The o4-mini model is currently unavailable. Please try again in a few minutes.",
+                    "user_action": "Try again later or contact support if the issue persists.",
                 }
             elif error.code == "insufficient_quota":
                 return {
                     "error": "quota_exceeded",
-                    "message": "API quota exceeded. Please check your OpenAI account.",
+                    "message": "API usage limit reached. Please check your OpenAI account or try again later.",
+                    "user_action": "Check your OpenAI account billing or wait for quota reset.",
+                }
+            elif error.code == "invalid_request_error":
+                return {
+                    "error": "invalid_request",
+                    "message": "There was an issue with your request. Please try rephrasing your message.",
+                    "user_action": "Try sending a different message or refresh the page.",
+                }
+            elif error.code == "authentication_error":
+                return {
+                    "error": "authentication_error",
+                    "message": "Authentication failed. Please refresh the page and try again.",
+                    "user_action": "Refresh the page or contact support if the issue continues.",
+                }
+            elif error.code == "permission_error":
+                return {
+                    "error": "permission_error",
+                    "message": "Access denied. You don't have permission to use this feature.",
+                    "user_action": "Contact support for assistance with account permissions.",
+                }
+
+        # Handle HTTP status codes
+        if hasattr(error, "status_code"):
+            if error.status_code == 503:
+                return {
+                    "error": "service_unavailable",
+                    "message": "The AI service is temporarily unavailable. Please try again in a few minutes.",
+                    "user_action": "Wait a few minutes and try again.",
+                }
+            elif error.status_code == 502 or error.status_code == 504:
+                return {
+                    "error": "gateway_error",
+                    "message": "Connection to AI service failed. Please try again.",
+                    "user_action": "Check your internet connection and try again.",
                 }
 
         return {
             "error": "api_error",
             "message": "An error occurred while processing your request. Please try again.",
+            "user_action": "Try again or refresh the page if the problem continues.",
         }
 
     def _handle_general_error(self, error: Exception) -> dict[str, str]:
-        """Handle general errors."""
-        print(f"General error in ResponsesAPIClient: {error}")
+        """Handle general errors with logging and user-friendly messages."""
+        import logging
+
+        logging.error(f"General error in ResponsesAPIClient: {error}", exc_info=True)
+
+        # Handle specific exception types
+        if isinstance(error, ConnectionError):
+            return {
+                "error": "connection_error",
+                "message": "Unable to connect to the AI service. Please check your internet connection.",
+                "user_action": "Check your internet connection and try again.",
+            }
+        elif isinstance(error, TimeoutError):
+            return {
+                "error": "timeout_error",
+                "message": "The request timed out. Please try again.",
+                "user_action": "Try again with a shorter message or check your connection.",
+            }
+        elif isinstance(error, json.JSONDecodeError):
+            return {
+                "error": "parsing_error",
+                "message": "Received an invalid response. Please try again.",
+                "user_action": "Try again or refresh the page.",
+            }
+
         return {
             "error": "general_error",
             "message": "An unexpected error occurred. Please try again.",
+            "user_action": "Try again or refresh the page if the problem continues.",
         }
 
     def process_stream_with_processor(
@@ -1314,7 +1475,7 @@ def converse():
             username: str,
             conversation_id: str,
         ):
-            """Start streaming thread using Responses API."""
+            """Start streaming thread using Responses API with comprehensive error handling."""
             event_processor = StreamEventProcessor(event_queue)
 
             try:
@@ -1328,9 +1489,13 @@ def converse():
 
                 # Check if we got an error response
                 if isinstance(stream, dict) and "error" in stream:
-                    event_queue.put(
-                        json.dumps({"type": "error", "message": stream["message"]})
-                    )
+                    error_data = {
+                        "type": "error",
+                        "message": stream.get("message", "An error occurred"),
+                        "error_code": stream.get("error", "unknown_error"),
+                        "user_action": stream.get("user_action", "Please try again."),
+                    }
+                    event_queue.put(json.dumps(error_data))
                     return
 
                 # Process the stream
@@ -1341,18 +1506,87 @@ def converse():
                 final_text = event_processor.accumulated_text
 
                 if final_text and response_id:
-                    # Store assistant response in conversation
-                    conversation_manager.add_message(
-                        username, conversation_id, "assistant", final_text, response_id
+                    try:
+                        # Store assistant response in conversation
+                        conversation_manager.add_message(
+                            username,
+                            conversation_id,
+                            "assistant",
+                            final_text,
+                            response_id,
+                        )
+                    except ConversationStorageError as e:
+                        import logging
+
+                        logging.error(f"Failed to save assistant response: {e}")
+                        event_queue.put(
+                            json.dumps(
+                                {
+                                    "type": "error",
+                                    "message": "Response received but failed to save. Your conversation may be incomplete.",
+                                    "error_code": "storage_error",
+                                    "user_action": "Try refreshing the page or contact support if the issue persists.",
+                                }
+                            )
+                        )
+                elif not final_text:
+                    import logging
+
+                    logging.warning(
+                        f"Empty response received for conversation {conversation_id}"
+                    )
+                    event_queue.put(
+                        json.dumps(
+                            {
+                                "type": "error",
+                                "message": "Received an empty response. Please try again.",
+                                "error_code": "empty_response",
+                                "user_action": "Try rephrasing your message or try again.",
+                            }
+                        )
                     )
 
-            except Exception as e:
-                print(f"Error in responses stream thread: {e}")
+            except ConnectionError as e:
+                import logging
+
+                logging.error(f"Connection error in stream thread: {e}")
                 event_queue.put(
                     json.dumps(
                         {
                             "type": "error",
-                            "message": "An error occurred while processing your request.",
+                            "message": "Connection lost while processing your request. Please check your internet connection.",
+                            "error_code": "connection_error",
+                            "user_action": "Check your internet connection and try again.",
+                        }
+                    )
+                )
+            except TimeoutError as e:
+                import logging
+
+                logging.error(f"Timeout error in stream thread: {e}")
+                event_queue.put(
+                    json.dumps(
+                        {
+                            "type": "error",
+                            "message": "Request timed out. Please try again.",
+                            "error_code": "timeout_error",
+                            "user_action": "Try again or check your connection.",
+                        }
+                    )
+                )
+            except Exception as e:
+                import logging
+
+                logging.error(
+                    f"Unexpected error in responses stream thread: {e}", exc_info=True
+                )
+                event_queue.put(
+                    json.dumps(
+                        {
+                            "type": "error",
+                            "message": "An unexpected error occurred while processing your request.",
+                            "error_code": "stream_thread_error",
+                            "user_action": "Try again or refresh the page if the problem continues.",
                         }
                     )
                 )
@@ -1405,15 +1639,64 @@ class StreamEventProcessor:
         self.accumulated_text = ""
 
     def process_stream(self, stream: Any) -> None:
-        """Process the entire stream of ResponseStreamEvent objects."""
+        """Process the entire stream of ResponseStreamEvent objects with comprehensive error handling."""
         try:
             for event in stream:
                 self._handle_stream_event(event)
-        except Exception as e:
-            print(f"Error processing stream: {e}")
+        except ConnectionError as e:
+            import logging
+
+            logging.error(f"Connection error during stream processing: {e}")
             self.event_queue.put(
                 json.dumps(
-                    {"type": "error", "message": "Error processing response stream"}
+                    {
+                        "type": "error",
+                        "message": "Connection lost during response. Please try again.",
+                        "error_code": "connection_error",
+                        "user_action": "Check your internet connection and try again.",
+                    }
+                )
+            )
+        except TimeoutError as e:
+            import logging
+
+            logging.error(f"Timeout error during stream processing: {e}")
+            self.event_queue.put(
+                json.dumps(
+                    {
+                        "type": "error",
+                        "message": "Response timed out. Please try again.",
+                        "error_code": "timeout_error",
+                        "user_action": "Try again or check your connection.",
+                    }
+                )
+            )
+        except json.JSONDecodeError as e:
+            import logging
+
+            logging.error(f"JSON parsing error during stream processing: {e}")
+            self.event_queue.put(
+                json.dumps(
+                    {
+                        "type": "error",
+                        "message": "Invalid response format received. Please try again.",
+                        "error_code": "parsing_error",
+                        "user_action": "Try again or refresh the page.",
+                    }
+                )
+            )
+        except Exception as e:
+            import logging
+
+            logging.error(f"Unexpected error processing stream: {e}", exc_info=True)
+            self.event_queue.put(
+                json.dumps(
+                    {
+                        "type": "error",
+                        "message": "An error occurred while processing the response. Please try again.",
+                        "error_code": "stream_processing_error",
+                        "user_action": "Try again or refresh the page if the problem continues.",
+                    }
                 )
             )
 
