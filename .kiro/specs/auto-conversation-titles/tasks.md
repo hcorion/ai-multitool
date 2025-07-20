@@ -14,7 +14,8 @@
 
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 2.1, 2.2_
 
-- [ ] 2. Enhance ResponsesAPIClient with title generation method
+- [x] 2. Enhance ResponsesAPIClient with title generation method
+
   - Add generate_conversation_title method to ResponsesAPIClient class
   - Configure method to use o3-mini model with minimal reasoning effort
   - Implement proper error handling and fallback mechanisms
@@ -22,13 +23,19 @@
   - Write unit tests for the new method
   - _Requirements: 1.1, 1.2, 1.3, 1.4_
 
-- [ ] 3. Update ConversationManager to support title updates
+- [x] 3. Update ConversationManager to support title updates
+
+
+
   - Add update_conversation_title method to ConversationManager class
   - Implement file-based storage update for conversation titles
   - Add validation to ensure conversation exists before updating title
   - Handle concurrent access and file locking if necessary
   - Write unit tests for title update functionality
   - _Requirements: 3.1, 3.2, 3.4_
+
+
+
 
 - [ ] 4. Integrate title generation into chat route
   - Modify /chat POST route to generate titles for new conversations
@@ -43,7 +50,6 @@
   - Update chat flow to work without manual title input
   - Modify conversation creation logic to use automatic titles
   - Update TypeScript types if needed for title handling
-  - Test frontend changes to ensure smooth conversation creation
   - _Requirements: 1.1, 3.1, 3.3_
 
 - [ ] 6. Add title update endpoint and frontend handling
@@ -61,11 +67,3 @@
   - Create error monitoring for title generation performance
   - Test all error scenarios and ensure graceful degradation
   - _Requirements: 1.4, 3.4_
-
-- [ ] 8. Write integration tests for complete title generation flow
-  - Create end-to-end tests for automatic title generation in new conversations
-  - Test title generation with various types of user messages
-  - Test error scenarios and fallback behavior
-  - Test frontend title updates and conversation list refresh
-  - Verify that conversation functionality works when title generation fails
-  - _Requirements: 1.1, 1.2, 1.3, 1.4, 2.1, 2.2, 3.1, 3.2, 3.3, 3.4_

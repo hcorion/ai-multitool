@@ -486,6 +486,66 @@ class ConversationManager:
         conversation.last_update = int(time.time())
         self._save_user_conversations(username, user_conversations)
 
+    def update_conversation_title(
+        self, username: str, conversation_id: str, title: str
+    ) -> bool:
+        """Update the title of an existing conversation."""
+        try:
+            user_conversations = self._load_user_conversations(username)
+
+            conversation = user_conversations.get_conversation(conversation_id)
+            if not conversation:
+                import logging
+
+                logging.warning(
+                    f"Conversation {conversation_id} not found for user {username}"
+                )
+                return False
+
+            # Validate and sanitize the title
+            if not title or not isinstance(title, str):
+                import logging
+
+                logging.warning(
+                    f"Invalid title provided for conversation {conversation_id}: {title}"
+                )
+                return False
+
+            # Clean the title for storage (same logic as create_conversation)
+            clean_title = re.sub(r"[^\w_. -]", "_", title.strip())
+            if len(clean_title) > 30:
+                clean_title = clean_title[:30]
+
+            # Update the conversation title
+            conversation.chat_name = clean_title
+            conversation.last_update = int(time.time())
+
+            # Save the updated conversations
+            self._save_user_conversations(username, user_conversations)
+
+            import logging
+
+            logging.info(
+                f"Updated title for conversation {conversation_id} to '{clean_title}'"
+            )
+            return True
+
+        except ConversationStorageError as e:
+            import logging
+
+            logging.error(
+                f"Storage error updating title for conversation {conversation_id}: {e}"
+            )
+            return False
+        except Exception as e:
+            import logging
+
+            logging.error(
+                f"Unexpected error updating title for conversation {conversation_id}: {e}",
+                exc_info=True,
+            )
+            return False
+
     def list_conversations(self, username: str) -> dict[str, Any]:
         """List all conversations for a user."""
         user_conversations = self._load_user_conversations(username)
@@ -1615,12 +1675,50 @@ def converse():
                 return {"error": "Conversation not found"}, 404
             print(f"Using existing conversation: {conversation_id}")
         else:
-            # Create new conversation
+            # Create new conversation with temporary title
             chat_name = request.json.get("chat_name", "New Chat")
             conversation_id = conversation_manager.create_conversation(
                 username, chat_name
             )
             print(f"Created new conversation: {conversation_id}")
+
+            # Generate title asynchronously for new conversations
+            def generate_title_async():
+                """Generate and update conversation title asynchronously."""
+                try:
+                    # Generate title using the user's first message
+                    generated_title = responses_client.generate_conversation_title(
+                        user_input
+                    )
+
+                    # Update the conversation with the generated title
+                    success = conversation_manager.update_conversation_title(
+                        username, conversation_id, generated_title
+                    )
+
+                    if success:
+                        import logging
+
+                        logging.info(
+                            f"Successfully generated title '{generated_title}' for conversation {conversation_id}"
+                        )
+                    else:
+                        import logging
+
+                        logging.warning(
+                            f"Failed to update title for conversation {conversation_id}"
+                        )
+
+                except Exception as e:
+                    import logging
+
+                    logging.error(
+                        f"Error generating title for conversation {conversation_id}: {e}",
+                        exc_info=True,
+                    )
+
+            # Start title generation in background thread
+            threading.Thread(target=generate_title_async, daemon=True).start()
 
         # Add user message to conversation
         conversation_manager.add_message(username, conversation_id, "user", user_input)
