@@ -706,6 +706,111 @@ code
             print(f"Error processing stream events: {e}")
             yield {"type": "error", "message": "Error processing response stream"}
 
+    def generate_conversation_title(self, user_message: str) -> str:
+        """Generate a conversation title using o3-mini with minimal reasoning."""
+        try:
+            # Truncate very long messages to avoid excessive API costs
+            truncated_message = (
+                user_message[:500] if len(user_message) > 500 else user_message
+            )
+
+            # Call OpenAI API with o3-mini and minimal reasoning for cost efficiency
+            response = self.client.responses.create(
+                model="o3-mini",  # Use o3-mini for cost efficiency
+                input=f"Generate a title for this conversation:\n\nUser message: {truncated_message}",
+                instructions=self._get_title_generation_instructions(),
+                stream=False,
+                reasoning={"effort": "low"},  # Minimal reasoning for cost efficiency
+                max_output_tokens=50,  # Limit output for title generation
+            )
+
+            # Extract title from response
+            if hasattr(response, "output") and response.output:
+                title = response.output.strip()
+                return self._sanitize_title(title)
+            else:
+                import logging
+
+                logging.warning("Empty response from o3-mini for title generation")
+                return self._generate_fallback_title()
+
+        except openai.RateLimitError as e:
+            import logging
+
+            logging.warning(f"Rate limit exceeded for title generation: {e}")
+            return self._generate_fallback_title()
+
+        except openai.APIError as e:
+            import logging
+
+            logging.error(f"OpenAI API error during title generation: {e}")
+            return self._generate_fallback_title()
+
+        except Exception as e:
+            import logging
+
+            logging.error(
+                f"Unexpected error during title generation: {e}", exc_info=True
+            )
+            return self._generate_fallback_title()
+
+    def _get_title_generation_instructions(self) -> str:
+        """Get the system instructions for title generation."""
+        return """You are a title generator for chat conversations. Create a concise, descriptive title (maximum 30 characters) based on the user's message.
+
+INSTRUCTIONS:
+- Extract the main topic, technology, or subject matter
+- Use specific technical terms when mentioned (e.g., "Python", "React", "API")
+- For coding questions, include the programming language or framework
+- For general questions, focus on the core subject
+- Avoid generic words like "help", "question", "how to", "assistance"
+- Use title case (capitalize important words)
+- Be specific and descriptive within the character limit
+
+EXAMPLES:
+- "How do I implement binary search in Python?" → "Python Binary Search"
+- "What's the difference between React and Vue?" → "React vs Vue Comparison"
+- "Help me debug this JavaScript error" → "JavaScript Debug Error"
+- "Can you explain machine learning?" → "Machine Learning Basics"
+- "I need help with CSS flexbox" → "CSS Flexbox Layout"
+
+Generate only the title (no quotes, no extra text)."""
+
+    def _sanitize_title(self, title: str) -> str:
+        """Ensure title meets length and content requirements."""
+        if not title:
+            return self._generate_fallback_title()
+
+        # Remove any quotes or extra whitespace
+        title = title.strip().strip("\"'")
+
+        # Remove any newlines or special characters that might break display
+        title = re.sub(r"[\n\r\t]", " ", title)
+        title = re.sub(r"\s+", " ", title)  # Collapse multiple spaces
+
+        # Truncate to 30 characters maximum
+        if len(title) > 30:
+            title = title[:27] + "..."
+
+        # If title is too short or generic, use fallback
+        if len(title.strip()) < 3 or title.lower() in [
+            "chat",
+            "conversation",
+            "help",
+            "hi",
+            "hello",
+        ]:
+            return self._generate_fallback_title()
+
+        return title
+
+    def _generate_fallback_title(self) -> str:
+        """Generate fallback title when AI generation fails."""
+        from datetime import datetime
+
+        date_str = datetime.now().strftime("%m/%d %H:%M")
+        return f"Chat - {date_str}"
+
 
 # Initialize the conversation manager
 conversation_manager = ConversationManager(app.static_folder or "static")
