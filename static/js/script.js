@@ -392,6 +392,109 @@ function refreshConversationList() {
         conversationsList.replaceChildren(...children);
     });
 }
+function updateConversationTitle(conversationId, newTitle) {
+    /**
+     * Update a conversation title on the server and refresh the conversation list.
+     */
+    $.ajax({
+        type: "POST",
+        url: "/update-conversation-title",
+        contentType: "application/json",
+        data: JSON.stringify({
+            conversation_id: conversationId,
+            title: newTitle
+        }),
+        success: (response) => {
+            if (response.success) {
+                console.log("Title updated successfully:", newTitle);
+                // Update local conversations cache with the server response
+                allConversations = response.conversations;
+                // Refresh the conversation list display
+                refreshConversationListFromCache();
+            }
+            else {
+                console.error("Failed to update title:", response.error);
+            }
+        },
+        error: (xhr, status, error) => {
+            console.error("Error updating conversation title:", error);
+        }
+    });
+}
+function refreshConversationListFromCache() {
+    /**
+     * Refresh the conversation list display using cached conversation data.
+     * This is more efficient than making another server request.
+     */
+    const conversationsList = document.getElementById("conversations-list");
+    let children = [];
+    for (let key in allConversations) {
+        let value = allConversations[key];
+        var convoItem = document.createElement("div");
+        convoItem.className = "conversation-item";
+        let creationDate = new Date(value.data.created_at * 1000);
+        convoItem.textContent = `${value.chat_name}\n${creationDate.toDateString()}`;
+        convoItem.setAttribute("data-conversation-id", key);
+        convoItem.addEventListener("click", onConversationSelected);
+        conversationsList.appendChild(convoItem);
+        children.unshift(convoItem);
+    }
+    conversationsList.replaceChildren(...children);
+}
+function scheduleConversationTitleRefresh(conversationId) {
+    /**
+     * Schedule periodic checks for AI-generated title updates for new conversations.
+     * This polls the server to see if the title has been updated from "New Chat" to an AI-generated title.
+     */
+    let attempts = 0;
+    const maxAttempts = 10; // Check for up to 30 seconds (3s * 10)
+    const checkInterval = 3000; // Check every 3 seconds
+    const checkForTitleUpdate = () => {
+        attempts++;
+        // Stop checking after max attempts or if conversation no longer exists
+        if (attempts > maxAttempts || !allConversations[conversationId]) {
+            console.log(`Stopped checking for title update for conversation ${conversationId}`);
+            return;
+        }
+        // Check if the title is still "New Chat" (meaning it hasn't been updated yet)
+        if (allConversations[conversationId].chat_name === "New Chat") {
+            console.log(`Checking for title update for conversation ${conversationId} (attempt ${attempts})`);
+            // Refresh the conversation list to get updated titles
+            $.get("/get-all-conversations", (response) => {
+                try {
+                    let conversations = JSON.parse(response);
+                    // Check if this conversation's title has been updated
+                    if (conversations[conversationId] && conversations[conversationId].chat_name !== "New Chat") {
+                        console.log(`Title updated for conversation ${conversationId}: ${conversations[conversationId].chat_name}`);
+                        // Update local cache
+                        allConversations = conversations;
+                        // Refresh the conversation list display
+                        refreshConversationListFromCache();
+                        // Stop checking since we found the update
+                        return;
+                    }
+                    // Schedule next check if title hasn't been updated yet
+                    setTimeout(checkForTitleUpdate, checkInterval);
+                }
+                catch (error) {
+                    console.error("Error parsing conversation list response:", error);
+                    // Continue checking despite the error
+                    setTimeout(checkForTitleUpdate, checkInterval);
+                }
+            }).fail((xhr, status, error) => {
+                console.error("Error fetching conversation list:", error);
+                // Continue checking despite the error
+                setTimeout(checkForTitleUpdate, checkInterval);
+            });
+        }
+        else {
+            // Title has already been updated, stop checking
+            console.log(`Title already updated for conversation ${conversationId}: ${allConversations[conversationId].chat_name}`);
+        }
+    };
+    // Start the first check after a short delay to give the server time to generate the title
+    setTimeout(checkForTitleUpdate, 2000); // Wait 2 seconds before first check
+}
 function onConversationSelected(ev) {
     let conversationId = this.getAttribute("data-conversation-id");
     console.log(`conversation: ${conversationId}`);
@@ -493,6 +596,7 @@ function sendChatMessage() {
             chat.refreshChatMessages(cachedMessageList);
             // Just populate it with dummy data so that we have data in case the refresh takes too long
             let currentTimeEpoch = new Date(Date.now()).getUTCSeconds();
+            const isNewConversation = !allConversations[chatData.threadId];
             allConversations[chatData.threadId] = {
                 data: {
                     id: chatData.threadId,
@@ -503,6 +607,10 @@ function sendChatMessage() {
                 chat_name: chatName,
                 last_update: currentTimeEpoch,
             };
+            // For new conversations, set up title refresh to catch AI-generated titles
+            if (isNewConversation && chatName === "New Chat") {
+                scheduleConversationTitleRefresh(chatData.threadId);
+            }
         }
         else if (chatData.type == "text_created") {
             cachedMessageList.push({ role: "assistant", text: "" });

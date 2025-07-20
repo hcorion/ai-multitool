@@ -48,14 +48,17 @@
   - Handle title generation errors gracefully without affecting chat functionality
   - _Requirements: 1.1, 3.1, 3.2, 3.3_
 
-- [ ] 5. Remove manual title prompt from frontend
+- [-] 5. Remove manual title prompt from frontend
+
   - Remove prompt() call from sendChatMessage function in script.ts
   - Update chat flow to work without manual title input
   - Modify conversation creation logic to use automatic titles
   - Update TypeScript types if needed for title handling
   - _Requirements: 1.1, 3.1, 3.3_
 
-- [ ] 6. Add title update endpoint and frontend handling
+- [x] 6. Add title update endpoint and frontend handling
+
+
   - Create /update-conversation-title POST endpoint in Flask app
   - Implement frontend JavaScript to handle title updates from server
   - Add real-time title updates to conversation list without page refresh

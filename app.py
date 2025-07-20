@@ -514,7 +514,7 @@ class ConversationManager:
             # Clean the title for storage (same logic as create_conversation)
             clean_title = re.sub(r"[^\w_. -]", "_", title.strip())
             if len(clean_title) > 30:
-                clean_title = clean_title[:30]
+                clean_title = f"{clean_title[:27]}..."
 
             # Update the conversation title
             conversation.chat_name = clean_title
@@ -780,17 +780,14 @@ code
                 input=f"Generate a title for this conversation:\n\nUser message: {truncated_message}",
                 instructions=self._get_title_generation_instructions(),
                 stream=False,
-                reasoning={"effort": "low"},  # Minimal reasoning for cost efficiency
-                max_output_tokens=50,  # Limit output for title generation
+                reasoning={"effort": "low"}, # Minimal reasoning for cost efficiency
             )
 
             # Extract title from response
-            if hasattr(response, "output") and response.output:
-                title = response.output.strip()
-                return self._sanitize_title(title)
+            if hasattr(response, 'output_text') and response.output_text:
+                return self._sanitize_title(response.output_text)
             else:
                 import logging
-
                 logging.warning("Empty response from o3-mini for title generation")
                 return self._generate_fallback_title()
 
@@ -839,6 +836,8 @@ Generate only the title (no quotes, no extra text)."""
     def _sanitize_title(self, title: str) -> str:
         """Ensure title meets length and content requirements."""
         if not title:
+            import logging
+            logging.error("No title to sanitize!")
             return self._generate_fallback_title()
 
         # Remove any quotes or extra whitespace
@@ -860,6 +859,8 @@ Generate only the title (no quotes, no extra text)."""
             "hi",
             "hello",
         ]:
+            import logging
+            logging.error(f"Title \"{title.strip()}\" too generic!")
             return self._generate_fallback_title()
 
         return title
@@ -1629,6 +1630,50 @@ def get_all_conversations() -> str:
     return json.dumps(conversations)
 
 
+@app.route("/update-conversation-title", methods=["POST"])
+def update_conversation_title():
+    """Update conversation title and return updated conversation list."""
+    if "username" not in session:
+        return jsonify({"error": "Username not in session"}), 401
+
+    username = session["username"]
+    
+    if not request.json:
+        return jsonify({"error": "Invalid request format"}), 400
+    
+    conversation_id = request.json.get("conversation_id")
+    new_title = request.json.get("title")
+    
+    if not conversation_id or not new_title:
+        return jsonify({"error": "Missing conversation_id or title"}), 400
+    
+    try:
+        # Update the conversation title
+        success = conversation_manager.update_conversation_title(username, conversation_id, new_title)
+        
+        if success:
+            # Return updated conversation list
+            conversations = conversation_manager.list_conversations(username)
+            return jsonify({
+                "success": True,
+                "message": "Title updated successfully",
+                "conversations": conversations
+            })
+        else:
+            return jsonify({
+                "success": False,
+                "error": "Failed to update conversation title"
+            }), 400
+            
+    except Exception as e:
+        import logging
+        logging.error(f"Error updating conversation title: {e}", exc_info=True)
+        return jsonify({
+            "success": False,
+            "error": "Internal server error"
+        }), 500
+
+
 # Old get_message_list function removed - now using ConversationManager.get_message_list()
 
 
@@ -1717,8 +1762,7 @@ def converse():
                         exc_info=True,
                     )
 
-            # Start title generation in background thread
-            threading.Thread(target=generate_title_async, daemon=True).start()
+            generate_title_async()
 
         # Add user message to conversation
         conversation_manager.add_message(username, conversation_id, "user", user_input)
