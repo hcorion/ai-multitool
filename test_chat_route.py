@@ -4,13 +4,11 @@ Test script for the updated chat route with Responses API integration.
 """
 
 import json
-import os
-import tempfile
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 from queue import Queue
 
 # Import the necessary components from app.py
-from app import app, conversation_manager, responses_client, StreamEventProcessor
+from app import conversation_manager, responses_client, StreamEventProcessor
 
 
 class MockResponsesStream:

@@ -32,7 +32,6 @@ from flask import (
     stream_with_context,
     url_for,
 )
-from openai.types.responses.response_stream_event import ResponseStreamEvent
 from PIL import Image as PILImage
 from PIL.PngImagePlugin import PngInfo
 from pydantic import BaseModel, Field
@@ -366,7 +365,7 @@ class ConversationManager:
                 try:
                     if os.path.exists(temp_file):
                         os.remove(temp_file)
-                except:
+                except OSError:
                     pass
                 raise ConversationStorageError(
                     f"Failed to save conversations for {username}: {e}"
@@ -381,7 +380,7 @@ class ConversationManager:
                 try:
                     if os.path.exists(temp_file):
                         os.remove(temp_file)
-                except:
+                except OSError:
                     pass
                 raise ConversationStorageError(
                     f"Failed to encode conversations for {username}: {e}"
@@ -397,7 +396,7 @@ class ConversationManager:
                 try:
                     if os.path.exists(temp_file):
                         os.remove(temp_file)
-                except:
+                except OSError:
                     pass
                 raise ConversationStorageError(
                     f"Unexpected error saving conversations for {username}: {e}"

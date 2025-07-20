@@ -4,11 +4,7 @@ Test script to verify that all Assistants API dependencies have been removed.
 This test ensures the migration is complete and no old API code remains.
 """
 
-import ast
-import inspect
-import json
 import re
-from typing import Any
 
 # Import the app to test
 import app

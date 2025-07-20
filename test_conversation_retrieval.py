@@ -6,8 +6,6 @@ This tests the updated routes and functions that now use local storage instead o
 
 import json
 import time
-from unittest.mock import patch
-from flask import Flask
 
 # Import the necessary components from app.py
 from app import app, conversation_manager

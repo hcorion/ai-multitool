@@ -7,10 +7,8 @@ This tests all the enhanced error handling scenarios for the Responses API migra
 import json
 import os
 import tempfile
-import time
 from queue import Queue
-from unittest.mock import Mock, patch, MagicMock
-from typing import Any
+from unittest.mock import Mock, patch
 
 # Import the necessary components from app.py
 from app import (
@@ -18,9 +16,7 @@ from app import (
     conversation_manager, 
     responses_client, 
     StreamEventProcessor,
-    ConversationStorageError,
-    ModerationException,
-    DownloadError
+    ConversationStorageError
 )
 import openai
 

@@ -5,12 +5,11 @@ This tests the complete conversation flow across multiple message exchanges.
 """
 
 import json
-import time
 from queue import Queue
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 
 # Import the necessary components from app.py
-from app import app, conversation_manager, responses_client, StreamEventProcessor
+from app import conversation_manager, responses_client, StreamEventProcessor
 
 
 class MockResponsesStream:
@@ -186,7 +185,7 @@ def test_responses_client_previous_response_id():
         mock_create.return_value = MockResponsesStream("resp_new_789", "API response")
         
         # Call create_response with previous_response_id
-        result = responses_client.create_response(
+        responses_client.create_response(
             input_text=test_input,
             previous_response_id=test_previous_id,
             stream=True,
@@ -200,10 +199,10 @@ def test_responses_client_previous_response_id():
         # Check that previous_response_id was passed
         assert call_args[1]["previous_response_id"] == test_previous_id, "previous_response_id not passed correctly"
         assert call_args[1]["input"] == test_input, "input not passed correctly"
-        assert call_args[1]["stream"] == True, "stream not passed correctly"
+        assert call_args[1]["stream"] is True, "stream not passed correctly"
         assert call_args[1]["user"] == test_username, "user parameter not passed correctly"
         assert call_args[1]["model"] == "o4-mini", "model not set correctly"
-        assert call_args[1]["store"] == True, "store parameter not set correctly"
+        assert call_args[1]["store"] is True, "store parameter not set correctly"
         
         print("✓ ResponsesAPIClient correctly passes previous_response_id to OpenAI API")
         print("✓ All other parameters passed correctly")

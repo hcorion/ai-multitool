@@ -4,13 +4,10 @@ Test script to verify conversation context preservation with the o4-mini model.
 This test makes actual API calls to verify the integration works end-to-end.
 """
 
-import json
-import time
-from queue import Queue
 from unittest.mock import patch
 
 # Import the necessary components from app.py
-from app import app, conversation_manager, responses_client, StreamEventProcessor
+from app import conversation_manager, responses_client
 
 
 def test_o4_mini_model_configuration():

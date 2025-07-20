@@ -5,7 +5,6 @@ Test script for StreamEventProcessor with real Responses API event types.
 
 import json
 from queue import Queue
-from typing import Any
 
 # Import the actual StreamEventProcessor from app.py
 from app import StreamEventProcessor

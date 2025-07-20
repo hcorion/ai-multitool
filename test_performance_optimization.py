@@ -4,18 +4,13 @@ Test script for performance optimization and final validation.
 This tests the optimized performance features for the Responses API migration.
 """
 
-import json
 import os
-import tempfile
 import time
-import threading
 from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import Mock, patch
-from typing import Any
 
 # Import the necessary components from app.py
 from app import (
-    app, 
     conversation_manager, 
     responses_client, 
     StreamEventProcessor,
