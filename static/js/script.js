@@ -454,13 +454,12 @@ var progressNum = 0;
 function sendChatMessage() {
     var chatName = "";
     if (currentThreadId) {
+        // Use existing conversation title
         chatName = allConversations[currentThreadId].chat_name;
     }
-    while (!chatName) {
-        chatName = prompt("Please title this conversation (max 30 chars):", "Conversation");
-        if (chatName.length > 30) {
-            chatName = "";
-        }
+    else {
+        // For new conversations, use a default title (server will generate the actual title)
+        chatName = "New Chat";
     }
     const chatInput = document.getElementById("chat-input");
     const sendChatButton = document.getElementById("send-chat");

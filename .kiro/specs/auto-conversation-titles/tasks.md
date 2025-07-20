@@ -41,6 +41,9 @@
   - Modify /chat POST route to generate titles for new conversations
   - Implement asynchronous title generation to avoid blocking conversation flow
   - Update conversation creation flow to use temporary title initially
+
+
+
   - Add title generation call after successful conversation creation
   - Handle title generation errors gracefully without affecting chat functionality
   - _Requirements: 1.1, 3.1, 3.2, 3.3_

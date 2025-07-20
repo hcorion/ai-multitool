@@ -3,6 +3,7 @@ import("./chat.js").then((chat) => {
 
     const conversationId = urlParams.get('id')
     if (conversationId) {
+        // @ts-ignore
         chat.onConversationSelected(conversationId, (chatData: chat.MessageHistory) => {
             chat.refreshChatMessages(chatData.messages);
         })
