@@ -106,7 +106,6 @@ class ConversationStorageError(Exception):
 
 
 class GeneratedImageData:
-    image_url: str
     local_image_path: str
     revised_prompt: str
     prompt: str
@@ -114,13 +113,11 @@ class GeneratedImageData:
 
     def __init__(
         self,
-        image_url: str,
         local_image_path: str,
         revised_prompt: str,
         prompt: str,
         image_name: str,
     ):
-        self.image_url = image_url
         self.local_image_path = local_image_path
         self.revised_prompt = revised_prompt
         self.prompt = prompt
@@ -1077,8 +1074,6 @@ def generate_novelai_image(
             file_bytes, prompt, revised_prompt, username, image_metadata
         )
         return GeneratedImageData(
-            # TODO: We need to remove this field, we don't actually get a URL from Stability AI so just stub it
-            "https://image.novelai.net",
             saved_data.local_image_path,
             revised_prompt,
             prompt,
@@ -1146,8 +1141,6 @@ def generate_stability_image(
             file_bytes, prompt, prompt, username, image_metadata
         )
         return GeneratedImageData(
-            # TODO: We need to remove this field, we don't actually get a URL from Stability AI so just stub it
-            "https://platform.stability.ai/",
             saved_data.local_image_path,
             prompt,
             prompt,
@@ -1166,21 +1159,26 @@ def generate_dalle_image(
     username: str,
     size: str = "1024x1024",
     quality: str = "standard",
-    style: str = "vivid",
     strict_follow_prompt: bool = False,
+    seed: int = 0,
 ) -> GeneratedImageData:
-    before_prompt = prompt
+    if not app.static_folder:
+        raise ValueError("Flask static folder not defined")
+
+    revised_prompt = make_prompt_dynamic(prompt, username, app.static_folder, seed)
+    before_prompt = revised_prompt
+
     if strict_follow_prompt:
-        if len(prompt) < 800:
-            prompt = (
+        if len(revised_prompt) < 800:
+            revised_prompt = (
                 "I NEED to test how the tool works with extremely simple prompts. DO NOT add any detail, just use it AS-IS:\n"
-                + prompt
+                + revised_prompt
             )
         else:
-            prompt = "My prompt has full detail so no need to add more:\n" + prompt
+            revised_prompt = "My prompt has full detail so no need to add more:\n" + revised_prompt
 
     # Run the prompt through moderation first, I don't want to get my account banned.
-    moderation = client.moderations.create(input=prompt)
+    moderation = client.moderations.create(input=revised_prompt)
     for result in moderation.results:
         if result.flagged:
             flagged_categories = ""
@@ -1191,45 +1189,36 @@ def generate_dalle_image(
                 flagged_categories = flagged_categories[:-2]
             raise ModerationException(message=flagged_categories)
 
-    # Call DALL-E 3 API
+    # Call OpenAI Image Generation API
     response = client.images.generate(
-        model="dall-e-3",
-        prompt=prompt,
+        model="gpt-image-1",
+        prompt=revised_prompt,
+        moderation="low",
         size=size,  # type: ignore
-        style=style,  # type: ignore
         quality=quality,  # type: ignore
         n=1,
     )
-    if not response.data or not response.data[0].url:
+    if not response.data or not response.data[0].b64_json:
         raise DownloadError("Was not able to get image url")
-    image_url = response.data[0].url
-    print(f"url: {image_url}")
-    revised_prompt = response.data[0].revised_prompt
+    decoded_data = base64.b64decode(response.data[0].b64_json)
 
-    # Download the image
-    image_response = requests.get(image_url)
-    if image_response.status_code == 200 and revised_prompt:
-        saved_data = process_image_response(
-            io.BytesIO(image_response.content),
-            before_prompt,
-            revised_prompt,
-            username,
-            {
-                "Prompt": prompt,
-                "Quality": quality,
-                "Style": style,
-                "Revised Prompt": revised_prompt,
-            },
-        )
-        return GeneratedImageData(
-            image_url,
-            saved_data.local_image_path,
-            revised_prompt,
-            prompt,
-            saved_data.image_name,
-        )
-    else:
-        raise DownloadError(f"Error downloading image {image_response.status_code}")
+    saved_data = process_image_response(
+        io.BytesIO(decoded_data),
+        before_prompt,
+        revised_prompt,
+        username,
+        {
+            "Prompt": prompt,
+            "Quality": quality,
+            "Revised Prompt": revised_prompt,
+        },
+    )
+    return GeneratedImageData(
+        saved_data.local_image_path,
+        revised_prompt,
+        prompt,
+        saved_data.image_name,
+    )
 
 
 def get_file_count(username: str, static_folder: str) -> int:
@@ -1316,6 +1305,9 @@ def generate_seed_for_provider(provider: str) -> int | None:
         return random.getrandbits(32)
     elif provider == "novelai":
         return random.getrandbits(64)
+    elif provider == "openai":
+        # We just use the seed for prompt generation for OpenAI, since the API doesn't allow passing in a seed
+        return random.getrandbits(32)
     return
 
 
@@ -1329,33 +1321,32 @@ def generate_image(
 ) -> GeneratedImageData:
     if not seed or seed <= 0:
         seed = generate_seed_for_provider(provider)
+    
+    if not seed:
+        raise ValueError("Unable to get 'seed' field.")
+
     if provider == "openai":
         quality = request.form.get("quality")
-        style = request.form.get("style")
         strict_follow_prompt = request.form.get("add-follow-prompt")
 
         if not size:
             raise ValueError("Unable to get 'size' field.")
         if not quality:
             raise ValueError("Unable to get 'quality' field.")
-        if not style:
-            raise ValueError("Unable to get 'style' field.")
 
         return generate_dalle_image(
             prompt,
             session["username"],
             size,
             quality,
-            style,
             bool(strict_follow_prompt),
+            seed,
         )
     elif provider == "stabilityai":
         negative_prompt = request.form.get("negative_prompt")
         aspect_ratio = request.form.get("aspect_ratio")
         upscale = bool(request.form.get("upscale"))
 
-        if not seed:
-            raise ValueError("Unable to get 'seed' field.")
         if not aspect_ratio:
             raise ValueError("Unable to get 'aspect_ratio' field.")
 
@@ -1373,8 +1364,6 @@ def generate_image(
         aspect_ratio = request.form.get("aspect_ratio")
         upscale = bool(request.form.get("upscale"))
 
-        if not seed:
-            raise ValueError("Unable to get 'seed' field.")
         if not size:
             raise ValueError("Unable to get 'size' field.")
 
@@ -1479,7 +1468,6 @@ def generate_image_grid(
     os.rename(image_thumb_filename_apng, image_thumb_filename)
 
     return GeneratedImageData(
-        image_url="none",
         local_image_path=image_filename,
         revised_prompt=image_data_list[dynamic_prompts[0]].revised_prompt,
         prompt=prompt,
@@ -1492,7 +1480,6 @@ def index():
     if "username" not in session:
         return redirect(url_for("login"))
     if request.method == "POST":
-        image_url = None
         local_image_path = None
         image_name = None
         prompt = None
@@ -1522,14 +1509,12 @@ def index():
                 generated_image_data = generate_image_grid(
                     provider, prompt, size, seed, grid_prompt_file, request
                 )
-                image_url = generated_image_data.image_url
                 local_image_path = generated_image_data.local_image_path
                 image_name = generated_image_data.image_name
                 prompt = generated_image_data.prompt
                 revised_prompt = generated_image_data.revised_prompt
                 return render_template(
                     "result-section.html",
-                    image_url=image_url,
                     local_image_path=local_image_path,
                     revised_prompt=revised_prompt,
                     prompt=prompt,
@@ -1540,14 +1525,12 @@ def index():
                 generated_image_data = generate_image(
                     provider, prompt, size, request, seed
                 )
-                image_url = generated_image_data.image_url
                 local_image_path = generated_image_data.local_image_path
                 image_name = generated_image_data.image_name
                 prompt = generated_image_data.prompt
                 revised_prompt = generated_image_data.revised_prompt
                 return render_template(
                     "result-section.html",
-                    image_url=image_url,
                     local_image_path=local_image_path,
                     revised_prompt=revised_prompt,
                     prompt=prompt,
@@ -1558,7 +1541,6 @@ def index():
             error_message = f"Your prompt doesn't pass OpenAI moderation. It triggers the following flags: {e.message}. Please adjust your prompt."
             return render_template(
                 "result-section.html",
-                image_url=image_url,
                 local_image_path=local_image_path,
                 revised_prompt=revised_prompt,
                 prompt=prompt,
@@ -1570,10 +1552,9 @@ def index():
             error_message = error["error"]["message"]
             error_code = error["error"]["code"]
             if error_code == "content_policy_violation":
-                error_message = "DALL-E 3 has generated an image that doesn't pass it's own moderation filters. You may want to adjust your prompt slightly."
+                error_message = "OpenAI Image Generation has generated an image that doesn't pass it's own moderation filters. You may want to adjust your prompt slightly."
             return render_template(
                 "result-section.html",
-                image_url=image_url,
                 local_image_path=local_image_path,
                 revised_prompt=revised_prompt,
                 prompt=prompt,
@@ -1589,7 +1570,6 @@ def index():
             error_message = f"Error processing request: {exc_type} {error}: {fname}"
             return render_template(
                 "result-section.html",
-                image_url=image_url,
                 local_image_path=local_image_path,
                 revised_prompt=revised_prompt,
                 prompt=prompt,
@@ -1599,7 +1579,6 @@ def index():
 
         return render_template(
             "result-section.html",
-            image_url=image_url,
             local_image_path=local_image_path,
             revised_prompt=revised_prompt,
             prompt=prompt,

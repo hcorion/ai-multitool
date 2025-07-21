@@ -31,16 +31,16 @@
         <form id="prompt-form">
             <label for="provider">Select Provider:</label>
             <select name="provider" id="provider">
-                <option value="openai">OpenAI (DALL-E 3)</option>
+                <option value="openai">OpenAI (GPT Image 1)</option>
                 <option value="stabilityai">Stability AI (Stable Diffusion 3)</option>
                 <option value="novelai">NovelAI</option>
             </select><br><br>
 
             <label for="size" class="openai novelai">Select Size:</label>
             <select name="size" id="size" class="openai novelai">
-                <option value="1024x1792" class="openai">1024x1792 (Portrait)</option>
+                <option value="1024x1536" class="openai">1024x1536 (Portrait)</option>
                 <option value="1024x1024" class="openai">1024x1024 (Square)</option>
-                <option value="1792x1024" class="openai">1792x1024 (Landscape)</option>
+                <option value="1536x1024" class="openai">1536x1024 (Landscape)</option>
                 <option value="832x1216" class="novelai">832x1216 (Portrait)</option>
                 <option value="640x1600" class="novelai">640x1600 (Portrait Tall)</option>
                 <option value="1024x1024" class="novelai">1024x1024 (Square)</option>
@@ -63,22 +63,16 @@
 
             <label for="quality" class="openai">Select Quality:</label>
             <select name="quality" id="quality" class="openai">
-                <option value="standard">standard</option>
-                <option value="hd">HD</option>
+                <option value="high">high</option>
+                <option value="medium">medium</option>
+                <option value="low">low</option>
             </select><br class="openai"><br class="openai">
 
-            <label for="style" class="openai">Select Style:</label>
-            <div id="styleDescription" style="font-size: medium;" class="openai">(Vivid causes the model to lean towards
-                generating hyper-real and dramatic images.)</div>
-            <select name="style" id="style" class="openai">
-                <option value="vivid">Vivid</option>
-                <option value="natural">Natural</option>
-            </select>
             <br class="openai"><br class="openai">
 
-            <label for="seed" class="stabilityai">Select Seed (0 means random):</label>
+            <label for="seed" class="stabilityai novelai openai">Select Seed (0 means random):</label>
             <input name="seed" id="seed" type="number" value="0" min="0" max="18446744073709551615" step="1"
-                class="stabilityai novelai" />
+                class="stabilityai novelai openai" />
             <div class="prompt-checkbox-group stabilityai novelai">
                 <input type="checkbox" id="upscale" class="prompt-checkbox stabilityai novelai" name="upscale">
                 <label class="prompt-checkbox-label stabilityai novelai" for="upscale" id="upscale">Upscale</label>

@@ -177,7 +177,10 @@ def remove_stop_words(input_string: str) -> str:
             "skindentation",
             "artist",
             "dynamic",
-            "pose"
+            "pose",
+            "ai",
+            "generated",
+            "assisted"
         ]
     )
 

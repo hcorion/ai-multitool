@@ -32,7 +32,6 @@ document.addEventListener("DOMContentLoaded", () => {
     addEventListenerToElement("gridViewTab", "click", handleTabClick);
     addEventListenerToElement("chatTab", "click", handleTabClick);
 
-    addEventListenerToElement("style", "input", updateStyleDescription);
     addEventListenerToElement("prompt", "input", updateCharacterCount);
 
     // Grid buttons
@@ -151,20 +150,6 @@ function updateCharacterCount(): void {
     const charCount: number = promptInput.value.length;
     const charCountDisplay = document.getElementById("charCount") as HTMLDivElement;
     charCountDisplay.textContent = `${charCount} / 4000`;
-}
-
-function updateStyleDescription(): void {
-    const styleInput = document.getElementById("style") as HTMLSelectElement;
-    const currentStyle: string = styleInput.value;
-    const styleDescriptionDisplay = document.getElementById("styleDescription") as HTMLDivElement;
-
-    if (currentStyle === "vivid") {
-        styleDescriptionDisplay.textContent =
-            "(Vivid causes the model to lean towards generating hyper-real and dramatic images)";
-    } else if (currentStyle === "natural") {
-        styleDescriptionDisplay.textContent =
-            "(Natural causes the model to produce more natural, less hyper-real looking images)";
-    }
 }
 
 function openTab(evt: MouseEvent, tabName: string): void {
