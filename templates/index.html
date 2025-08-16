@@ -100,6 +100,32 @@
             <div class="stabilityai novelai">Enter Negative Prompt:</div>
             <textarea name="negative_prompt" id="negative_prompt" class="stabilityai novelai negativeprompt"
                 maxlength="4000" rows="8" cols="50" spellcheck="true"></textarea>
+            
+            <!-- Character Prompt Interface for NovelAI -->
+            <div id="character-prompt-section" class="novelai character-prompt-section" style="display: none;">
+                <div class="character-prompt-header">
+                    <h3>Character Prompts</h3>
+                    <div class="character-controls">
+                        <button type="button" id="add-character-btn" class="character-btn">Add Character</button>
+                        <span id="character-count">0 characters</span>
+                    </div>
+                </div>
+                
+                <div class="character-visibility-controls">
+                    <label class="visibility-toggle">
+                        <input type="checkbox" id="show-positive-prompts" checked>
+                        Show Positive Prompts
+                    </label>
+                    <label class="visibility-toggle">
+                        <input type="checkbox" id="show-negative-prompts" checked>
+                        Show Negative Prompts
+                    </label>
+                </div>
+                
+                <div id="character-prompts-container">
+                    <!-- Character prompt sections will be dynamically added here -->
+                </div>
+            </div>
             <div class="prompt-checkbox-group openai">
                 <input type="checkbox" id="add-follow-prompt" class="prompt-checkbox openai" name="add-follow-prompt">
                 <label class="prompt-checkbox-label openai" for="add-follow-prompt" id="add-follow-prompt">Strictly

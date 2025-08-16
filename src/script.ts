@@ -54,6 +54,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
     document.getElementById("generationTab")!.click();
 
+    // Character prompt event listeners
+    addEventListenerToElement("add-character-btn", "click", addCharacterPrompt);
+    addEventListenerToElement("show-positive-prompts", "change", togglePositivePromptVisibility);
+    addEventListenerToElement("show-negative-prompts", "change", toggleNegativePromptVisibility);
+
     // Just refresh the image gen provider
     providerChanged();
 });
@@ -100,16 +105,19 @@ function providerChanged() {
         $(".stabilityai").hide();
         $(".novelai").hide();
         $(".openai").show();
+        hideCharacterPromptInterface();
         (document.getElementById("size") as HTMLSelectElement).selectedIndex = 0;
     } else if ((selection.value == "stabilityai")) {
         $(".openai").hide();
         $(".novelai").hide();
         $(".stabilityai").show();
+        hideCharacterPromptInterface();
         modelChanged(selection.value);
     } else if ((selection.value == "novelai")) {
         $(".openai").hide();
         $(".stabilityai").hide();
         $(".novelai").show();
+        showCharacterPromptInterface();
         // This is ugly, but index #3 is where the novelai size options start
         (document.getElementById("size") as HTMLSelectElement).selectedIndex = 3;
         modelChanged(selection.value);
@@ -372,6 +380,13 @@ function updateGridModalImage(): void {
             if (characterPrompts.length > 0) {
                 (window as any).pendingCharacterPrompts = characterPrompts;
                 console.log("Character prompts found in metadata:", characterPrompts);
+                
+                // If NovelAI is currently selected, populate immediately
+                const provider = document.getElementById("provider") as HTMLSelectElement;
+                if (provider && provider.value === "novelai") {
+                    populateCharacterPrompts(characterPrompts);
+                    delete (window as any).pendingCharacterPrompts;
+                }
             }
             
             // Switch to the Generation tab.
@@ -776,3 +791,208 @@ function updateMostRecentChatMessage(messages: chat.ChatMessage[]): void {
     }
     chatHistory.scrollTop = chatHistory.scrollHeight; // Scroll to bottom
 }
+
+//////////////////////
+/// CHARACTER PROMPTS ///
+//////////////////////
+
+let characterPromptCount = 0;
+
+interface CharacterPromptData {
+    positive: string;
+    negative: string;
+}
+
+function showCharacterPromptInterface(): void {
+    const characterSection = document.getElementById("character-prompt-section");
+    if (characterSection) {
+        characterSection.style.display = "block";
+        
+        // Check if there are pending character prompts from copy functionality
+        const pendingPrompts = (window as any).pendingCharacterPrompts;
+        if (pendingPrompts && Array.isArray(pendingPrompts)) {
+            populateCharacterPrompts(pendingPrompts);
+            delete (window as any).pendingCharacterPrompts;
+        }
+    }
+}
+
+function hideCharacterPromptInterface(): void {
+    const characterSection = document.getElementById("character-prompt-section");
+    if (characterSection) {
+        characterSection.style.display = "none";
+    }
+}
+
+function addCharacterPrompt(): void {
+    characterPromptCount++;
+    const container = document.getElementById("character-prompts-container");
+    if (!container) return;
+
+    const characterDiv = document.createElement("div");
+    characterDiv.className = "character-prompt-item";
+    characterDiv.setAttribute("data-character-id", characterPromptCount.toString());
+
+    characterDiv.innerHTML = `
+        <div class="character-item-header">
+            <span class="character-label">Character ${characterPromptCount}</span>
+            <button type="button" class="remove-character-btn" onclick="removeCharacterPrompt(${characterPromptCount})">Remove</button>
+        </div>
+        
+        <div class="character-prompt-group positive-group">
+            <div class="character-prompt-label">
+                <span>Positive Prompt</span>
+                <span class="content-indicator" style="display: none;">Has Content</span>
+            </div>
+            <textarea 
+                name="character_prompts[${characterPromptCount - 1}][positive]" 
+                placeholder="Describe this character's appearance and traits..."
+                data-character-id="${characterPromptCount}"
+                data-prompt-type="positive"
+                oninput="updateCharacterContentIndicator(this)"
+            ></textarea>
+        </div>
+        
+        <div class="character-prompt-group negative-group">
+            <div class="character-prompt-label">
+                <span>Negative Prompt</span>
+                <span class="content-indicator" style="display: none;">Has Content</span>
+            </div>
+            <textarea 
+                name="character_prompts[${characterPromptCount - 1}][negative]" 
+                placeholder="What to avoid for this character..."
+                data-character-id="${characterPromptCount}"
+                data-prompt-type="negative"
+                oninput="updateCharacterContentIndicator(this)"
+            ></textarea>
+        </div>
+    `;
+
+    container.appendChild(characterDiv);
+    updateCharacterPromptCount();
+    updatePromptVisibility();
+}
+
+function removeCharacterPrompt(characterId: number): void {
+    const characterDiv = document.querySelector(`[data-character-id="${characterId}"]`);
+    if (characterDiv) {
+        characterDiv.remove();
+        updateCharacterPromptCount();
+        reindexCharacterPrompts();
+    }
+}
+
+function updateCharacterPromptCount(): void {
+    const container = document.getElementById("character-prompts-container");
+    const countElement = document.getElementById("character-count");
+    if (container && countElement) {
+        const characterItems = container.querySelectorAll(".character-prompt-item");
+        const count = characterItems.length;
+        countElement.textContent = `${count} character${count !== 1 ? 's' : ''}`;
+    }
+}
+
+function reindexCharacterPrompts(): void {
+    const container = document.getElementById("character-prompts-container");
+    if (!container) return;
+
+    const characterItems = container.querySelectorAll(".character-prompt-item");
+    characterItems.forEach((item, index) => {
+        const characterDiv = item as HTMLElement;
+        const label = characterDiv.querySelector(".character-label");
+        if (label) {
+            label.textContent = `Character ${index + 1}`;
+        }
+
+        // Update form field names
+        const textareas = characterDiv.querySelectorAll("textarea");
+        textareas.forEach((textarea) => {
+            const promptType = textarea.getAttribute("data-prompt-type");
+            textarea.name = `character_prompts[${index}][${promptType}]`;
+        });
+    });
+}
+
+function togglePositivePromptVisibility(): void {
+    const checkbox = document.getElementById("show-positive-prompts") as HTMLInputElement;
+    const positiveGroups = document.querySelectorAll(".positive-group");
+    
+    positiveGroups.forEach((group) => {
+        const groupElement = group as HTMLElement;
+        if (checkbox.checked) {
+            groupElement.classList.remove("hidden");
+        } else {
+            groupElement.classList.add("hidden");
+        }
+    });
+}
+
+function toggleNegativePromptVisibility(): void {
+    const checkbox = document.getElementById("show-negative-prompts") as HTMLInputElement;
+    const negativeGroups = document.querySelectorAll(".negative-group");
+    
+    negativeGroups.forEach((group) => {
+        const groupElement = group as HTMLElement;
+        if (checkbox.checked) {
+            groupElement.classList.remove("hidden");
+        } else {
+            groupElement.classList.add("hidden");
+        }
+    });
+}
+
+function updatePromptVisibility(): void {
+    togglePositivePromptVisibility();
+    toggleNegativePromptVisibility();
+}
+
+function updateCharacterContentIndicator(textarea: HTMLTextAreaElement): void {
+    const characterDiv = textarea.closest(".character-prompt-item");
+    if (!characterDiv) return;
+
+    const promptType = textarea.getAttribute("data-prompt-type");
+    const indicator = characterDiv.querySelector(`.${promptType}-group .content-indicator`) as HTMLElement;
+    
+    if (indicator) {
+        if (textarea.value.trim().length > 0) {
+            indicator.style.display = "inline-block";
+        } else {
+            indicator.style.display = "none";
+        }
+    }
+}
+
+function populateCharacterPrompts(characterPrompts: CharacterPromptData[]): void {
+    // Clear existing character prompts
+    const container = document.getElementById("character-prompts-container");
+    if (container) {
+        container.innerHTML = "";
+        characterPromptCount = 0;
+    }
+
+    // Add character prompts from the provided data
+    characterPrompts.forEach((promptData) => {
+        addCharacterPrompt();
+        
+        // Get the last added character prompt and populate it
+        const lastCharacterDiv = container?.querySelector(".character-prompt-item:last-child");
+        if (lastCharacterDiv) {
+            const positiveTextarea = lastCharacterDiv.querySelector('textarea[data-prompt-type="positive"]') as HTMLTextAreaElement;
+            const negativeTextarea = lastCharacterDiv.querySelector('textarea[data-prompt-type="negative"]') as HTMLTextAreaElement;
+            
+            if (positiveTextarea) {
+                positiveTextarea.value = promptData.positive;
+                updateCharacterContentIndicator(positiveTextarea);
+            }
+            
+            if (negativeTextarea) {
+                negativeTextarea.value = promptData.negative;
+                updateCharacterContentIndicator(negativeTextarea);
+            }
+        }
+    });
+}
+
+// Make removeCharacterPrompt globally accessible for onclick handlers
+(window as any).removeCharacterPrompt = removeCharacterPrompt;
+(window as any).updateCharacterContentIndicator = updateCharacterContentIndicator;
