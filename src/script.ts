@@ -312,11 +312,23 @@ function updateGridModalImage(): void {
         for (const key in metadata) {
             const infoItem = document.createElement("div");
             infoItem.className = "info-item";
+            
+            // Add special styling for character prompts
+            if (key.match(/^Character \d+ (Prompt|Negative)$/)) {
+                infoItem.classList.add("character-prompt-item");
+            }
+            
             infoItem.textContent = key + ":";
             metadataDiv.appendChild(infoItem);
 
             const infoValue = document.createElement("div");
             infoValue.className = "prompt-value";
+            
+            // Add special styling for character prompt values
+            if (key.match(/^Character \d+ (Prompt|Negative)$/)) {
+                infoValue.classList.add("character-prompt-value");
+            }
+            
             infoValue.textContent = metadata[key];
             metadataDiv.appendChild(infoValue);
         }
@@ -339,6 +351,29 @@ function updateGridModalImage(): void {
             const negativePromptText = metadata["Negative Prompt"] || "";
             promptTextarea.value = promptText;
             negativePromptTextarea.value = negativePromptText;
+            
+            // Handle character prompt metadata if present
+            // Extract character prompts from metadata and populate character interface when available
+            const characterPrompts: Array<{positive: string, negative: string}> = [];
+            for (const key in metadata) {
+                const characterMatch = key.match(/^Character (\d+) Prompt$/);
+                if (characterMatch) {
+                    const charNum = parseInt(characterMatch[1]);
+                    const negativeKey = `Character ${charNum} Negative`;
+                    characterPrompts[charNum - 1] = {
+                        positive: metadata[key],
+                        negative: metadata[negativeKey] || ""
+                    };
+                }
+            }
+            
+            // Store character prompts for when character interface becomes available
+            // This will be used by the character prompt interface implementation
+            if (characterPrompts.length > 0) {
+                (window as any).pendingCharacterPrompts = characterPrompts;
+                console.log("Character prompts found in metadata:", characterPrompts);
+            }
+            
             // Switch to the Generation tab.
             document.getElementById("generationTab")?.click();
         };

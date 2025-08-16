@@ -337,6 +337,18 @@ img {
 .grid-modal .modal-content-wrapper .info-panel .info-item span:first-child {
   font-weight: bold;
 }
+.grid-modal .modal-content-wrapper .info-panel .info-item.character-prompt-item {
+  background-color: rgba(10, 132, 255, 0.1);
+  border-left: 3px solid #0a84ff;
+  border-radius: 4px;
+}
+.grid-modal .modal-content-wrapper .info-panel .info-item.character-prompt-item span:first-child {
+  color: rgb(112, 183.2081632653, 255);
+}
+.grid-modal .modal-content-wrapper .info-panel .prompt-value.character-prompt-value {
+  background-color: rgba(10, 132, 255, 0.05);
+  border-left: 2px solid rgba(10, 132, 255, 0.5);
+}
 
 .grid-nav-buttons {
   padding: 10px 10px;

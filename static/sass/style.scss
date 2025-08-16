@@ -389,6 +389,24 @@ img {
                         font-weight: bold;
                     }
                 }
+
+                // Special styling for character prompt metadata
+                &.character-prompt-item {
+                    background-color: rgba($color: $submit-btn-color, $alpha: 0.1);
+                    border-left: 3px solid $submit-btn-color;
+                    border-radius: 4px;
+                    
+                    span:first-child {
+                        color: color.adjust($submit-btn-color, $lightness: 20%);
+                    }
+                }
+            }
+
+            .prompt-value {
+                &.character-prompt-value {
+                    background-color: rgba($color: $submit-btn-color, $alpha: 0.05);
+                    border-left: 2px solid rgba($color: $submit-btn-color, $alpha: 0.5);
+                }
             }
         }
     }

@@ -16,7 +16,12 @@
   - Write unit tests for character prompt processing and dynamic prompt integration
   - _Requirements: 1.2, 1.3, 1.5, 6.1, 6.2, 6.4_
 
-- [ ] 2. Update image metadata handling for character prompts
+- [x] 2. Update image metadata handling for character prompts
+
+
+
+
+
   - Modify image metadata storage to include character prompt information
   - Implement logic to omit empty negative prompts from metadata
   - Ensure character metadata is preserved in generated images

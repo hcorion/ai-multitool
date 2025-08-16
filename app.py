@@ -1109,10 +1109,12 @@ def generate_novelai_image(
     if processed_character_prompts:
         for i, char_prompt in enumerate(processed_character_prompts):
             char_num = i + 1
+            # Only include character metadata if positive prompt exists
             if char_prompt.get('positive', '').strip():
                 image_metadata[f"Character {char_num} Prompt"] = char_prompt['positive']
-            if char_prompt.get('negative', '').strip():
-                image_metadata[f"Character {char_num} Negative"] = char_prompt['negative']
+                # Only include negative prompt if it exists and positive prompt exists
+                if char_prompt.get('negative', '').strip():
+                    image_metadata[f"Character {char_num} Negative"] = char_prompt['negative']
 
     response = requests.post(
         "https://image.novelai.net/ai/generate-image",
