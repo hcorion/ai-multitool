@@ -43,8 +43,6 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("generationTab").click();
     // Character prompt event listeners
     addEventListenerToElement("add-character-btn", "click", addCharacterPrompt);
-    addEventListenerToElement("show-positive-prompts", "change", togglePositivePromptVisibility);
-    addEventListenerToElement("show-negative-prompts", "change", toggleNegativePromptVisibility);
     // Just refresh the image gen provider
     providerChanged();
 });
@@ -693,10 +691,6 @@ function updateMostRecentChatMessage(messages) {
     }
     chatHistory.scrollTop = chatHistory.scrollHeight; // Scroll to bottom
 }
-//////////////////////
-/// CHARACTER PROMPTS ///
-//////////////////////
-let characterPromptCount = 0;
 function showCharacterPromptInterface() {
     const characterSection = document.getElementById("character-prompt-section");
     if (characterSection) {
@@ -716,17 +710,25 @@ function hideCharacterPromptInterface() {
     }
 }
 function addCharacterPrompt() {
-    characterPromptCount++;
     const container = document.getElementById("character-prompts-container");
     if (!container)
         return;
+    // Get current count to determine the new character's position
+    const currentCount = container.querySelectorAll(".character-prompt-item").length;
+    const newCharacterNumber = currentCount + 1;
     const characterDiv = document.createElement("div");
     characterDiv.className = "character-prompt-item";
-    characterDiv.setAttribute("data-character-id", characterPromptCount.toString());
+    characterDiv.setAttribute("data-character-index", currentCount.toString());
     characterDiv.innerHTML = `
         <div class="character-item-header">
-            <span class="character-label">Character ${characterPromptCount}</span>
-            <button type="button" class="remove-character-btn" onclick="removeCharacterPrompt(${characterPromptCount})">Remove</button>
+            <span class="character-label">Character ${newCharacterNumber}</span>
+            <div class="character-item-controls">
+                <label class="individual-toggle">
+                    <input type="checkbox" class="show-negative-toggle" data-character-index="${currentCount}">
+                    Show Negative
+                </label>
+                <button type="button" class="remove-character-btn">Remove</button>
+            </div>
         </div>
         
         <div class="character-prompt-group positive-group">
@@ -735,39 +737,53 @@ function addCharacterPrompt() {
                 <span class="content-indicator" style="display: none;">Has Content</span>
             </div>
             <textarea 
-                name="character_prompts[${characterPromptCount - 1}][positive]" 
+                name="character_prompts[${currentCount}][positive]" 
                 placeholder="Describe this character's appearance and traits..."
-                data-character-id="${characterPromptCount}"
                 data-prompt-type="positive"
                 oninput="updateCharacterContentIndicator(this)"
             ></textarea>
         </div>
         
-        <div class="character-prompt-group negative-group">
+        <div class="character-prompt-group negative-group" style="display: none;">
             <div class="character-prompt-label">
                 <span>Negative Prompt</span>
                 <span class="content-indicator" style="display: none;">Has Content</span>
             </div>
             <textarea 
-                name="character_prompts[${characterPromptCount - 1}][negative]" 
+                name="character_prompts[${currentCount}][negative]" 
                 placeholder="What to avoid for this character..."
-                data-character-id="${characterPromptCount}"
                 data-prompt-type="negative"
                 oninput="updateCharacterContentIndicator(this)"
             ></textarea>
         </div>
     `;
+    // Add event listener for the remove button
+    const removeBtn = characterDiv.querySelector(".remove-character-btn");
+    if (removeBtn) {
+        removeBtn.addEventListener("click", () => {
+            characterDiv.remove();
+            updateCharacterPromptCount();
+            reindexCharacterPrompts();
+        });
+    }
+    // Add event listener for the individual negative prompt toggle
+    const negativeToggle = characterDiv.querySelector(".show-negative-toggle");
+    if (negativeToggle) {
+        negativeToggle.addEventListener("change", (event) => {
+            const checkbox = event.target;
+            const negativeGroup = characterDiv.querySelector(".negative-group");
+            if (negativeGroup) {
+                negativeGroup.style.display = checkbox.checked ? "block" : "none";
+            }
+        });
+    }
     container.appendChild(characterDiv);
     updateCharacterPromptCount();
-    updatePromptVisibility();
 }
-function removeCharacterPrompt(characterId) {
-    const characterDiv = document.querySelector(`[data-character-id="${characterId}"]`);
-    if (characterDiv) {
-        characterDiv.remove();
-        updateCharacterPromptCount();
-        reindexCharacterPrompts();
-    }
+function removeCharacterPrompt(characterDiv) {
+    characterDiv.remove();
+    updateCharacterPromptCount();
+    reindexCharacterPrompts();
 }
 function updateCharacterPromptCount() {
     const container = document.getElementById("character-prompts-container");
@@ -785,6 +801,9 @@ function reindexCharacterPrompts() {
     const characterItems = container.querySelectorAll(".character-prompt-item");
     characterItems.forEach((item, index) => {
         const characterDiv = item;
+        // Update data-character-index attribute
+        characterDiv.setAttribute("data-character-index", index.toString());
+        // Update character label
         const label = characterDiv.querySelector(".character-label");
         if (label) {
             label.textContent = `Character ${index + 1}`;
@@ -795,38 +814,14 @@ function reindexCharacterPrompts() {
             const promptType = textarea.getAttribute("data-prompt-type");
             textarea.name = `character_prompts[${index}][${promptType}]`;
         });
-    });
-}
-function togglePositivePromptVisibility() {
-    const checkbox = document.getElementById("show-positive-prompts");
-    const positiveGroups = document.querySelectorAll(".positive-group");
-    positiveGroups.forEach((group) => {
-        const groupElement = group;
-        if (checkbox.checked) {
-            groupElement.classList.remove("hidden");
-        }
-        else {
-            groupElement.classList.add("hidden");
+        // Update negative toggle data-character-index
+        const negativeToggle = characterDiv.querySelector(".show-negative-toggle");
+        if (negativeToggle) {
+            negativeToggle.setAttribute("data-character-index", index.toString());
         }
     });
 }
-function toggleNegativePromptVisibility() {
-    const checkbox = document.getElementById("show-negative-prompts");
-    const negativeGroups = document.querySelectorAll(".negative-group");
-    negativeGroups.forEach((group) => {
-        const groupElement = group;
-        if (checkbox.checked) {
-            groupElement.classList.remove("hidden");
-        }
-        else {
-            groupElement.classList.add("hidden");
-        }
-    });
-}
-function updatePromptVisibility() {
-    togglePositivePromptVisibility();
-    toggleNegativePromptVisibility();
-}
+// Positive prompts are always visible, individual negative toggles handle their own visibility
 function updateCharacterContentIndicator(textarea) {
     const characterDiv = textarea.closest(".character-prompt-item");
     if (!characterDiv)
@@ -847,7 +842,6 @@ function populateCharacterPrompts(characterPrompts) {
     const container = document.getElementById("character-prompts-container");
     if (container) {
         container.innerHTML = "";
-        characterPromptCount = 0;
     }
     // Add character prompts from the provided data
     characterPrompts.forEach((promptData) => {
@@ -864,10 +858,18 @@ function populateCharacterPrompts(characterPrompts) {
             if (negativeTextarea) {
                 negativeTextarea.value = promptData.negative;
                 updateCharacterContentIndicator(negativeTextarea);
+                // If there's negative content, enable the toggle and show the negative group
+                if (promptData.negative.trim().length > 0) {
+                    const negativeToggle = lastCharacterDiv.querySelector('.show-negative-toggle');
+                    const negativeGroup = lastCharacterDiv.querySelector('.negative-group');
+                    if (negativeToggle && negativeGroup) {
+                        negativeToggle.checked = true;
+                        negativeGroup.style.display = "block";
+                    }
+                }
             }
         }
     });
 }
-// Make removeCharacterPrompt globally accessible for onclick handlers
-window.removeCharacterPrompt = removeCharacterPrompt;
+// Make updateCharacterContentIndicator globally accessible for oninput handlers
 window.updateCharacterContentIndicator = updateCharacterContentIndicator;

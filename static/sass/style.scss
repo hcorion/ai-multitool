@@ -638,27 +638,7 @@ button#send-chat {
         }
     }
 
-    .character-visibility-controls {
-        display: flex;
-        gap: 20px;
-        margin-bottom: 20px;
-        padding: 10px;
-        background-color: rgba($color: $background-color, $alpha: 0.3);
-        border-radius: 4px;
-
-        .visibility-toggle {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            cursor: pointer;
-            font-size: 0.9rem;
-
-            input[type="checkbox"] {
-                width: auto;
-                margin: 0;
-            }
-        }
-    }
+    // Character visibility controls removed - positive prompts always visible, negative prompts have individual toggles
 }
 
 .character-prompt-item {
@@ -681,17 +661,37 @@ button#send-chat {
             font-size: 1rem;
         }
 
-        .remove-character-btn {
-            background-color: #ff4d4f;
-            color: white;
-            border: none;
-            padding: 5px 10px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 0.8rem;
+        .character-item-controls {
+            display: flex;
+            align-items: center;
+            gap: 15px;
 
-            &:hover {
-                background-color: #ff7875;
+            .individual-toggle {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                cursor: pointer;
+                font-size: 0.85rem;
+                color: rgba($color: $text-color, $alpha: 0.8);
+
+                input[type="checkbox"] {
+                    width: auto;
+                    margin: 0;
+                }
+            }
+
+            .remove-character-btn {
+                background-color: #ff4d4f;
+                color: white;
+                border: none;
+                padding: 5px 10px;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 0.8rem;
+
+                &:hover {
+                    background-color: #ff7875;
+                }
             }
         }
     }

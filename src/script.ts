@@ -56,8 +56,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Character prompt event listeners
     addEventListenerToElement("add-character-btn", "click", addCharacterPrompt);
-    addEventListenerToElement("show-positive-prompts", "change", togglePositivePromptVisibility);
-    addEventListenerToElement("show-negative-prompts", "change", toggleNegativePromptVisibility);
 
     // Just refresh the image gen provider
     providerChanged();
@@ -320,23 +318,23 @@ function updateGridModalImage(): void {
         for (const key in metadata) {
             const infoItem = document.createElement("div");
             infoItem.className = "info-item";
-            
+
             // Add special styling for character prompts
             if (key.match(/^Character \d+ (Prompt|Negative)$/)) {
                 infoItem.classList.add("character-prompt-item");
             }
-            
+
             infoItem.textContent = key + ":";
             metadataDiv.appendChild(infoItem);
 
             const infoValue = document.createElement("div");
             infoValue.className = "prompt-value";
-            
+
             // Add special styling for character prompt values
             if (key.match(/^Character \d+ (Prompt|Negative)$/)) {
                 infoValue.classList.add("character-prompt-value");
             }
-            
+
             infoValue.textContent = metadata[key];
             metadataDiv.appendChild(infoValue);
         }
@@ -359,10 +357,10 @@ function updateGridModalImage(): void {
             const negativePromptText = metadata["Negative Prompt"] || "";
             promptTextarea.value = promptText;
             negativePromptTextarea.value = negativePromptText;
-            
+
             // Handle character prompt metadata if present
             // Extract character prompts from metadata and populate character interface when available
-            const characterPrompts: Array<{positive: string, negative: string}> = [];
+            const characterPrompts: Array<{ positive: string, negative: string }> = [];
             for (const key in metadata) {
                 const characterMatch = key.match(/^Character (\d+) Prompt$/);
                 if (characterMatch) {
@@ -374,13 +372,13 @@ function updateGridModalImage(): void {
                     };
                 }
             }
-            
+
             // Store character prompts for when character interface becomes available
             // This will be used by the character prompt interface implementation
             if (characterPrompts.length > 0) {
                 (window as any).pendingCharacterPrompts = characterPrompts;
                 console.log("Character prompts found in metadata:", characterPrompts);
-                
+
                 // If NovelAI is currently selected, populate immediately
                 const provider = document.getElementById("provider") as HTMLSelectElement;
                 if (provider && provider.value === "novelai") {
@@ -388,7 +386,7 @@ function updateGridModalImage(): void {
                     delete (window as any).pendingCharacterPrompts;
                 }
             }
-            
+
             // Switch to the Generation tab.
             document.getElementById("generationTab")?.click();
         };
@@ -554,42 +552,42 @@ function scheduleConversationTitleRefresh(conversationId: string): void {
     let attempts = 0;
     const maxAttempts = 10; // Check for up to 30 seconds (3s * 10)
     const checkInterval = 3000; // Check every 3 seconds
-    
+
     const checkForTitleUpdate = () => {
         attempts++;
-        
+
         // Stop checking after max attempts or if conversation no longer exists
         if (attempts > maxAttempts || !allConversations[conversationId]) {
             console.log(`Stopped checking for title update for conversation ${conversationId}`);
             return;
         }
-        
+
         // Check if the title is still "New Chat" (meaning it hasn't been updated yet)
         if (allConversations[conversationId].chat_name === "New Chat") {
             console.log(`Checking for title update for conversation ${conversationId} (attempt ${attempts})`);
-            
+
             // Refresh the conversation list to get updated titles
             $.get("/get-all-conversations", (response: string) => {
                 try {
                     let conversations: { [key: string]: ConversationData } = JSON.parse(response);
-                    
+
                     // Check if this conversation's title has been updated
                     if (conversations[conversationId] && conversations[conversationId].chat_name !== "New Chat") {
                         console.log(`Title updated for conversation ${conversationId}: ${conversations[conversationId].chat_name}`);
-                        
+
                         // Update local cache
                         allConversations = conversations;
-                        
+
                         // Refresh the conversation list display
                         refreshConversationListFromCache();
-                        
+
                         // Stop checking since we found the update
                         return;
                     }
-                    
+
                     // Schedule next check if title hasn't been updated yet
                     setTimeout(checkForTitleUpdate, checkInterval);
-                    
+
                 } catch (error) {
                     console.error("Error parsing conversation list response:", error);
                     // Continue checking despite the error
@@ -605,7 +603,7 @@ function scheduleConversationTitleRefresh(conversationId: string): void {
             console.log(`Title already updated for conversation ${conversationId}: ${allConversations[conversationId].chat_name}`);
         }
     };
-    
+
     // Start the first check after a short delay to give the server time to generate the title
     setTimeout(checkForTitleUpdate, 2000); // Wait 2 seconds before first check
 }
@@ -731,7 +729,7 @@ function sendChatMessage(): void {
                     chat_name: chatName,
                     last_update: currentTimeEpoch,
                 };
-                
+
                 // For new conversations, set up title refresh to catch AI-generated titles
                 if (isNewConversation && chatName === "New Chat") {
                     scheduleConversationTitleRefresh(chatData.threadId);
@@ -796,7 +794,7 @@ function updateMostRecentChatMessage(messages: chat.ChatMessage[]): void {
 /// CHARACTER PROMPTS ///
 //////////////////////
 
-let characterPromptCount = 0;
+// Character prompt management - no longer using global counter
 
 interface CharacterPromptData {
     positive: string;
@@ -807,7 +805,7 @@ function showCharacterPromptInterface(): void {
     const characterSection = document.getElementById("character-prompt-section");
     if (characterSection) {
         characterSection.style.display = "block";
-        
+
         // Check if there are pending character prompts from copy functionality
         const pendingPrompts = (window as any).pendingCharacterPrompts;
         if (pendingPrompts && Array.isArray(pendingPrompts)) {
@@ -825,18 +823,27 @@ function hideCharacterPromptInterface(): void {
 }
 
 function addCharacterPrompt(): void {
-    characterPromptCount++;
     const container = document.getElementById("character-prompts-container");
     if (!container) return;
 
+    // Get current count to determine the new character's position
+    const currentCount = container.querySelectorAll(".character-prompt-item").length;
+    const newCharacterNumber = currentCount + 1;
+
     const characterDiv = document.createElement("div");
     characterDiv.className = "character-prompt-item";
-    characterDiv.setAttribute("data-character-id", characterPromptCount.toString());
+    characterDiv.setAttribute("data-character-index", currentCount.toString());
 
     characterDiv.innerHTML = `
         <div class="character-item-header">
-            <span class="character-label">Character ${characterPromptCount}</span>
-            <button type="button" class="remove-character-btn" onclick="removeCharacterPrompt(${characterPromptCount})">Remove</button>
+            <span class="character-label">Character ${newCharacterNumber}</span>
+            <div class="character-item-controls">
+                <label class="individual-toggle">
+                    <input type="checkbox" class="show-negative-toggle" data-character-index="${currentCount}">
+                    Show Negative
+                </label>
+                <button type="button" class="remove-character-btn">Remove</button>
+            </div>
         </div>
         
         <div class="character-prompt-group positive-group">
@@ -845,41 +852,57 @@ function addCharacterPrompt(): void {
                 <span class="content-indicator" style="display: none;">Has Content</span>
             </div>
             <textarea 
-                name="character_prompts[${characterPromptCount - 1}][positive]" 
+                name="character_prompts[${currentCount}][positive]" 
                 placeholder="Describe this character's appearance and traits..."
-                data-character-id="${characterPromptCount}"
                 data-prompt-type="positive"
                 oninput="updateCharacterContentIndicator(this)"
             ></textarea>
         </div>
         
-        <div class="character-prompt-group negative-group">
+        <div class="character-prompt-group negative-group" style="display: none;">
             <div class="character-prompt-label">
                 <span>Negative Prompt</span>
                 <span class="content-indicator" style="display: none;">Has Content</span>
             </div>
             <textarea 
-                name="character_prompts[${characterPromptCount - 1}][negative]" 
+                name="character_prompts[${currentCount}][negative]" 
                 placeholder="What to avoid for this character..."
-                data-character-id="${characterPromptCount}"
                 data-prompt-type="negative"
                 oninput="updateCharacterContentIndicator(this)"
             ></textarea>
         </div>
     `;
 
+    // Add event listener for the remove button
+    const removeBtn = characterDiv.querySelector(".remove-character-btn");
+    if (removeBtn) {
+        removeBtn.addEventListener("click", () => {
+            characterDiv.remove();
+            updateCharacterPromptCount();
+            reindexCharacterPrompts();
+        });
+    }
+
+    // Add event listener for the individual negative prompt toggle
+    const negativeToggle = characterDiv.querySelector(".show-negative-toggle");
+    if (negativeToggle) {
+        negativeToggle.addEventListener("change", (event) => {
+            const checkbox = event.target as HTMLInputElement;
+            const negativeGroup = characterDiv.querySelector(".negative-group") as HTMLElement;
+            if (negativeGroup) {
+                negativeGroup.style.display = checkbox.checked ? "block" : "none";
+            }
+        });
+    }
+
     container.appendChild(characterDiv);
     updateCharacterPromptCount();
-    updatePromptVisibility();
 }
 
-function removeCharacterPrompt(characterId: number): void {
-    const characterDiv = document.querySelector(`[data-character-id="${characterId}"]`);
-    if (characterDiv) {
-        characterDiv.remove();
-        updateCharacterPromptCount();
-        reindexCharacterPrompts();
-    }
+function removeCharacterPrompt(characterDiv: HTMLElement): void {
+    characterDiv.remove();
+    updateCharacterPromptCount();
+    reindexCharacterPrompts();
 }
 
 function updateCharacterPromptCount(): void {
@@ -899,6 +922,11 @@ function reindexCharacterPrompts(): void {
     const characterItems = container.querySelectorAll(".character-prompt-item");
     characterItems.forEach((item, index) => {
         const characterDiv = item as HTMLElement;
+
+        // Update data-character-index attribute
+        characterDiv.setAttribute("data-character-index", index.toString());
+
+        // Update character label
         const label = characterDiv.querySelector(".character-label");
         if (label) {
             label.textContent = `Character ${index + 1}`;
@@ -910,41 +938,16 @@ function reindexCharacterPrompts(): void {
             const promptType = textarea.getAttribute("data-prompt-type");
             textarea.name = `character_prompts[${index}][${promptType}]`;
         });
-    });
-}
 
-function togglePositivePromptVisibility(): void {
-    const checkbox = document.getElementById("show-positive-prompts") as HTMLInputElement;
-    const positiveGroups = document.querySelectorAll(".positive-group");
-    
-    positiveGroups.forEach((group) => {
-        const groupElement = group as HTMLElement;
-        if (checkbox.checked) {
-            groupElement.classList.remove("hidden");
-        } else {
-            groupElement.classList.add("hidden");
+        // Update negative toggle data-character-index
+        const negativeToggle = characterDiv.querySelector(".show-negative-toggle");
+        if (negativeToggle) {
+            negativeToggle.setAttribute("data-character-index", index.toString());
         }
     });
 }
 
-function toggleNegativePromptVisibility(): void {
-    const checkbox = document.getElementById("show-negative-prompts") as HTMLInputElement;
-    const negativeGroups = document.querySelectorAll(".negative-group");
-    
-    negativeGroups.forEach((group) => {
-        const groupElement = group as HTMLElement;
-        if (checkbox.checked) {
-            groupElement.classList.remove("hidden");
-        } else {
-            groupElement.classList.add("hidden");
-        }
-    });
-}
-
-function updatePromptVisibility(): void {
-    togglePositivePromptVisibility();
-    toggleNegativePromptVisibility();
-}
+// Positive prompts are always visible, individual negative toggles handle their own visibility
 
 function updateCharacterContentIndicator(textarea: HTMLTextAreaElement): void {
     const characterDiv = textarea.closest(".character-prompt-item");
@@ -952,7 +955,7 @@ function updateCharacterContentIndicator(textarea: HTMLTextAreaElement): void {
 
     const promptType = textarea.getAttribute("data-prompt-type");
     const indicator = characterDiv.querySelector(`.${promptType}-group .content-indicator`) as HTMLElement;
-    
+
     if (indicator) {
         if (textarea.value.trim().length > 0) {
             indicator.style.display = "inline-block";
@@ -967,32 +970,41 @@ function populateCharacterPrompts(characterPrompts: CharacterPromptData[]): void
     const container = document.getElementById("character-prompts-container");
     if (container) {
         container.innerHTML = "";
-        characterPromptCount = 0;
     }
 
     // Add character prompts from the provided data
     characterPrompts.forEach((promptData) => {
         addCharacterPrompt();
-        
+
         // Get the last added character prompt and populate it
         const lastCharacterDiv = container?.querySelector(".character-prompt-item:last-child");
         if (lastCharacterDiv) {
             const positiveTextarea = lastCharacterDiv.querySelector('textarea[data-prompt-type="positive"]') as HTMLTextAreaElement;
             const negativeTextarea = lastCharacterDiv.querySelector('textarea[data-prompt-type="negative"]') as HTMLTextAreaElement;
-            
+
             if (positiveTextarea) {
                 positiveTextarea.value = promptData.positive;
                 updateCharacterContentIndicator(positiveTextarea);
             }
-            
+
             if (negativeTextarea) {
                 negativeTextarea.value = promptData.negative;
                 updateCharacterContentIndicator(negativeTextarea);
+
+                // If there's negative content, enable the toggle and show the negative group
+                if (promptData.negative.trim().length > 0) {
+                    const negativeToggle = lastCharacterDiv.querySelector('.show-negative-toggle') as HTMLInputElement;
+                    const negativeGroup = lastCharacterDiv.querySelector('.negative-group') as HTMLElement;
+
+                    if (negativeToggle && negativeGroup) {
+                        negativeToggle.checked = true;
+                        negativeGroup.style.display = "block";
+                    }
+                }
             }
         }
     });
 }
 
-// Make removeCharacterPrompt globally accessible for onclick handlers
-(window as any).removeCharacterPrompt = removeCharacterPrompt;
+// Make updateCharacterContentIndicator globally accessible for oninput handlers
 (window as any).updateCharacterContentIndicator = updateCharacterContentIndicator;
