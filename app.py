@@ -12,6 +12,7 @@ import threading
 import time
 import uuid
 import zipfile
+from datetime import datetime
 from queue import Queue
 from typing import Any, AnyStr, Dict, Generator, Mapping
 
@@ -565,7 +566,7 @@ class ResponsesAPIClient:
 
     def __init__(self, openai_client: openai.OpenAI):
         self.client = openai_client
-        self.model = "o4-mini"
+        self.model = "gpt-5"
 
     def create_response(
         self,
@@ -582,7 +583,8 @@ class ResponsesAPIClient:
                 "stream": stream,
                 "store": True,  # Store responses for conversation continuity
                 "reasoning": {"effort": "high"},
-                "instructions": """You are CodeGPT, a large language model trained by OpenAI, based on the o4 architecture. Knowledge cutoff: 2023-10. Current year: 2025.
+                "tools": [{"type": "web_search_preview"}],
+                "instructions": f"""You are CodeGPT, a large language model trained by OpenAI, based on the GPT-5 architecture. Knowledge cutoff: 2024-09-30. Current date: {datetime.today().strftime("%Y-%m-%d")}.
 You are trained to act and respond like a professional software engineer would, with vast knowledge of every programming language and excellent reasoning skills. You write industry-standard clean, elegant code. You output code in Markdown format like so:
 ```lang
 code
@@ -771,20 +773,21 @@ code
                 user_message[:500] if len(user_message) > 500 else user_message
             )
 
-            # Call OpenAI API with o3-mini and minimal reasoning for cost efficiency
+            # Call OpenAI API responses API with minimal reasoning for cost efficiency
             response = self.client.responses.create(
-                model="o3-mini",  # Use o3-mini for cost efficiency
+                model="gpt-5-nano",  # Use gpt-5-nano for cost efficiency
                 input=f"Generate a title for this conversation:\n\nUser message: {truncated_message}",
                 instructions=self._get_title_generation_instructions(),
                 stream=False,
-                reasoning={"effort": "low"}, # Minimal reasoning for cost efficiency
+                reasoning={"effort": "low"},  # Minimal reasoning for cost efficiency
             )
 
             # Extract title from response
-            if hasattr(response, 'output_text') and response.output_text:
+            if hasattr(response, "output_text") and response.output_text:
                 return self._sanitize_title(response.output_text)
             else:
                 import logging
+
                 logging.warning("Empty response from o3-mini for title generation")
                 return self._generate_fallback_title()
 
@@ -834,6 +837,7 @@ Generate only the title (no quotes, no extra text)."""
         """Ensure title meets length and content requirements."""
         if not title:
             import logging
+
             logging.error("No title to sanitize!")
             return self._generate_fallback_title()
 
@@ -857,7 +861,8 @@ Generate only the title (no quotes, no extra text)."""
             "hello",
         ]:
             import logging
-            logging.error(f"Title \"{title.strip()}\" too generic!")
+
+            logging.error(f'Title "{title.strip()}" too generic!')
             return self._generate_fallback_title()
 
         return title
@@ -1039,7 +1044,11 @@ def generate_novelai_image(
                 "caption": {
                     "base_caption": negative_prompt,
                     "char_captions": [
-                        {"centers": [{"x": 0, "y": 0}], "char_caption": ""}
+                        {
+                            "centers": [{"x": 0, "y": 0}],
+                            # TODO: Add negative char_captions
+                            "char_caption": "",
+                        }
                     ],
                 },
                 "use_coords": False,
@@ -1175,7 +1184,9 @@ def generate_dalle_image(
                 + revised_prompt
             )
         else:
-            revised_prompt = "My prompt has full detail so no need to add more:\n" + revised_prompt
+            revised_prompt = (
+                "My prompt has full detail so no need to add more:\n" + revised_prompt
+            )
 
     # Run the prompt through moderation first, I don't want to get my account banned.
     moderation = client.moderations.create(input=revised_prompt)
@@ -1321,7 +1332,7 @@ def generate_image(
 ) -> GeneratedImageData:
     if not seed or seed <= 0:
         seed = generate_seed_for_provider(provider)
-    
+
     if not seed:
         raise ValueError("Unable to get 'seed' field.")
 
@@ -1616,41 +1627,42 @@ def update_conversation_title():
         return jsonify({"error": "Username not in session"}), 401
 
     username = session["username"]
-    
+
     if not request.json:
         return jsonify({"error": "Invalid request format"}), 400
-    
+
     conversation_id = request.json.get("conversation_id")
     new_title = request.json.get("title")
-    
+
     if not conversation_id or not new_title:
         return jsonify({"error": "Missing conversation_id or title"}), 400
-    
+
     try:
         # Update the conversation title
-        success = conversation_manager.update_conversation_title(username, conversation_id, new_title)
-        
+        success = conversation_manager.update_conversation_title(
+            username, conversation_id, new_title
+        )
+
         if success:
             # Return updated conversation list
             conversations = conversation_manager.list_conversations(username)
-            return jsonify({
-                "success": True,
-                "message": "Title updated successfully",
-                "conversations": conversations
-            })
+            return jsonify(
+                {
+                    "success": True,
+                    "message": "Title updated successfully",
+                    "conversations": conversations,
+                }
+            )
         else:
-            return jsonify({
-                "success": False,
-                "error": "Failed to update conversation title"
-            }), 400
-            
+            return jsonify(
+                {"success": False, "error": "Failed to update conversation title"}
+            ), 400
+
     except Exception as e:
         import logging
+
         logging.error(f"Error updating conversation title: {e}", exc_info=True)
-        return jsonify({
-            "success": False,
-            "error": "Internal server error"
-        }), 500
+        return jsonify({"success": False, "error": "Internal server error"}), 500
 
 
 # Old get_message_list function removed - now using ConversationManager.get_message_list()
