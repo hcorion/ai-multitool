@@ -27,10 +27,10 @@ Template: "A __colors__ __subjects__ in {__styles__:2} style"
 Result:  "A red cat in {{anime}} style"
 """
 
-from dataclasses import dataclass
 import os
-import re
 import random
+import re
+from dataclasses import dataclass
 from typing import List
 
 

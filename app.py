@@ -43,8 +43,8 @@ import utils
 from dynamic_prompts import (
     GridDynamicPromptInfo,
     get_prompts_for_name,
-    make_prompt_dynamic,
     make_character_prompts_dynamic,
+    make_prompt_dynamic,
 )
 
 app = Flask(__name__)
@@ -139,6 +139,7 @@ class SavedImageData:
 @dataclass
 class CharacterPrompt:
     """Data class for individual character prompt data."""
+
     positive_prompt: str
     negative_prompt: str = ""
 
@@ -146,6 +147,7 @@ class CharacterPrompt:
 @dataclass
 class MultiCharacterPromptData:
     """Data class for multi-character prompt data including main prompts."""
+
     main_prompt: str
     main_negative_prompt: str = ""
     character_prompts: List[CharacterPrompt] = field(default_factory=list)
@@ -1003,7 +1005,7 @@ def _build_char_captions(character_prompts: List[dict], prompt_type: str) -> Lis
     Only includes non-empty character prompts.
     """
     char_captions = []
-    
+
     for char_prompt in character_prompts:
         prompt_value = char_prompt.get(prompt_type, "")
         # Handle None values by converting to empty string
@@ -1011,11 +1013,13 @@ def _build_char_captions(character_prompts: List[dict], prompt_type: str) -> Lis
             prompt_value = ""
         prompt_text = str(prompt_value).strip()
         if prompt_text:  # Only include non-empty prompts
-            char_captions.append({
-                "centers": [{"x": 0, "y": 0}],
-                "char_caption": prompt_text,
-            })
-    
+            char_captions.append(
+                {
+                    "centers": [{"x": 0, "y": 0}],
+                    "char_caption": prompt_text,
+                }
+            )
+
     return char_captions
 
 
@@ -1035,13 +1039,17 @@ def generate_novelai_image(
     revised_prompt = make_prompt_dynamic(
         prompt, username, app.static_folder, seed, grid_dynamic_prompt
     )
-    
+
     # Process character prompts if provided
     processed_character_prompts = []
     if character_prompts:
         try:
             processed_character_prompts = make_character_prompts_dynamic(
-                character_prompts, username, app.static_folder, seed, grid_dynamic_prompt
+                character_prompts,
+                username,
+                app.static_folder,
+                seed,
+                grid_dynamic_prompt,
             )
         except (ValueError, LookupError) as e:
             raise ValueError(f"Error processing character prompts: {str(e)}")
@@ -1079,7 +1087,9 @@ def generate_novelai_image(
             "v4_prompt": {
                 "caption": {
                     "base_caption": revised_prompt,
-                    "char_captions": _build_char_captions(processed_character_prompts, "positive"),
+                    "char_captions": _build_char_captions(
+                        processed_character_prompts, "positive"
+                    ),
                 },
                 "use_coords": False,
                 "use_order": True,
@@ -1087,7 +1097,9 @@ def generate_novelai_image(
             "v4_negative_prompt": {
                 "caption": {
                     "base_caption": negative_prompt,
-                    "char_captions": _build_char_captions(processed_character_prompts, "negative"),
+                    "char_captions": _build_char_captions(
+                        processed_character_prompts, "negative"
+                    ),
                 },
                 "use_coords": False,
                 "use_order": True,
@@ -1104,23 +1116,33 @@ def generate_novelai_image(
     }
     if negative_prompt:
         image_metadata["Negative Prompt"] = negative_prompt
-    
+
     # Add character prompt metadata (both original and processed)
     if character_prompts and processed_character_prompts:
-        for i, (original_char_prompt, processed_char_prompt) in enumerate(zip(character_prompts, processed_character_prompts)):
+        for i, (original_char_prompt, processed_char_prompt) in enumerate(
+            zip(character_prompts, processed_character_prompts)
+        ):
             char_num = i + 1
             # Only include character metadata if positive prompt exists
-            if original_char_prompt.get('positive', '').strip():
+            if original_char_prompt.get("positive", "").strip():
                 # Save original prompt (with dynamic prompt syntax) for copying
-                image_metadata[f"Character {char_num} Prompt"] = original_char_prompt['positive']
+                image_metadata[f"Character {char_num} Prompt"] = original_char_prompt[
+                    "positive"
+                ]
                 # Save processed prompt for reference
-                image_metadata[f"Character {char_num} Processed Prompt"] = processed_char_prompt['positive']
-                
+                image_metadata[f"Character {char_num} Processed Prompt"] = (
+                    processed_char_prompt["positive"]
+                )
+
                 # Only include negative prompts if they exist
-                if original_char_prompt.get('negative', '').strip():
-                    image_metadata[f"Character {char_num} Negative"] = original_char_prompt['negative']
-                if processed_char_prompt.get('negative', '').strip():
-                    image_metadata[f"Character {char_num} Processed Negative"] = processed_char_prompt['negative']
+                if original_char_prompt.get("negative", "").strip():
+                    image_metadata[f"Character {char_num} Negative"] = (
+                        original_char_prompt["negative"]
+                    )
+                if processed_char_prompt.get("negative", "").strip():
+                    image_metadata[f"Character {char_num} Processed Negative"] = (
+                        processed_char_prompt["negative"]
+                    )
 
     response = requests.post(
         "https://image.novelai.net/ai/generate-image",
@@ -1383,29 +1405,28 @@ def _extract_character_prompts_from_form(request: Request) -> List[dict]:
     Expected form format: character_prompts[0][positive], character_prompts[0][negative], etc.
     """
     character_prompts = []
-    
+
     # Parse character prompt data from form
     char_index = 0
     while True:
         positive_key = f"character_prompts[{char_index}][positive]"
         negative_key = f"character_prompts[{char_index}][negative]"
-        
+
         positive_prompt = request.form.get(positive_key, "").strip()
         negative_prompt = request.form.get(negative_key, "").strip()
-        
+
         # If no positive prompt found, we've reached the end
         if positive_key not in request.form:
             break
-            
+
         # Only add character if it has at least a positive prompt
         if positive_prompt:
-            character_prompts.append({
-                'positive': positive_prompt,
-                'negative': negative_prompt
-            })
-        
+            character_prompts.append(
+                {"positive": positive_prompt, "negative": negative_prompt}
+            )
+
         char_index += 1
-    
+
     return character_prompts
 
 
@@ -1466,7 +1487,7 @@ def generate_image(
             raise ValueError("Unable to get 'size' field.")
 
         split_size = size.split("x")
-        
+
         # Extract character prompt data from form
         character_prompts = _extract_character_prompts_from_form(request)
 
