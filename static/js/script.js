@@ -281,7 +281,7 @@ function updateGridModalImage() {
             const infoItem = document.createElement("div");
             infoItem.className = "info-item";
             // Add special styling for character prompts
-            if (key.match(/^Character \d+ (Prompt|Negative)$/)) {
+            if (key.match(/^Character \d+ (Prompt|Negative|Processed Prompt|Processed Negative)$/)) {
                 infoItem.classList.add("character-prompt-item");
             }
             infoItem.textContent = key + ":";
@@ -289,7 +289,7 @@ function updateGridModalImage() {
             const infoValue = document.createElement("div");
             infoValue.className = "prompt-value";
             // Add special styling for character prompt values
-            if (key.match(/^Character \d+ (Prompt|Negative)$/)) {
+            if (key.match(/^Character \d+ (Prompt|Negative|Processed Prompt|Processed Negative)$/)) {
                 infoValue.classList.add("character-prompt-value");
             }
             infoValue.textContent = metadata[key];

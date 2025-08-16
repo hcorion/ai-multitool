@@ -320,7 +320,7 @@ function updateGridModalImage(): void {
             infoItem.className = "info-item";
 
             // Add special styling for character prompts
-            if (key.match(/^Character \d+ (Prompt|Negative)$/)) {
+            if (key.match(/^Character \d+ (Prompt|Negative|Processed Prompt|Processed Negative)$/)) {
                 infoItem.classList.add("character-prompt-item");
             }
 
@@ -331,7 +331,7 @@ function updateGridModalImage(): void {
             infoValue.className = "prompt-value";
 
             // Add special styling for character prompt values
-            if (key.match(/^Character \d+ (Prompt|Negative)$/)) {
+            if (key.match(/^Character \d+ (Prompt|Negative|Processed Prompt|Processed Negative)$/)) {
                 infoValue.classList.add("character-prompt-value");
             }
 

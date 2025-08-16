@@ -1105,16 +1105,22 @@ def generate_novelai_image(
     if negative_prompt:
         image_metadata["Negative Prompt"] = negative_prompt
     
-    # Add character prompt metadata
-    if processed_character_prompts:
-        for i, char_prompt in enumerate(processed_character_prompts):
+    # Add character prompt metadata (both original and processed)
+    if character_prompts and processed_character_prompts:
+        for i, (original_char_prompt, processed_char_prompt) in enumerate(zip(character_prompts, processed_character_prompts)):
             char_num = i + 1
             # Only include character metadata if positive prompt exists
-            if char_prompt.get('positive', '').strip():
-                image_metadata[f"Character {char_num} Prompt"] = char_prompt['positive']
-                # Only include negative prompt if it exists and positive prompt exists
-                if char_prompt.get('negative', '').strip():
-                    image_metadata[f"Character {char_num} Negative"] = char_prompt['negative']
+            if original_char_prompt.get('positive', '').strip():
+                # Save original prompt (with dynamic prompt syntax) for copying
+                image_metadata[f"Character {char_num} Prompt"] = original_char_prompt['positive']
+                # Save processed prompt for reference
+                image_metadata[f"Character {char_num} Processed Prompt"] = processed_char_prompt['positive']
+                
+                # Only include negative prompts if they exist
+                if original_char_prompt.get('negative', '').strip():
+                    image_metadata[f"Character {char_num} Negative"] = original_char_prompt['negative']
+                if processed_char_prompt.get('negative', '').strip():
+                    image_metadata[f"Character {char_num} Processed Negative"] = processed_char_prompt['negative']
 
     response = requests.post(
         "https://image.novelai.net/ai/generate-image",
