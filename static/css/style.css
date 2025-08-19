@@ -37,6 +37,16 @@ input::selection {
   color: #fff;
 }
 
+/* White selection highlight for all textareas */
+textarea::selection {
+  background-color: #ffffff;
+  color: #000000;
+}
+textarea::-moz-selection {
+  background-color: #ffffff;
+  color: #000000;
+}
+
 .submit-button {
   width: 50%;
   height: 40px;

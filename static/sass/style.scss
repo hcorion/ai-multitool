@@ -50,6 +50,19 @@ input {
     }
 }
 
+/* White selection highlight for all textareas */
+textarea {
+    &::selection {
+        background-color: #ffffff;
+        color: #000000;
+    }
+
+    &::-moz-selection {
+        background-color: #ffffff;
+        color: #000000;
+    }
+}
+
 .submit-button {
     width: 50%;
     height: 40px;
@@ -395,7 +408,7 @@ img {
                     background-color: rgba($color: $submit-btn-color, $alpha: 0.1);
                     border-left: 3px solid $submit-btn-color;
                     border-radius: 4px;
-                    
+
                     span:first-child {
                         color: color.adjust($submit-btn-color, $lightness: 20%);
                     }
