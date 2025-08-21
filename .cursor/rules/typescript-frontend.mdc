@@ -1,5 +1,12 @@
 # TypeScript Frontend Development Guidelines
 
+## Frontend Tech Stack
+- **TypeScript** - ES2024 target with strict type checking and ES2022 modules
+- **jQuery** - DOM manipulation and AJAX requests
+- **Highlight.js** - Syntax highlighting for code blocks
+- **Showdown** - Markdown to HTML conversion for chat messages
+- **Sass** - CSS preprocessing with source maps
+
 ## File Organization
 - [src/script.ts](mdc:src/script.ts) - Main frontend logic, event handlers, and UI interactions
 - [src/chat.ts](mdc:src/chat.ts) - Chat functionality and message handling
@@ -8,29 +15,9 @@
 
 ## Code Conventions
 - Use camelCase for functions, PascalCase for types and interfaces
-- TypeScript modules export functions and types
-- Use strict type checking (ES2024 target)
-- Compile to [static/js/](mdc:static/js/) directory
-
-## Type Definitions
-```typescript
-interface ImageGenerationRequest {
-  prompt: string;
-  provider: 'openai' | 'stability' | 'novelai';
-  negative_prompt?: string;
-  width?: number;
-  height?: number;
-  quality?: string;
-  style?: string;
-  grid?: boolean;
-}
-
-interface ChatRequest {
-  message: string;
-  conversation_id?: string;
-  assistant_id?: string;
-}
-```
+- ES2022 modules with explicit `.js` imports for compiled output
+- Strict TypeScript with ES2024 target and DOM/ES2023 libraries
+- UMD global access for jQuery integration
 
 ## UI Components
 - Image generation interface with provider selection
@@ -51,10 +38,10 @@ interface ChatRequest {
 - Graceful fallbacks for missing features
 
 ## Build Process
-- TypeScript compiler with watch mode: `tsc --watch`
-- Source maps enabled for debugging
-- Strict type checking enforced
-- Output to [static/js/](mdc:static/js/) directory
+- **TypeScript**: `tsc` compiles src/ to static/js/ with source maps
+- **Sass**: `sass static/sass:static/css` compiles SCSS to CSS
+- **Watch mode**: `tsc --watch` for automatic recompilation
+- **Type definitions**: @types packages for jQuery, Highlight.js, Showdown
 description:
 globs:
 alwaysApply: false

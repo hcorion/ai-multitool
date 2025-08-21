@@ -11,15 +11,36 @@ pipenv shell
 .\run-user.ps1
 
 # Testing
-pytest                    # All tests
-pytest -m "not integration"  # Unit tests only
-pytest -m integration     # Integration tests only
-pytest --cov=app         # With coverage
+pipenv run pytest                    # All tests
+pipenv run pytest -m "not integration"  # Unit tests only
+pipenv run pytest -m integration     # Integration tests only
+pipenv run pytest --cov=app         # With coverage
+
+# Code Quality
+pipenv run ruff check               # Lint Python code
+pipenv run ruff format              # Format Python code
+pipenv run ruff check --fix         # Auto-fix linting issues
 
 # Building
 tsc                      # Compile TypeScript
 sass static/sass:static/css  # Compile Sass
 ```
+
+## Code Quality & Linting
+
+### Python Code Standards
+- **Ruff** is configured for Python 3.13 with strict type checking
+- Configuration in [ruff.toml](mdc:ruff.toml) excludes `.venv` directory
+- Run `pipenv run ruff check` before committing code
+- Use `pipenv run ruff format` to auto-format code
+- Auto-fix common issues with `pipenv run ruff check --fix`
+
+### Pre-commit Checklist
+1. Run `pipenv run ruff check --fix` to fix linting issues
+2. Run `pipenv run ruff format` to format code
+3. Run `pipenv run pytest` to ensure tests pass
+4. Compile TypeScript: `tsc`
+5. Compile Sass: `sass static/sass:static/css`
 
 ## Common Development Tasks
 
@@ -55,7 +76,7 @@ ai-multitool/
 ## Environment Setup
 - Create `.env.local` with API keys
 - Install global tools: `npm install -g typescript sass`
-- Use `pipenv` for Python dependency management
+- Use `pipenv` for Python dependency management (includes Ruff for linting)
 - Development server runs on `http://localhost:5000`
 
 ## Debugging

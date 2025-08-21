@@ -1,25 +1,55 @@
 # Python Backend Development Guidelines
 
+## Python Tech Stack
+- **Python 3.13** with **Pipenv** for dependency management
+- **Flask** - Web framework with session management and templating
+- **Pydantic** - Data validation and conversation management
+- **OpenAI SDK** - Official client for GPT and image generation
+- **Requests** - HTTP client for external APIs (Stability AI, NovelAI)
+- **Pillow (PIL)** - Image processing and thumbnail generation
+- **Wand** - ImageMagick binding for advanced image operations
+- **Pytest** - Testing framework with **pytest-dotenv** for environment management
+- **Ruff** - Code formatting and linting
+
 ## File Organization
 - [app.py](mdc:app.py) contains all Flask routes and main application logic
-- [dynamic_prompts.py](mdc:dynamic_prompts.py) handles template-based prompt processing
+- [image_models.py](mdc:image_models.py) defines data models for unified image generation API with strict typing
+- [dynamic_prompts.py](mdc:dynamic_prompts.py) handles template-based prompt processing  
 - [utils.py](mdc:utils.py) contains utility functions for text processing and file operations
 - [novelai_client.py](mdc:novelai_client.py) handles NovelAI API integration
 
 ## Code Conventions
 - Use snake_case for function and variable names
-- Flask routes handle both GET (display) and POST (processing)
-- Image processing functions return structured data objects
-- Use custom exception classes for error handling
+- Define API models using dataclasses and enums in `image_models.py`
+- Image processing functions return `GeneratedImageData` objects
+- Use Pydantic models for conversation management and validation
+- Session-based authentication with `username` in Flask session
 - Store user-specific content under `static/{type}/{username}/`
+- Use typing hints and strict validation for API requests
 
 ## API Structure
-- `POST /image` - Image generation endpoint supporting multiple providers
-- `POST /chat` - Chat conversation with OpenAI Assistant
-- `GET /gallery` - User image gallery retrieval
-- `GET /share/<id>` - Shared content display
-- `POST /upload` - File upload endpoint
-- `GET /download/<path>` - File download endpoint
+
+### Core Routes
+- `GET /` - Main application interface (requires authentication)
+- `GET /login` / `POST /login` - User authentication
+- `GET /logout` - User logout
+- `GET /share` - Shared content interface
+
+### Image Generation
+- `POST /image` - Unified image generation endpoint supporting multiple providers (OpenAI, NovelAI, Stability)
+  - Supports operations: `generate`, `inpaint`, `img2img`
+  - Returns JSON responses with image paths and metadata
+
+### Chat System  
+- `GET /chat` - Retrieve conversation messages
+- `POST /chat` - Send message and get streaming AI response using OpenAI Responses API
+- `GET /get-all-conversations` - List user's conversations
+- `POST /update-conversation-title` - Update conversation title
+
+### Image Gallery
+- `GET /get-total-pages` - Get total number of gallery pages
+- `GET /get-images/<int:page>` - Get paginated user images
+- `GET /get-image-metadata/<filename>` - Get image metadata from PNG info
 
 ## Testing Patterns
 - Unit tests in [tests/](mdc:tests/) directory
@@ -35,10 +65,11 @@
 - Flask session management with secure secret generation
 
 ## Error Handling
-- Return structured JSON responses with `success` and `error` fields
-- Use specific error codes: `INVALID_PROVIDER`, `MISSING_API_KEY`, `API_ERROR`, etc.
-- Validate user input and sanitize prompts
-- Handle API rate limits and timeouts gracefully
+- `/image` endpoint returns structured JSON responses with `success` field and error details
+- Use proper HTTP status codes: 400 for validation errors, 401 for authentication, 500 for server errors
+- Validate input through Pydantic models in `image_models.py`
+- Handle API rate limits and timeouts gracefully with user-friendly messages
+- Custom exception classes: `ModerationException`, `DownloadError`, `ConversationStorageError`
 description:
 globs:
 alwaysApply: false

@@ -71,7 +71,7 @@ pytest --cov=app --cov-report=html
 ```
 
 ## Environment Variables
-- `OPENAI_API_KEY`: Required for DALL-E 3 and chat functionality
+- `OPENAI_API_KEY`: Required for OpenAI Image and chat functionality
 - `STABILITY_API_KEY`: Required for StabilityAI image generation
 - `NOVELAI_API_KEY`: Required for NovelAI image generation
 ## Testing Guidelines

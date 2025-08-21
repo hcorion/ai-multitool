@@ -1,6 +1,6 @@
 # AI Multitool Project Overview
 
-This is a web-based frontend for interacting with multiple AI image generation services including OpenAI's DALL-E 3, StabilityAI's Stable Diffusion, and NovelAI's image generation models.
+This is a web-based frontend for interacting with multiple AI image generation services including OpenAI's Image, StabilityAI's Stable Diffusion, and NovelAI's image generation models.
 
 ## Core Architecture
 - **Backend**: Flask (Python 3.13) with multi-provider AI integration

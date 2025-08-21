@@ -1,40 +1,20 @@
 # API Integration Guidelines
 
 ## Supported Providers
-- **OpenAI DALL-E 3**: High-quality image generation with style options
-- **StabilityAI**: Stable Diffusion with fine-tuning parameters
-- **NovelAI**: Anime-style generation with specialized models
+- **OpenAI**: High-quality image generation using `gpt-image-1` model with dimension validation
+- **Stability AI**: Stable Diffusion 3.5 with aspect ratio control
+- **NovelAI**: Anime-style generation with character prompts and upscaling support
 
-## Provider-Specific Parameters
+## Operations Supported
+- **Generate**: Text-to-image generation (all providers)
+- **Inpaint**: Masked image editing (OpenAI, NovelAI)  
+- **Img2Img**: Image-to-image transformation (NovelAI only)
 
-### OpenAI (DALL-E 3)
-```python
-{
-    "quality": "standard" | "hd",
-    "style": "vivid" | "natural",
-    "size": "1024x1024" | "1792x1024" | "1024x1792"
-}
-```
-
-### StabilityAI
-```python
-{
-    "negative_prompt": "string",
-    "cfg_scale": 1-20,  # default: 7
-    "steps": 10-50,     # default: 30
-    "seed": "number"
-}
-```
-
-### NovelAI
-```python
-{
-    "negative_prompt": "string",
-    "quality_toggle": "boolean",
-    "uc_preset": "string",
-    "sampler": "string"
-}
-```
+## Unified API Endpoint
+- `POST /image` - Single endpoint handling all providers and operations
+- Request validation through `image_models.py` with strict typing
+- Provider-specific parameter routing and validation
+- Consistent JSON response format with `success`, `image_path`, `metadata` fields
 
 ## Error Handling
 - Handle API rate limits gracefully

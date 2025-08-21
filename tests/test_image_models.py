@@ -97,10 +97,10 @@ class TestImageGenerationRequest:
         valid_request = ImageGenerationRequest(
             prompt="test",
             provider=Provider.OPENAI,
-            width=1792,
+            width=1536,
             height=1024
         )
-        assert valid_request.width == 1792
+        assert valid_request.width == 1536
         assert valid_request.height == 1024
         
         # Invalid dimensions should raise error
@@ -276,9 +276,6 @@ class TestImageRequestValidator:
         # Valid OpenAI models
         assert ImageRequestValidator.validate_model_for_provider(
             Provider.OPENAI, OpenAIModel.GPT_IMAGE_1.value
-        )
-        assert ImageRequestValidator.validate_model_for_provider(
-            Provider.OPENAI, OpenAIModel.DALL_E_3.value
         )
         
         # Invalid model for OpenAI

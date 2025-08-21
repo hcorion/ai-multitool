@@ -32,17 +32,8 @@ class TestFrontendIntegration:
         assert response.status_code == 200
         assert b'prompt-form' in response.data
     
-    @patch('app.generate_image')
-    def test_legacy_endpoint_still_works(self, mock_generate, client, authenticated_session):
-        """Test that the legacy / endpoint still works for backward compatibility."""
-        # Mock the generate_image function
-        mock_generated_data = Mock()
-        mock_generated_data.local_image_path = '/path/to/image.png'
-        mock_generated_data.image_name = 'image.png'
-        mock_generated_data.prompt = 'test prompt'
-        mock_generated_data.revised_prompt = 'revised test prompt'
-        mock_generate.return_value = mock_generated_data
-        
+    def test_legacy_endpoint_no_longer_supports_post(self, client, authenticated_session):
+        """Test that the legacy / endpoint no longer supports POST."""
         response = client.post('/', data={
             'prompt': 'test prompt',
             'provider': 'openai',
@@ -50,14 +41,13 @@ class TestFrontendIntegration:
             'quality': 'standard'
         })
         
-        # Should return HTML template, not JSON
-        assert response.status_code == 200
-        assert b'result-section' in response.data or b'image' in response.data
+        # Should return 405 Method Not Allowed
+        assert response.status_code == 405
     
-    @patch('app.generate_image')
+    @patch('app.generate_openai_image')
     def test_new_endpoint_json_response(self, mock_generate, client, authenticated_session):
         """Test that the new /image endpoint returns JSON responses."""
-        # Mock the generate_image function
+        # Mock the generate_openai_image function
         mock_generated_data = Mock()
         mock_generated_data.local_image_path = '/path/to/image.png'
         mock_generated_data.image_name = 'image.png'
@@ -71,7 +61,7 @@ class TestFrontendIntegration:
             'operation': 'generate',
             'width': '1024',
             'height': '1024',
-            'quality': 'standard'
+            'quality': 'high'
         })
         
         assert response.status_code == 200
@@ -100,10 +90,10 @@ class TestFrontendIntegration:
         assert 'error' in data
         assert 'Prompt cannot be empty' in data['error']
     
-    @patch('app.generate_image')
+    @patch('app.generate_openai_image')
     def test_endpoint_selection_logic(self, mock_generate, client, authenticated_session):
-        """Test that the correct endpoint is used based on request parameters."""
-        # Mock the generate_image function
+        """Test that the new image endpoint works correctly."""
+        # Mock the generate_openai_image function
         mock_generated_data = Mock()
         mock_generated_data.local_image_path = '/path/to/image.png'
         mock_generated_data.image_name = 'image.png'
@@ -111,30 +101,18 @@ class TestFrontendIntegration:
         mock_generated_data.revised_prompt = 'revised test prompt'
         mock_generate.return_value = mock_generated_data
         
-        # Test basic generation - should work with new endpoint
+        # Test basic generation with new endpoint
         response = client.post('/image', data={
             'prompt': 'test prompt',
             'provider': 'openai',
-            'operation': 'generate'
+            'operation': 'generate',
+            'width': '1024',
+            'height': '1024'
         })
         
         assert response.status_code == 200
         data = json.loads(response.data)
         assert data['success'] is True
-        
-        # Test that legacy endpoint still handles complex grid generation
-        response = client.post('/', data={
-            'prompt': 'test prompt',
-            'provider': 'openai',
-            'size': '1024x1024',
-            'quality': 'standard',
-            'advanced-generate-grid': 'on',
-            'grid-prompt-file': 'test.txt'
-        })
-        
-        # This should still work with the legacy endpoint
-        # (though it might fail due to missing grid file, that's expected)
-        assert response.status_code in [200, 400, 500]  # Various expected outcomes
     
     def test_response_format_consistency(self, client, authenticated_session):
         """Test that response formats are consistent across different scenarios."""
@@ -166,10 +144,10 @@ class TestFrontendIntegration:
 class TestEndpointCompatibility:
     """Test compatibility between old and new endpoints."""
     
-    @patch('app.generate_image')
-    def test_same_parameters_different_endpoints(self, mock_generate, client, authenticated_session):
-        """Test that the same parameters work on both endpoints (where applicable)."""
-        # Mock the generate_image function
+    @patch('app.generate_openai_image')
+    def test_new_endpoint_parameters(self, mock_generate, client, authenticated_session):
+        """Test that the new /image endpoint works with proper parameters."""
+        # Mock the generate_openai_image function
         mock_generated_data = Mock()
         mock_generated_data.local_image_path = '/path/to/image.png'
         mock_generated_data.image_name = 'image.png'
@@ -177,35 +155,26 @@ class TestEndpointCompatibility:
         mock_generated_data.revised_prompt = 'revised test prompt'
         mock_generate.return_value = mock_generated_data
         
-        # Parameters that should work on both endpoints
-        common_params = {
+        # Test legacy endpoint no longer supports POST
+        legacy_response = client.post('/', data={
             'prompt': 'test prompt',
             'provider': 'openai',
-            'quality': 'standard'
-        }
-        
-        # Legacy endpoint parameters
-        legacy_params = {
-            **common_params,
-            'size': '1024x1024'
-        }
-        
-        # New endpoint parameters
-        new_params = {
-            **common_params,
-            'operation': 'generate',
-            'width': '1024',
-            'height': '1024'
-        }
-        
-        # Test legacy endpoint
-        legacy_response = client.post('/', data=legacy_params)
-        assert legacy_response.status_code == 200
+            'size': '1024x1024',
+            'quality': 'high'
+        })
+        assert legacy_response.status_code == 405  # Method Not Allowed
         
         # Test new endpoint
-        new_response = client.post('/image', data=new_params)
+        new_response = client.post('/image', data={
+            'prompt': 'test prompt',
+            'provider': 'openai',
+            'operation': 'generate',
+            'width': '1024',
+            'height': '1024',
+            'quality': 'high'
+        })
         assert new_response.status_code == 200
         
-        # Both should succeed (though with different response formats)
+        # Verify JSON response format
         new_data = json.loads(new_response.data)
         assert new_data['success'] is True

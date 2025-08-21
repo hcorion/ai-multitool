@@ -38,7 +38,6 @@ class NovelAIModel(str, Enum):
 class OpenAIModel(str, Enum):
     """OpenAI model options."""
     GPT_IMAGE_1 = "gpt-image-1"
-    DALL_E_3 = "dall-e-3"
 
 
 @dataclass
