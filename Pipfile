@@ -12,6 +12,8 @@ pygments = "*"
 markdown = "*"
 wand = "*"
 pydantic = "*"
+pytest = "*"
+pytest-dotenv = "*"
 
 [dev-packages]
 ruff = "*"

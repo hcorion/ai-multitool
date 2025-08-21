@@ -1,8 +1,8 @@
 # Technology Stack
 
 ## Backend
-- **Python 3.13** with Flask web framework
-- **OpenAI Python SDK** for DALL-E 3 and Responses API integration
+- **Python 3.13** Latest idiomatic python with Flask web framework
+- **OpenAI Python SDK** for Image and Responses API integration
 - **Pydantic** for data validation and serialization with type safety
 - **Requests** library for StabilityAI and NovelAI API calls
 - **Pillow (PIL)** for image processing and metadata handling
