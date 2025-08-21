@@ -379,6 +379,14 @@ img {
   font-size: 0.8rem;
   opacity: 0.7;
 }
+.grid-modal .modal-content-wrapper .info-panel .prompt-value.character-prompt-value.processed-prompt-value .diff-highlight {
+  background-color: rgba(34, 197, 94, 0.3);
+  color: #fff;
+  padding: 1px 3px;
+  border-radius: 3px;
+  font-weight: 500;
+  box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.4);
+}
 
 .grid-nav-buttons {
   padding: 10px 10px;

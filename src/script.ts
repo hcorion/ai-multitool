@@ -388,6 +388,70 @@ function openGridModal(evt: Event): void {
     $("#grid-image-modal").show();
 }
 
+/**
+ * Highlights differences between base and processed text by finding and highlighting
+ * only the parts that actually changed (like __color__ -> violet).
+ */
+function highlightTextDifferences(baseText: string, processedText: string): string {
+    // Use a more sophisticated approach to find dynamic prompt replacements
+    // This handles cases like "1.5::__color__" -> "1.5::violet" where only "violet" should be highlighted
+    
+    let result = processedText;
+    
+    // Find all dynamic prompt patterns in the base text (like __color__, __style__, etc.)
+    const dynamicPromptPattern = /__([^_]+)__/g;
+    const matches = [...baseText.matchAll(dynamicPromptPattern)];
+    
+    for (const match of matches) {
+        const fullPlaceholder = match[0]; // e.g., "__color__"
+        const placeholderName = match[1]; // e.g., "color"
+        
+        // Find where this placeholder appears in the base text
+        const baseIndex = match.index!;
+        
+        // Get the context around the placeholder to find the corresponding part in processed text
+        const beforePlaceholder = baseText.substring(0, baseIndex);
+        const afterPlaceholder = baseText.substring(baseIndex + fullPlaceholder.length);
+        
+        // Find the corresponding position in the processed text
+        const beforeIndex = beforePlaceholder.length;
+        let afterIndex = processedText.length;
+        
+        if (afterPlaceholder.length > 0) {
+            const afterStart = processedText.indexOf(afterPlaceholder, beforeIndex);
+            if (afterStart !== -1) {
+                afterIndex = afterStart;
+            }
+        }
+        
+        // Extract the replacement value from the processed text
+        const replacementValue = processedText.substring(beforeIndex, afterIndex);
+        
+        // Only highlight if the replacement is different and not empty
+        if (replacementValue && replacementValue !== fullPlaceholder) {
+            const highlightedReplacement = `<span class="diff-highlight">${escapeHtml(replacementValue)}</span>`;
+            result = result.substring(0, beforeIndex) + highlightedReplacement + result.substring(afterIndex);
+        }
+    }
+    
+    // If no dynamic prompts were found, fall back to basic word comparison for other changes
+    if (matches.length === 0 && baseText !== processedText) {
+        // Simple fallback: highlight the entire processed text if it's completely different
+        result = `<span class="diff-highlight">${escapeHtml(processedText)}</span>`;
+    }
+    
+    return result;
+}
+
+/**
+ * Escapes HTML special characters to prevent XSS
+ */
+function escapeHtml(text: string): string {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
 function updateGridModalImage(): void {
     // Get the list of grid images from the current grid DOM.
     const gridImages = $(".image-grid img");
@@ -426,14 +490,17 @@ function updateGridModalImage(): void {
         const metadataDiv = document.getElementById("grid-info-panel") as HTMLElement;
         metadataDiv.innerHTML = ""; // Clear previous metadata
 
-        // Process character prompts to determine what to display
+        // Process character prompts and main prompts to determine what to display
         const processedMetadata: { [key: string]: string } = {};
         const characterPromptData: { [key: string]: { base: string; processed: string; isDifferent: boolean } } = {};
+        const mainPromptData: { [key: string]: { base: string; processed: string; isDifferent: boolean } } = {};
 
         // First pass: identify character prompts and compare base vs processed
         for (const key in metadata) {
             const characterMatch = key.match(/^Character (\d+) (Prompt|Negative)$/);
             const processedMatch = key.match(/^Character (\d+) Processed (Prompt|Negative)$/);
+            const mainPromptMatch = key.match(/^(Prompt|Negative Prompt)$/);
+            const processedMainMatch = key.match(/^Revised (Prompt|Negative Prompt)$/);
 
             if (characterMatch) {
                 const charNum = characterMatch[1];
@@ -468,8 +535,41 @@ function updateGridModalImage(): void {
                     // Only processed exists (shouldn't happen, but handle it)
                     processedMetadata[processedKey] = processedValue;
                 }
-            } else if (!processedMatch) {
-                // Non-character prompt metadata, add as-is
+            } else if (mainPromptMatch) {
+                // Handle main prompts (Prompt, Negative Prompt)
+                const promptType = mainPromptMatch[1];
+                const baseKey = promptType;
+                const processedKey = `Revised ${promptType}`;
+                
+                const baseValue = metadata[baseKey] || "";
+                const processedValue = metadata[processedKey] || "";
+                
+                // If both exist, compare them
+                if (baseValue && processedValue) {
+                    const isDifferent = baseValue !== processedValue;
+                    mainPromptData[baseKey] = {
+                        base: baseValue,
+                        processed: processedValue,
+                        isDifferent: isDifferent
+                    };
+                    
+                    if (isDifferent) {
+                        // Show both base and processed with different styling
+                        processedMetadata[baseKey] = baseValue;
+                        processedMetadata[processedKey] = processedValue;
+                    } else {
+                        // Show only the base prompt
+                        processedMetadata[baseKey] = baseValue;
+                    }
+                } else if (baseValue) {
+                    // Only base exists
+                    processedMetadata[baseKey] = baseValue;
+                } else if (processedValue) {
+                    // Only processed exists (shouldn't happen, but handle it)
+                    processedMetadata[processedKey] = processedValue;
+                }
+            } else if (!processedMatch && !processedMainMatch) {
+                // Non-prompt metadata, add as-is
                 processedMetadata[key] = metadata[key];
             }
             // Skip processed prompts in this pass as they're handled above
@@ -498,10 +598,38 @@ function updateGridModalImage(): void {
                 // Add additional styling for processed prompts when they differ from base
                 if (key.match(/^Character \d+ Processed (Prompt|Negative)$/)) {
                     infoValue.classList.add("processed-prompt-value");
+                    
+                    // Find the corresponding base prompt to highlight differences
+                    const baseKey = key.replace(" Processed ", " ");
+                    const basePromptData = characterPromptData[baseKey];
+                    
+                    if (basePromptData && basePromptData.isDifferent) {
+                        // Use diff highlighting for processed prompts
+                        infoValue.innerHTML = highlightTextDifferences(basePromptData.base, basePromptData.processed);
+                    } else {
+                        infoValue.textContent = processedMetadata[key];
+                    }
+                } else {
+                    infoValue.textContent = processedMetadata[key];
                 }
+            } else if (key.match(/^Revised (Prompt|Negative Prompt)$/)) {
+                // Handle main revised prompts
+                infoValue.classList.add("character-prompt-value", "processed-prompt-value");
+                
+                // Find the corresponding base prompt to highlight differences
+                const baseKey = key.replace("Revised ", "");
+                const basePromptData = mainPromptData[baseKey];
+                
+                if (basePromptData && basePromptData.isDifferent) {
+                    // Use diff highlighting for processed main prompts
+                    infoValue.innerHTML = highlightTextDifferences(basePromptData.base, basePromptData.processed);
+                } else {
+                    infoValue.textContent = processedMetadata[key];
+                }
+            } else {
+                infoValue.textContent = processedMetadata[key];
             }
 
-            infoValue.textContent = processedMetadata[key];
             metadataDiv.appendChild(infoValue);
         }
 
