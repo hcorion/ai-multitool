@@ -10,12 +10,14 @@ import json
 import zipfile
 import io
 from unittest.mock import Mock, patch, MagicMock
+from PIL import Image as PILImage
 
 from novelai_client import (
     NovelAIClient,
     NovelAIModel,
     NovelAIAction,
     NovelAIGenerationPayload,
+    NovelAIInpaintPayload,
     NovelAIClientError,
     NovelAIAPIError
 )
@@ -242,6 +244,288 @@ class TestNovelAIClient:
             
             assert "Failed to extract image from response" in str(exc_info.value)
     
+    def test_generate_inpaint_image_basic(self):
+        """Test basic inpainting functionality."""
+        # Create a mock ZIP file with inpainted image data
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w') as zip_file:
+            zip_file.writestr("inpainted.png", b"inpainted image data")
+        zip_content = zip_buffer.getvalue()
+        
+        with patch.object(NovelAIClient, '_make_request') as mock_request:
+            mock_response = Mock()
+            mock_response.content = zip_content
+            mock_request.return_value = mock_response
+            
+            with patch.object(NovelAIClient, '_process_novelai_mask') as mock_process_mask:
+                mock_process_mask.return_value = b"processed mask data"
+                
+                client = NovelAIClient("test-key")
+                result = client.generate_inpaint_image(
+                    base_image=b"base image data",
+                    mask=b"mask image data",
+                    prompt="inpaint this area"
+                )
+                
+                assert result == b"inpainted image data"
+                
+                # Verify mask processing was called
+                mock_process_mask.assert_called_once_with(b"mask image data")
+                
+                # Verify the request payload
+                mock_request.assert_called_once()
+                call_args = mock_request.call_args
+                endpoint, payload = call_args[0]
+                
+                assert endpoint == "ai/generate-image"
+                assert payload["action"] == "infill"
+                assert payload["model"] == "nai-diffusion-4-5-full-inpainting"
+                assert payload["parameters"]["v4_prompt"]["caption"]["base_caption"] == "inpaint this area"
+                assert "image" in payload
+                assert "mask" in payload
+    
+    def test_generate_inpaint_image_with_negative_prompt(self):
+        """Test inpainting with negative prompt."""
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w') as zip_file:
+            zip_file.writestr("inpainted.png", b"inpainted image data")
+        zip_content = zip_buffer.getvalue()
+        
+        with patch.object(NovelAIClient, '_make_request') as mock_request:
+            mock_response = Mock()
+            mock_response.content = zip_content
+            mock_request.return_value = mock_response
+            
+            with patch.object(NovelAIClient, '_process_novelai_mask') as mock_process_mask:
+                mock_process_mask.return_value = b"processed mask data"
+                
+                client = NovelAIClient("test-key")
+                result = client.generate_inpaint_image(
+                    base_image=b"base image data",
+                    mask=b"mask image data",
+                    prompt="inpaint this area",
+                    negative_prompt="avoid this"
+                )
+                
+                assert result == b"inpainted image data"
+                
+                # Verify negative prompt in payload
+                call_args = mock_request.call_args
+                payload = call_args[0][1]
+                assert payload["parameters"]["v4_negative_prompt"]["caption"]["base_caption"] == "avoid this"
+    
+    def test_generate_inpaint_image_custom_parameters(self):
+        """Test inpainting with custom parameters."""
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w') as zip_file:
+            zip_file.writestr("inpainted.png", b"inpainted image data")
+        zip_content = zip_buffer.getvalue()
+        
+        with patch.object(NovelAIClient, '_make_request') as mock_request:
+            mock_response = Mock()
+            mock_response.content = zip_content
+            mock_request.return_value = mock_response
+            
+            with patch.object(NovelAIClient, '_process_novelai_mask') as mock_process_mask:
+                mock_process_mask.return_value = b"processed mask data"
+                
+                client = NovelAIClient("test-key")
+                result = client.generate_inpaint_image(
+                    base_image=b"base image data",
+                    mask=b"mask image data",
+                    prompt="inpaint this area",
+                    width=512,
+                    height=768,
+                    seed=12345,
+                    steps=20,
+                    scale=7.5
+                )
+                
+                assert result == b"inpainted image data"
+                
+                # Verify custom parameters
+                call_args = mock_request.call_args
+                payload = call_args[0][1]
+                params = payload["parameters"]
+                
+                assert params["width"] == 512
+                assert params["height"] == 768
+                assert params["seed"] == 12345
+                assert params["steps"] == 20
+                assert params["scale"] == 7.5
+    
+    @patch('novelai_client.base64.b64encode')
+    def test_generate_inpaint_image_base64_encoding(self, mock_b64encode):
+        """Test that base64 encoding is called correctly for inpainting."""
+        # Mock base64 encoding
+        mock_b64encode.side_effect = [
+            Mock(decode=Mock(return_value="base64_base_image")),
+            Mock(decode=Mock(return_value="base64_processed_mask"))
+        ]
+        
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w') as zip_file:
+            zip_file.writestr("inpainted.png", b"inpainted image data")
+        zip_content = zip_buffer.getvalue()
+        
+        with patch.object(NovelAIClient, '_make_request') as mock_request:
+            mock_response = Mock()
+            mock_response.content = zip_content
+            mock_request.return_value = mock_response
+            
+            with patch.object(NovelAIClient, '_process_novelai_mask') as mock_process_mask:
+                mock_process_mask.return_value = b"processed mask data"
+                
+                client = NovelAIClient("test-key")
+                result = client.generate_inpaint_image(
+                    base_image=b"base image data",
+                    mask=b"mask image data",
+                    prompt="inpaint this area"
+                )
+                
+                assert result == b"inpainted image data"
+                
+                # Verify mask processing was called
+                mock_process_mask.assert_called_once_with(b"mask image data")
+                
+                # Verify base64 encoding was called for both images
+                assert mock_b64encode.call_count == 2
+                mock_b64encode.assert_any_call(b"base image data")
+                mock_b64encode.assert_any_call(b"processed mask data")  # Should use processed mask
+                
+                # Verify encoded data is in payload
+                call_args = mock_request.call_args
+                payload = call_args[0][1]
+                assert payload["image"] == "base64_base_image"
+                assert payload["mask"] == "base64_processed_mask"
+    
+    def test_generate_inpaint_image_zip_extraction_error(self):
+        """Test error handling when inpainting ZIP extraction fails."""
+        with patch.object(NovelAIClient, '_make_request') as mock_request:
+            mock_response = Mock()
+            mock_response.content = b"invalid zip data"
+            mock_request.return_value = mock_response
+            
+            with patch.object(NovelAIClient, '_process_novelai_mask') as mock_process_mask:
+                mock_process_mask.return_value = b"processed mask data"
+                
+                client = NovelAIClient("test-key")
+                
+                with pytest.raises(NovelAIClientError) as exc_info:
+                    client.generate_inpaint_image(
+                        base_image=b"base image data",
+                        mask=b"mask image data",
+                        prompt="inpaint this area"
+                    )
+                
+                assert "Failed to extract inpainted image from response" in str(exc_info.value)
+    
+    def test_process_novelai_mask(self):
+        """Test the NovelAI mask processing function."""
+        # Create a test mask image
+        mask_image = PILImage.new('RGB', (64, 64), color='black')
+        
+        # Add a white square in the center
+        for x in range(24, 40):
+            for y in range(24, 40):
+                mask_image.putpixel((x, y), (255, 255, 255))
+        
+        # Convert to bytes
+        mask_buffer = io.BytesIO()
+        mask_image.save(mask_buffer, format='PNG')
+        mask_bytes = mask_buffer.getvalue()
+        
+        client = NovelAIClient("test-key")
+        processed_mask_bytes = client._process_novelai_mask(mask_bytes)
+        
+        # Verify the processed mask
+        processed_mask = PILImage.open(io.BytesIO(processed_mask_bytes))
+        
+        # Should be same size as original
+        assert processed_mask.size == (64, 64)
+        
+        # Should be RGB format
+        assert processed_mask.mode == 'RGB'
+        
+        # Check that the mask has the expected block structure
+        # Due to the 8x downscale and upscale, we should have 8x8 pixel blocks
+        # Sample a few pixels to verify block structure
+        center_pixel = processed_mask.getpixel((32, 32))  # Should be white
+        assert center_pixel == (255, 255, 255) or center_pixel == (0, 0, 0)  # Should be pure black or white
+        
+        corner_pixel = processed_mask.getpixel((0, 0))  # Should be black
+        assert corner_pixel == (0, 0, 0)
+    
+    def test_process_novelai_mask_grayscale_input(self):
+        """Test mask processing with grayscale input."""
+        # Create a grayscale test mask
+        mask_image = PILImage.new('L', (32, 32), color=0)  # Black background
+        
+        # Add white area
+        for x in range(12, 20):
+            for y in range(12, 20):
+                mask_image.putpixel((x, y), 255)
+        
+        mask_buffer = io.BytesIO()
+        mask_image.save(mask_buffer, format='PNG')
+        mask_bytes = mask_buffer.getvalue()
+        
+        client = NovelAIClient("test-key")
+        processed_mask_bytes = client._process_novelai_mask(mask_bytes)
+        
+        # Should process without error
+        processed_mask = PILImage.open(io.BytesIO(processed_mask_bytes))
+        assert processed_mask.size == (32, 32)
+        assert processed_mask.mode == 'RGB'
+    
+    def test_process_novelai_mask_error_handling(self):
+        """Test mask processing error handling."""
+        client = NovelAIClient("test-key")
+        
+        # Test with invalid image data
+        with pytest.raises(NovelAIClientError) as exc_info:
+            client._process_novelai_mask(b"invalid image data")
+        
+        assert "Failed to process NovelAI mask" in str(exc_info.value)
+    
+    def test_process_novelai_mask_block_structure(self):
+        """Test that mask processing creates the expected 8x8 block structure."""
+        # Create a test mask with a specific pattern
+        mask_image = PILImage.new('RGB', (80, 80), color='black')  # Size divisible by 8
+        
+        # Add a white square that should create blocks
+        for x in range(32, 48):  # 16x16 white area
+            for y in range(32, 48):
+                mask_image.putpixel((x, y), (255, 255, 255))
+        
+        # Convert to bytes
+        mask_buffer = io.BytesIO()
+        mask_image.save(mask_buffer, format='PNG')
+        mask_bytes = mask_buffer.getvalue()
+        
+        client = NovelAIClient("test-key")
+        processed_mask_bytes = client._process_novelai_mask(mask_bytes)
+        
+        # Verify the processed mask has block structure
+        processed_mask = PILImage.open(io.BytesIO(processed_mask_bytes))
+        
+        # Check that adjacent pixels in an 8x8 block have the same value
+        # Sample a few positions to verify block structure
+        pixel_40_40 = processed_mask.getpixel((40, 40))  # Should be white (in the white area)
+        pixel_41_40 = processed_mask.getpixel((41, 40))  # Should be same as pixel_40_40 (same 8x8 block)
+        pixel_47_47 = processed_mask.getpixel((47, 47))  # Should be same as pixel_40_40 (same 8x8 block)
+        
+        # All pixels in the same 8x8 block should have the same value
+        assert pixel_40_40 == pixel_41_40
+        assert pixel_40_40 == pixel_47_47
+        
+        # Check a pixel outside the white area
+        pixel_16_16 = processed_mask.getpixel((16, 16))  # Should be black
+        assert pixel_16_16 == (0, 0, 0)
+        
+        # The white area pixels should be different from black area pixels
+        assert pixel_40_40 != pixel_16_16
+    
     def test_upscale_image_basic(self):
         """Test basic image upscaling functionality."""
         # Create a mock ZIP file with upscaled image data
@@ -374,6 +658,38 @@ class TestNovelAIGenerationPayload:
         assert payload.model == NovelAIModel.DIFFUSION_4_5_FULL_INPAINTING
         assert payload.action == NovelAIAction.INPAINT
         assert payload.parameters == custom_params
+
+
+class TestNovelAIInpaintPayload:
+    """Test cases for NovelAIInpaintPayload dataclass."""
+    
+    def test_inpaint_payload_creation(self):
+        """Test basic inpaint payload creation."""
+        payload = NovelAIInpaintPayload("inpaint prompt")
+        
+        assert payload.input == "inpaint prompt"
+        assert payload.model == NovelAIModel.DIFFUSION_4_5_FULL_INPAINTING
+        assert payload.action == NovelAIAction.INPAINT
+        assert payload.parameters == {}
+        assert payload.mask == ""
+        assert payload.image == ""
+    
+    def test_inpaint_payload_with_image_data(self):
+        """Test inpaint payload creation with image data."""
+        payload = NovelAIInpaintPayload(
+            "inpaint prompt",
+            mask="base64_mask_data",
+            image="base64_image_data"
+        )
+        
+        assert payload.input == "inpaint prompt"
+        assert payload.mask == "base64_mask_data"
+        assert payload.image == "base64_image_data"
+    
+    def test_inpaint_payload_inheritance(self):
+        """Test that inpaint payload inherits from generation payload."""
+        payload = NovelAIInpaintPayload("test")
+        assert isinstance(payload, NovelAIGenerationPayload)
 
 
 class TestNovelAIExceptions:

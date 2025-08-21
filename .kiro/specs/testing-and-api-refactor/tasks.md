@@ -46,14 +46,22 @@
   - Test integration with existing Flask routes
   - _Requirements: 2.6, 1.3_
 
-- [ ] 3. Add inpainting support for both providers
-- [ ] 3.1 Implement NovelAI inpainting functionality with tests
+- [x] 3. Add inpainting support for both providers
+
+
+
+
+- [x] 3.1 Implement NovelAI inpainting functionality with tests
+
+
   - Add generate_inpaint_image method to NovelAIClient
   - Create NovelAIInpaintPayload dataclass with mask and image fields
   - Implement base64 encoding for image and mask data
   - Write unit tests for inpainting functionality with mocked responses
   - Write integration test using sample images and actual API key
   - _Requirements: 2.4, 3.1, 1.3_
+
+
 
 - [ ] 3.2 Implement OpenAI inpainting functionality with tests
   - Create generate_openai_inpaint_image function using client.images.edit API
@@ -62,6 +70,8 @@
   - Add error handling for OpenAI inpainting API responses
   - Write unit tests with mocked OpenAI responses
   - Write integration test using actual OpenAI API key
+
+
   - _Requirements: 3.1, 3.2, 3.3, 1.3_
 
 - [ ] 3.3 Rename OpenAI generation function with tests

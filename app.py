@@ -949,8 +949,6 @@ def upscale_stability_creative(
         raise Exception(error_message)
 
 
-
-
 def _build_char_captions(character_prompts: List[dict], prompt_type: str) -> List[dict]:
     """
     Build char_captions array for NovelAI API request.
@@ -987,7 +985,7 @@ def generate_novelai_image(
 ) -> GeneratedImageData:
     if not app.static_folder:
         raise ValueError("Flask static folder not defined")
-    
+
     if not novelai_api_key:
         raise ValueError("NovelAI API key not configured")
 
@@ -1014,7 +1012,7 @@ def generate_novelai_image(
 
     # Create NovelAI client
     client = NovelAIClient(novelai_api_key)
-    
+
     try:
         # Generate image using the client
         image_bytes = client.generate_image(
@@ -1023,12 +1021,12 @@ def generate_novelai_image(
             width=width,
             height=height,
             seed=seed,
-            character_prompts=processed_character_prompts
+            character_prompts=processed_character_prompts,
         )
-        
+
         if upscale:
             image_bytes = client.upscale_image(image_bytes, width, height)
-        
+
         file_bytes = io.BytesIO(image_bytes)
 
         # Build image metadata
@@ -1049,9 +1047,9 @@ def generate_novelai_image(
                 # Only include character metadata if positive prompt exists
                 if original_char_prompt.get("positive", "").strip():
                     # Save original prompt (with dynamic prompt syntax) for copying
-                    image_metadata[f"Character {char_num} Prompt"] = original_char_prompt[
-                        "positive"
-                    ]
+                    image_metadata[f"Character {char_num} Prompt"] = (
+                        original_char_prompt["positive"]
+                    )
                     # Save processed prompt for reference
                     image_metadata[f"Character {char_num} Processed Prompt"] = (
                         processed_char_prompt["positive"]
@@ -1076,7 +1074,7 @@ def generate_novelai_image(
             prompt,
             saved_data.image_name,
         )
-        
+
     except NovelAIAPIError as e:
         error_message = f"NovelAI Generate Image {e.status_code}: {e.message}"
         raise Exception(error_message)
@@ -1152,14 +1150,25 @@ def generate_stability_image(
         raise Exception(error_message)
 
 
-def generate_dalle_image(
-    prompt: str,
-    username: str,
-    size: str = "1024x1024",
-    quality: str = "standard",
-    strict_follow_prompt: bool = False,
-    seed: int = 0,
-) -> GeneratedImageData:
+def _process_openai_prompt(
+    prompt: str, username: str, seed: int = 0, strict_follow_prompt: bool = False
+) -> tuple[str, str]:
+    """
+    Process and moderate a prompt for OpenAI API calls.
+
+    Args:
+        prompt: Original prompt text
+        username: Username for dynamic prompt processing
+        seed: Random seed for prompt processing
+        strict_follow_prompt: Whether to apply strict prompt following instructions
+
+    Returns:
+        Tuple of (original_processed_prompt, final_prompt)
+
+    Raises:
+        ValueError: If Flask static folder is not defined
+        ModerationException: If prompt fails OpenAI moderation
+    """
     if not app.static_folder:
         raise ValueError("Flask static folder not defined")
 
@@ -1177,7 +1186,7 @@ def generate_dalle_image(
                 "My prompt has full detail so no need to add more:\n" + revised_prompt
             )
 
-    # Run the prompt through moderation first, I don't want to get my account banned.
+    # Run the prompt through moderation first
     moderation = client.moderations.create(input=revised_prompt)
     for result in moderation.results:
         if result.flagged:
@@ -1189,36 +1198,191 @@ def generate_dalle_image(
                 flagged_categories = flagged_categories[:-2]
             raise ModerationException(message=flagged_categories)
 
-    # Call OpenAI Image Generation API
-    response = client.images.generate(
-        model="gpt-image-1",
-        prompt=revised_prompt,
-        moderation="low",
-        size=size,  # type: ignore
-        quality=quality,  # type: ignore
-        n=1,
-    )
-    if not response.data or not response.data[0].b64_json:
-        raise DownloadError("Was not able to get image url")
-    decoded_data = base64.b64decode(response.data[0].b64_json)
+    return before_prompt, revised_prompt
 
-    saved_data = process_image_response(
-        io.BytesIO(decoded_data),
-        before_prompt,
-        revised_prompt,
-        username,
-        {
-            "Prompt": prompt,
-            "Quality": quality,
-            "Revised Prompt": revised_prompt,
-        },
+
+def _handle_openai_api_errors(
+    e: Exception, operation: str = "Image Generation"
+) -> None:
+    """
+    Handle OpenAI API errors with consistent error messages.
+
+    Args:
+        e: The exception that was raised
+        operation: The operation being performed (for error messages)
+
+    Raises:
+        Exception: Formatted exception with appropriate error message
+    """
+    if isinstance(e, openai.BadRequestError):
+        error = json.loads(e.response.content)
+        error_message = error["error"]["message"]
+        error_code = error["error"]["code"]
+        if error_code == "content_policy_violation":
+            error_message = f"OpenAI {operation.lower()} has generated content that doesn't pass moderation filters. You may want to adjust your prompt slightly."
+        raise Exception(f"OpenAI {operation} Error {error_code}: {error_message}")
+    elif isinstance(e, openai.APIError):
+        raise Exception(f"OpenAI {operation} API Error: {str(e)}")
+    elif "OpenAI" in str(e):
+        raise e
+    else:
+        raise Exception(f"OpenAI {operation} Error: {str(e)}")
+
+
+def generate_openai_image(
+    prompt: str,
+    username: str,
+    size: str = "1024x1024",
+    quality: str = "standard",
+    strict_follow_prompt: bool = False,
+    seed: int = 0,
+) -> GeneratedImageData:
+    """
+    Generate an image using OpenAI's text-to-image model.
+
+    Args:
+        prompt: Text prompt for image generation
+        username: Username for file organization
+        size: Image size (1024x1024, 512x512, or 256x256)
+        quality: Image quality (standard or hd)
+        strict_follow_prompt: Whether to apply strict prompt following
+        seed: Random seed for prompt processing
+
+    Returns:
+        GeneratedImageData object with image information
+
+    Raises:
+        ValueError: If Flask static folder is not defined
+        ModerationException: If prompt fails OpenAI moderation
+        Exception: If OpenAI API call fails
+    """
+    before_prompt, revised_prompt = _process_openai_prompt(
+        prompt, username, seed, strict_follow_prompt
     )
-    return GeneratedImageData(
-        saved_data.local_image_path,
-        revised_prompt,
-        prompt,
-        saved_data.image_name,
-    )
+
+    try:
+        # Call OpenAI Image Generation API
+        response = client.images.generate(
+            model="gpt-image-1",
+            prompt=revised_prompt,
+            moderation="low",
+            size=size,  # type: ignore
+            quality=quality,  # type: ignore
+            n=1,
+        )
+
+        if not response.data or not response.data[0].b64_json:
+            raise DownloadError("Was not able to get image url")
+
+        decoded_data = base64.b64decode(response.data[0].b64_json)
+
+        saved_data = process_image_response(
+            io.BytesIO(decoded_data),
+            before_prompt,
+            revised_prompt,
+            username,
+            {
+                "Prompt": prompt,
+                "Quality": quality,
+                "Revised Prompt": revised_prompt,
+                "Provider": "openai",
+                "Operation": "generate",
+                "Size": size,
+            },
+        )
+
+        return GeneratedImageData(
+            saved_data.local_image_path,
+            revised_prompt,
+            prompt,
+            saved_data.image_name,
+        )
+
+    except Exception as e:
+        _handle_openai_api_errors(e, "Image Generation")
+
+
+def generate_openai_inpaint_image(
+    base_image_path: str,
+    mask_path: str,
+    prompt: str,
+    username: str,
+    size: str = "1024x1024",
+    seed: int = 0,
+) -> GeneratedImageData:
+    """
+    Generate an inpainted image using OpenAI's images.edit API.
+
+    Args:
+        base_image_path: Path to the base image file (PNG format)
+        mask_path: Path to the mask image file (PNG format, white = inpaint, black = keep)
+        prompt: Text prompt for inpainting
+        username: Username for file organization
+        size: Image size (1024x1024, 512x512, or 256x256)
+        seed: Random seed for prompt processing
+
+    Returns:
+        GeneratedImageData object with image information
+
+    Raises:
+        ValueError: If Flask static folder is not defined
+        FileNotFoundError: If base image or mask files don't exist
+        ModerationException: If prompt fails OpenAI moderation
+        Exception: If OpenAI API call fails
+    """
+    # Verify files exist
+    if not os.path.exists(base_image_path):
+        raise FileNotFoundError(f"Base image file not found: {base_image_path}")
+    if not os.path.exists(mask_path):
+        raise FileNotFoundError(f"Mask image file not found: {mask_path}")
+
+    # Process and moderate the prompt using shared utility
+    before_prompt, revised_prompt = _process_openai_prompt(prompt, username, seed)
+
+    try:
+        # Call OpenAI Images Edit API for inpainting
+        with (
+            open(base_image_path, "rb") as base_image_file,
+            open(mask_path, "rb") as mask_file,
+        ):
+            response = client.images.edit(
+                image=base_image_file,
+                mask=mask_file,
+                prompt=revised_prompt,
+                size=size,  # type: ignore
+                n=1,
+            )
+
+        if not response.data or not response.data[0].b64_json:
+            raise Exception("OpenAI inpainting API did not return image data")
+
+        decoded_data = base64.b64decode(response.data[0].b64_json)
+
+        saved_data = process_image_response(
+            io.BytesIO(decoded_data),
+            before_prompt,
+            revised_prompt,
+            username,
+            {
+                "Prompt": prompt,
+                "Revised Prompt": revised_prompt,
+                "Operation": "inpaint",
+                "Provider": "openai",
+                "Base Image": os.path.basename(base_image_path),
+                "Mask Image": os.path.basename(mask_path),
+                "Size": size,
+            },
+        )
+
+        return GeneratedImageData(
+            saved_data.local_image_path,
+            revised_prompt,
+            prompt,
+            saved_data.image_name,
+        )
+
+    except Exception as e:
+        _handle_openai_api_errors(e, "Inpainting")
 
 
 def get_file_count(username: str, static_folder: str) -> int:
@@ -1365,7 +1529,7 @@ def generate_image(
         if not quality:
             raise ValueError("Unable to get 'quality' field.")
 
-        return generate_dalle_image(
+        return generate_openai_image(
             prompt,
             session["username"],
             size,
