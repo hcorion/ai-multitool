@@ -122,6 +122,7 @@ class GeneratedImageData:
     revised_prompt: str
     prompt: str
     image_name: str
+    metadata: dict[str, str]
 
     def __init__(
         self,
@@ -129,11 +130,13 @@ class GeneratedImageData:
         revised_prompt: str,
         prompt: str,
         image_name: str,
+        metadata: dict[str, str] | None = None,
     ):
         self.local_image_path = local_image_path
         self.revised_prompt = revised_prompt
         self.prompt = prompt
         self.image_name = image_name
+        self.metadata = metadata or {}
 
 
 class SavedImageData:
@@ -1081,6 +1084,7 @@ def generate_novelai_image(
             revised_prompt,
             prompt,
             saved_data.image_name,
+            image_metadata,
         )
 
     except NovelAIAPIError as e:
@@ -1149,6 +1153,7 @@ def generate_stability_image(
             prompt,
             prompt,
             saved_data.image_name,
+            image_metadata,
         )
     else:
         body = response.json()
@@ -1284,19 +1289,21 @@ def generate_openai_image(
 
         decoded_data = base64.b64decode(response.data[0].b64_json)
 
+        openai_metadata = {
+            "Prompt": prompt,
+            "Quality": quality,
+            "Revised Prompt": revised_prompt,
+            "Provider": "openai",
+            "Operation": "generate",
+            "Size": size,
+        }
+        
         saved_data = process_image_response(
             io.BytesIO(decoded_data),
             before_prompt,
             revised_prompt,
             username,
-            {
-                "Prompt": prompt,
-                "Quality": quality,
-                "Revised Prompt": revised_prompt,
-                "Provider": "openai",
-                "Operation": "generate",
-                "Size": size,
-            },
+            openai_metadata,
         )
 
         return GeneratedImageData(
@@ -1304,6 +1311,7 @@ def generate_openai_image(
             revised_prompt,
             prompt,
             saved_data.image_name,
+            openai_metadata,
         )
 
     except Exception as e:
@@ -1366,20 +1374,22 @@ def generate_openai_inpaint_image(
 
         decoded_data = base64.b64decode(response.data[0].b64_json)
 
+        inpaint_metadata = {
+            "Prompt": prompt,
+            "Revised Prompt": revised_prompt,
+            "Operation": "inpaint",
+            "Provider": "openai",
+            "Base Image": os.path.basename(base_image_path),
+            "Mask Image": os.path.basename(mask_path),
+            "Size": size,
+        }
+        
         saved_data = process_image_response(
             io.BytesIO(decoded_data),
             before_prompt,
             revised_prompt,
             username,
-            {
-                "Prompt": prompt,
-                "Revised Prompt": revised_prompt,
-                "Operation": "inpaint",
-                "Provider": "openai",
-                "Base Image": os.path.basename(base_image_path),
-                "Mask Image": os.path.basename(mask_path),
-                "Size": size,
-            },
+            inpaint_metadata,
         )
 
         return GeneratedImageData(
@@ -1387,6 +1397,7 @@ def generate_openai_inpaint_image(
             revised_prompt,
             prompt,
             saved_data.image_name,
+            inpaint_metadata,
         )
 
     except Exception as e:
@@ -1682,6 +1693,7 @@ def generate_image_grid(
         revised_prompt=image_data_list[dynamic_prompts[0]].revised_prompt,
         prompt=prompt,
         image_name=image_name,
+        metadata={},
     )
 
 
@@ -1861,7 +1873,8 @@ def _handle_generation_request(image_request: ImageGenerationRequest) -> ImageOp
             image_name=generated_data.image_name,
             provider=image_request.provider,
             operation=image_request.operation,
-            revised_prompt=generated_data.revised_prompt
+            revised_prompt=generated_data.revised_prompt,
+            metadata=generated_data.metadata
         )
         
     except Exception as e:

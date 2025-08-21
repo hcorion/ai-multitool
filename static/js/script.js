@@ -97,6 +97,21 @@ function shouldUseNewImageEndpoint() {
     return !advancedGrid; // Use new endpoint unless advanced grid is enabled
 }
 function renderImageResult(response) {
+    // Extract character prompts from metadata
+    let characterPromptsHtml = '';
+    if (response.metadata) {
+        const characterPrompts = [];
+        for (const [key, value] of Object.entries(response.metadata)) {
+            // Look for processed character prompt metadata (revised prompts)
+            const match = key.match(/^Character (\d+) Processed Prompt$/);
+            if (match && value && typeof value === 'string') {
+                characterPrompts.push(value);
+            }
+        }
+        if (characterPrompts.length > 0) {
+            characterPromptsHtml = `<p><strong>Character Prompts:</strong> ${characterPrompts.join(', ')}</p>`;
+        }
+    }
     const resultHtml = `
         <div class="result-container">
             <div class="image-container">
@@ -105,6 +120,7 @@ function renderImageResult(response) {
             <div class="result-info">
                 <h3>Generated Image</h3>
                 ${response.revised_prompt ? `<p><strong>Revised Prompt:</strong> ${response.revised_prompt}</p>` : ''}
+                ${characterPromptsHtml}
                 <p><strong>Provider:</strong> ${response.provider}</p>
                 <p><strong>Operation:</strong> ${response.operation}</p>
                 <p><strong>Image Name:</strong> ${response.image_name}</p>
