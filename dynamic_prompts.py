@@ -31,7 +31,7 @@ import os
 import random
 import re
 from dataclasses import dataclass
-from typing import List
+from typing import List, Dict
 
 
 @dataclass
@@ -294,23 +294,23 @@ def make_prompt_dynamic(
 
 
 def make_character_prompts_dynamic(
-    character_prompts: List[dict],
+    character_prompts: List[Dict[str, str]],
     username: str,
     static_folder: str,
     seed: int,
     grid_prompt: GridDynamicPromptInfo | None = None,
-) -> List[dict]:
+) -> List[Dict[str, str]]:
     """
     Process dynamic prompts for character prompts independently.
     Each character prompt gets its own seed offset to ensure variety.
     """
-    processed_character_prompts = []
+    processed_character_prompts: List[Dict[str, str]] = []
 
     for i, char_prompt in enumerate(character_prompts):
         # Use seed offset for each character to ensure variety
         char_seed = seed + i + 1
 
-        processed_char = {}
+        processed_char: Dict[str, str] = {}
 
         # Process positive prompt
         if char_prompt.get("positive", "").strip():

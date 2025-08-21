@@ -378,7 +378,7 @@ class TestGenerateOpenAIInpaintImage:
             mock_b64decode.return_value = b"decoded image data"
             
             # Call with custom size
-            result = generate_openai_inpaint_image(
+            _ = generate_openai_inpaint_image(
                 base_image_path=base_image_path,
                 mask_path=mask_path,
                 prompt="test prompt",

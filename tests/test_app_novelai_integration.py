@@ -105,7 +105,7 @@ class TestGenerateNovelAIImageRefactored:
             mock_app.static_folder = "/test/static"
 
             # Call the function
-            result = generate_novelai_image(
+            _ = generate_novelai_image(
                 prompt="test prompt",
                 negative_prompt=None,
                 username="testuser",
@@ -167,7 +167,7 @@ class TestGenerateNovelAIImageRefactored:
             mock_app.static_folder = "/test/static"
 
             # Call the function with upscale=True
-            result = generate_novelai_image(
+            _ = generate_novelai_image(
                 prompt="test prompt",
                 negative_prompt=None,
                 username="testuser",

@@ -107,7 +107,7 @@ class TestGenerateOpenAIImageRenamed:
             mock_b64decode.return_value = b"decoded image data"
             
             # Call with strict_follow_prompt=True
-            result = generate_openai_image(
+            _ = generate_openai_image(
                 prompt="test prompt",
                 username="testuser",
                 strict_follow_prompt=True

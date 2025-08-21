@@ -175,7 +175,7 @@ def create_request_from_form_data(form_data: Dict[str, Any]) -> Union[ImageGener
         raise ValueError(f"Provider {provider.value} does not support operation {operation.value}")
     
     # Extract character prompts from form data
-    character_prompts = []
+    character_prompts: list[dict[str, str]] = []
     char_index = 0
     while True:
         positive_key = f"character_prompts[{char_index}][positive]"
@@ -205,42 +205,62 @@ def create_request_from_form_data(form_data: Dict[str, Any]) -> Union[ImageGener
         # Fallback to default size if parsing fails
         width, height = 1024, 1024
     
-    # Common parameters
-    common_params = {
-        "prompt": form_data.get("prompt", ""),
-        "provider": provider,
-        "operation": operation,
-        "negative_prompt": form_data.get("negative_prompt"),
-        "width": width,
-        "height": height,
-        "quality": Quality(form_data.get("quality", Quality.HIGH.value)),
-        "model": form_data.get("model"),
-        "character_prompts": character_prompts if character_prompts else None
-    }
+    # Extract and prepare parameters
+    prompt = form_data.get("prompt", "")
+    negative_prompt = form_data.get("negative_prompt")
+    quality = Quality(form_data.get("quality", Quality.HIGH.value))
+    model = form_data.get("model")
+    character_prompts_final = character_prompts if character_prompts else None
     
     # Set default model if not provided
-    if not common_params["model"]:
-        common_params["model"] = ImageRequestValidator.get_default_model(provider, operation)
+    if not model:
+        model = ImageRequestValidator.get_default_model(provider, operation)
     
     # Validate model compatibility
-    if not ImageRequestValidator.validate_model_for_provider(provider, common_params["model"]):
-        raise ValueError(f"Model {common_params['model']} is not compatible with provider {provider.value}")
+    if not ImageRequestValidator.validate_model_for_provider(provider, model):
+        raise ValueError(f"Model {model} is not compatible with provider {provider.value}")
     
     # Create appropriate request object based on operation
     if operation == Operation.INPAINT:
         return InpaintingRequest(
-            **common_params,
+            prompt=prompt,
+            provider=provider,
+            operation=operation,
+            negative_prompt=negative_prompt,
+            width=width,
+            height=height,
+            quality=quality,
+            model=model,
+            character_prompts=character_prompts_final,
             base_image_path=form_data.get("base_image_path", ""),
             mask_path=form_data.get("mask_path", "")
         )
     elif operation == Operation.IMG2IMG:
         return Img2ImgRequest(
-            **common_params,
+            prompt=prompt,
+            provider=provider,
+            operation=operation,
+            negative_prompt=negative_prompt,
+            width=width,
+            height=height,
+            quality=quality,
+            model=model,
+            character_prompts=character_prompts_final,
             base_image_path=form_data.get("base_image_path", ""),
             strength=float(form_data.get("strength", 0.7))
         )
     else:
-        return ImageGenerationRequest(**common_params)
+        return ImageGenerationRequest(
+            prompt=prompt,
+            provider=provider,
+            operation=operation,
+            negative_prompt=negative_prompt,
+            width=width,
+            height=height,
+            quality=quality,
+            model=model,
+            character_prompts=character_prompts_final
+        )
 
 
 def create_success_response(
