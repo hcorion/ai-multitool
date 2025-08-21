@@ -21,6 +21,7 @@ import openai
 import requests
 import wand
 import wand.font
+from novelai_client import NovelAIClient, NovelAIClientError, NovelAIAPIError
 from flask import (
     Flask,
     Request,
@@ -948,55 +949,6 @@ def upscale_stability_creative(
         raise Exception(error_message)
 
 
-def upscale_novelai(
-    lowres_response_bytes: io.BytesIO,
-    starting_width: int,
-    starting_height: int,
-    novelai_headers: Mapping[str, str | bytes | None],
-) -> io.BytesIO:
-    # 640x640 images cost 0 Anlas with Opus, so resize down to that res before sending it to upscale
-    max_resolution = 640 * 640
-    if starting_width * starting_height > max_resolution:
-        resized_image = PILImage.open(lowres_response_bytes)
-        resized_width = int(
-            math.floor(math.sqrt(max_resolution * (starting_width / starting_height)))
-        )
-        resized_height = int(
-            math.floor(math.sqrt(max_resolution * (starting_height / starting_width)))
-        )
-
-        resized_image.thumbnail(
-            (resized_width, resized_height), PILImage.Resampling.LANCZOS
-        )
-        image_bytes = io.BytesIO()
-        resized_image.save(image_bytes, format="PNG")
-    else:
-        image_bytes = lowres_response_bytes
-        resized_height = starting_height
-        resized_width = starting_width
-
-    data: dict[str, int | str] = {
-        "scale": 4,
-        "width": resized_width,
-        "height": resized_height,
-        "image": base64.b64encode(image_bytes.getbuffer()).decode("ascii"),
-    }
-    # print(json.dumps(data))
-    upscale_response = requests.post(
-        "https://api.novelai.net/ai/upscale",
-        headers=novelai_headers,
-        json=data,
-    )
-    if upscale_response.status_code == 200:
-        zipped_file = zipfile.ZipFile(io.BytesIO(upscale_response.content))
-        file_bytes = io.BytesIO(zipped_file.read(zipped_file.infolist()[0]))
-        return file_bytes
-    else:
-        body = upscale_response.json()
-        error_message = (
-            f"NovelAI Upscale {upscale_response.status_code}: {body['message']}"
-        )
-        raise Exception(error_message)
 
 
 def _build_char_captions(character_prompts: List[dict], prompt_type: str) -> List[dict]:
@@ -1035,6 +987,9 @@ def generate_novelai_image(
 ) -> GeneratedImageData:
     if not app.static_folder:
         raise ValueError("Flask static folder not defined")
+    
+    if not novelai_api_key:
+        raise ValueError("NovelAI API key not configured")
 
     revised_prompt = make_prompt_dynamic(
         prompt, username, app.static_folder, seed, grid_dynamic_prompt
@@ -1057,119 +1012,60 @@ def generate_novelai_image(
     width = size[0]
     height = size[1]
 
-    data = {  # type: ignore
-        # TODO: Use infill action for inpainting
-        "action": "generate",
-        # TODO: Use nai-diffusion-4-5-full-inpainting for inpainting
-        "model": "nai-diffusion-4-5-full",
-        "parameters": {
-            "add_original_image": True,
-            "autoSmea": False,
-            "cfg_rescale": 0.4,
-            "controlnet_strength": 1,
-		    "deliberate_euler_ancestral_bug": False,
-		    "dynamic_thresholding": True,
-            "width": width,
-            "height": height,
-            "inpaintImg2ImgStrength": 1,
-            "legacy": False,
-            "legacy_uc": False,
-            "legacy_v3_extend": False,
-            "n_samples": 1,
-            "noise": 0.2,
-            "noise_schedule": "karras",
-            "normalize_reference_strength_multiple": True,
-            "params_version": 3,
-            "prefer_brownian": True,
-            "qualityToggle": True,
-            "sampler": "k_euler_ancestral",
-            "scale": 6,
-            # TODO: Add variety toggle
-            #"skip_cfg_above_sigma": 58,
-            "steps": 28, # Max steps before Opus users have to pay money
-            "strength": 0.6,
-            "ucPreset": 4,
-            # TODO: use b64 encoded png string for image to inpaint
-            # "image": "data",
-            # TODO: use b64 encoded png string for image inpainting mask
-            # The setup for this mask is very specific:
-            # - Start with a mask the size of the base image, the generated mask must be completely black or white pixels, no in between.
-            # - You must scale the mask down by 12.5 percent (1/8 scale) using no interpolation (ie just black and white pixels, no shades in between).
-            # - You then must upscale the new small image back up to the regular mask size, also with no interpolation,
-            #   so you have a mask of the same resolution as the image, but each block of color is 8x8 pixels
-            # "mask": "data",
-            "seed": seed,
-            "v4_prompt": {
-                "caption": {
-                    "base_caption": revised_prompt,
-                    "char_captions": _build_char_captions(
-                        processed_character_prompts, "positive"
-                    ),
-                },
-                "use_coords": False,
-                "use_order": True,
-            },
-            "v4_negative_prompt": {
-                "caption": {
-                    "base_caption": negative_prompt,
-                    "char_captions": _build_char_captions(
-                        processed_character_prompts, "negative"
-                    ),
-                },
-                "use_coords": False,
-                "use_order": True,
-            },
-        },
-    }
-
-    novelai_headers = {"authorization": f"Bearer {novelai_api_key}"}
-
-    image_metadata: dict[str, str] = {
-        "Prompt": prompt,
-        "Revised Prompt": revised_prompt,
-        "seed": str(seed),
-    }
-    if negative_prompt:
-        image_metadata["Negative Prompt"] = negative_prompt
-
-    # Add character prompt metadata (both original and processed)
-    if character_prompts and processed_character_prompts:
-        for i, (original_char_prompt, processed_char_prompt) in enumerate(
-            zip(character_prompts, processed_character_prompts)
-        ):
-            char_num = i + 1
-            # Only include character metadata if positive prompt exists
-            if original_char_prompt.get("positive", "").strip():
-                # Save original prompt (with dynamic prompt syntax) for copying
-                image_metadata[f"Character {char_num} Prompt"] = original_char_prompt[
-                    "positive"
-                ]
-                # Save processed prompt for reference
-                image_metadata[f"Character {char_num} Processed Prompt"] = (
-                    processed_char_prompt["positive"]
-                )
-
-                # Only include negative prompts if they exist
-                if original_char_prompt.get("negative", "").strip():
-                    image_metadata[f"Character {char_num} Negative"] = (
-                        original_char_prompt["negative"]
-                    )
-                if processed_char_prompt.get("negative", "").strip():
-                    image_metadata[f"Character {char_num} Processed Negative"] = (
-                        processed_char_prompt["negative"]
-                    )
-
-    response = requests.post(
-        "https://image.novelai.net/ai/generate-image",
-        headers=novelai_headers,
-        data=json.dumps(data),
-    )
-    if response.status_code == 200:
-        zipped_file = zipfile.ZipFile(io.BytesIO(response.content))
-        file_bytes = io.BytesIO(zipped_file.read(zipped_file.infolist()[0]))
-
+    # Create NovelAI client
+    client = NovelAIClient(novelai_api_key)
+    
+    try:
+        # Generate image using the client
+        image_bytes = client.generate_image(
+            prompt=revised_prompt,
+            negative_prompt=negative_prompt,
+            width=width,
+            height=height,
+            seed=seed,
+            character_prompts=processed_character_prompts
+        )
+        
         if upscale:
-            file_bytes = upscale_novelai(file_bytes, width, height, novelai_headers)
+            image_bytes = client.upscale_image(image_bytes, width, height)
+        
+        file_bytes = io.BytesIO(image_bytes)
+
+        # Build image metadata
+        image_metadata: dict[str, str] = {
+            "Prompt": prompt,
+            "Revised Prompt": revised_prompt,
+            "seed": str(seed),
+        }
+        if negative_prompt:
+            image_metadata["Negative Prompt"] = negative_prompt
+
+        # Add character prompt metadata (both original and processed)
+        if character_prompts and processed_character_prompts:
+            for i, (original_char_prompt, processed_char_prompt) in enumerate(
+                zip(character_prompts, processed_character_prompts)
+            ):
+                char_num = i + 1
+                # Only include character metadata if positive prompt exists
+                if original_char_prompt.get("positive", "").strip():
+                    # Save original prompt (with dynamic prompt syntax) for copying
+                    image_metadata[f"Character {char_num} Prompt"] = original_char_prompt[
+                        "positive"
+                    ]
+                    # Save processed prompt for reference
+                    image_metadata[f"Character {char_num} Processed Prompt"] = (
+                        processed_char_prompt["positive"]
+                    )
+
+                    # Only include negative prompts if they exist
+                    if original_char_prompt.get("negative", "").strip():
+                        image_metadata[f"Character {char_num} Negative"] = (
+                            original_char_prompt["negative"]
+                        )
+                    if processed_char_prompt.get("negative", "").strip():
+                        image_metadata[f"Character {char_num} Processed Negative"] = (
+                            processed_char_prompt["negative"]
+                        )
 
         saved_data = process_image_response(
             file_bytes, prompt, revised_prompt, username, image_metadata
@@ -1180,11 +1076,12 @@ def generate_novelai_image(
             prompt,
             saved_data.image_name,
         )
-    else:
-        body = response.json()
-        error_message = (
-            f"NovelAI Generate Image {response.status_code}: {body['message']}: "
-        )
+        
+    except NovelAIAPIError as e:
+        error_message = f"NovelAI Generate Image {e.status_code}: {e.message}"
+        raise Exception(error_message)
+    except NovelAIClientError as e:
+        error_message = f"NovelAI Generate Image Error: {str(e)}"
         raise Exception(error_message)
 
 

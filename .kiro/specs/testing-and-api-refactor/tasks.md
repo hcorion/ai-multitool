@@ -12,8 +12,14 @@
   - Create basic test fixtures and configuration in conftest.py
   - _Requirements: 1.1, 1.2, 1.4, 1.5, 1.6_
 
-- [ ] 2. Create NovelAI client abstraction with core functionality
-- [ ] 2.1 Create NovelAIClient class with basic image generation and tests
+- [x] 2. Create NovelAI client abstraction with core functionality
+
+
+
+
+- [x] 2.1 Create NovelAIClient class with basic image generation and tests
+
+
   - Create novelai_client.py file with NovelAIClient class
   - Define NovelAIModel, NovelAIAction, and related enums
   - Implement __init__ method with API key and session management
@@ -25,7 +31,14 @@
   - Write integration test using actual API key from .env.local
   - _Requirements: 2.1, 2.2, 2.3, 1.3_
 
-- [ ] 2.2 Refactor existing generate_novelai_image function with tests
+
+
+- [x] 2.2 Refactor existing generate_novelai_image function with tests
+
+
+
+
+
   - Update generate_novelai_image function to use NovelAIClient
   - Maintain backward compatibility with existing function signature
   - Update error handling to use new client error classes
