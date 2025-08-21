@@ -1,0 +1,57 @@
+# Testing Guidelines
+
+## Test Structure
+- Unit tests in [tests/](mdc:tests/) directory
+- Integration tests in [tests/integration/](mdc:tests/integration/)
+- Shared fixtures in [tests/conftest.py](mdc:tests/conftest.py)
+
+## Test Patterns
+```python
+# Unit test with mock
+@patch('app.requests.post')
+def test_api_call(mock_post):
+    mock_post.return_value.status_code = 200
+    mock_post.return_value.json.return_value = {"success": True}
+    # Test implementation
+
+# Integration test
+@pytest.mark.integration
+def test_real_api(skip_if_no_api_key):
+    skip_if_no_api_key('openai')
+    # Test with real API
+
+# Flask endpoint test
+def test_endpoint(client):
+    response = client.post('/image', data={...})
+    assert response.status_code == 200
+```
+
+## Available Fixtures
+- `client` - Flask test client
+- `mock_openai_client` - Mocked OpenAI client
+- `api_keys` - Dictionary of available API keys
+- `skip_if_no_api_key` - Skip integration tests without keys
+- `sample_image_data` - Sample PNG data for testing
+
+## Test Categories
+- **Unit Tests**: Mock external dependencies, test individual functions
+- **Integration Tests**: Use real API calls when keys available
+- **Endpoint Tests**: Test Flask routes with test client
+- **Frontend Tests**: Manual testing checklist for UI components
+
+## Running Tests
+- `pytest` - Run all tests
+- `pytest -m "not integration"` - Unit tests only
+- `pytest -m integration` - Integration tests only
+- `pytest --cov=app --cov-report=html` - With coverage
+
+## Best Practices
+- Test isolation: Each test independent
+- Descriptive test names
+- Arrange-Act-Assert pattern
+- Error condition testing
+- Environment safety (no destructive API calls)
+description:
+globs:
+alwaysApply: false
+---

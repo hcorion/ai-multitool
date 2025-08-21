@@ -6,7 +6,7 @@ and handle responses appropriately.
 """
 
 import pytest
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 from app import app, GeneratedImageData
 

@@ -6,7 +6,6 @@ to generate_openai_image and that all functionality remains intact.
 """
 
 import pytest
-import io
 from unittest.mock import Mock, patch
 
 from app import generate_openai_image, GeneratedImageData, ModerationException
@@ -213,7 +212,7 @@ class TestGenerateOpenAIImageRenamed:
         
         # Verify the old function name doesn't exist
         with pytest.raises(ImportError):
-            from app import generate_dalle_image
+            pass
 
 
 class TestOpenAIImageGenerationIntegration:

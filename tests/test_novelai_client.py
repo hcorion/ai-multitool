@@ -9,7 +9,7 @@ import pytest
 import json
 import zipfile
 import io
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 from PIL import Image as PILImage
 
 from novelai_client import (

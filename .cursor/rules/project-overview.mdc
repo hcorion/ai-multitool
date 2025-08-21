@@ -1,0 +1,34 @@
+# AI Multitool Project Overview
+
+This is a web-based frontend for interacting with multiple AI image generation services including OpenAI's DALL-E 3, StabilityAI's Stable Diffusion, and NovelAI's image generation models.
+
+## Core Architecture
+- **Backend**: Flask (Python 3.13) with multi-provider AI integration
+- **Frontend**: TypeScript + jQuery with Sass styling
+- **Build System**: TypeScript compiler + Sass compiler with watch modes
+- **Testing**: pytest with unit and integration test support
+
+## Key Files
+- [app.py](mdc:app.py) - Main Flask application with all routes and image generation logic
+- [dynamic_prompts.py](mdc:dynamic_prompts.py) - Dynamic prompt system for template-based generation
+- [utils.py](mdc:utils.py) - Utility functions for text processing and common operations
+- [src/script.ts](mdc:src/script.ts) - Main frontend logic and UI interactions
+- [src/chat.ts](mdc:src/chat.ts) - Chat functionality and message handling
+- [templates/index.html](mdc:templates/index.html) - Main application interface
+
+## Core Features
+- Multi-provider image generation (OpenAI, StabilityAI, NovelAI)
+- Dynamic prompt system with template-based generation
+- Real-time chat interface with OpenAI Assistant
+- Image gallery with metadata preservation
+- File sharing and user session management
+
+## Development Workflow
+- Use `pipenv shell` and `.\run-user.ps1` for development server
+- TypeScript and Sass compile automatically in watch mode
+- Tests run with `pytest` (unit tests) and `pytest -m integration` (integration tests)
+- Environment variables stored in `.env.local` for API keys
+description:
+globs:
+alwaysApply: false
+---

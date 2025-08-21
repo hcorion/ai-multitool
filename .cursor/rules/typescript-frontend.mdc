@@ -1,0 +1,61 @@
+# TypeScript Frontend Development Guidelines
+
+## File Organization
+- [src/script.ts](mdc:src/script.ts) - Main frontend logic, event handlers, and UI interactions
+- [src/chat.ts](mdc:src/chat.ts) - Chat functionality and message handling
+- [src/share.ts](mdc:src/share.ts) - Sharing functionality
+- [src/utils.ts](mdc:src/utils.ts) - Frontend utility functions
+
+## Code Conventions
+- Use camelCase for functions, PascalCase for types and interfaces
+- TypeScript modules export functions and types
+- Use strict type checking (ES2024 target)
+- Compile to [static/js/](mdc:static/js/) directory
+
+## Type Definitions
+```typescript
+interface ImageGenerationRequest {
+  prompt: string;
+  provider: 'openai' | 'stability' | 'novelai';
+  negative_prompt?: string;
+  width?: number;
+  height?: number;
+  quality?: string;
+  style?: string;
+  grid?: boolean;
+}
+
+interface ChatRequest {
+  message: string;
+  conversation_id?: string;
+  assistant_id?: string;
+}
+```
+
+## UI Components
+- Image generation interface with provider selection
+- Real-time chat interface with streaming responses
+- Gallery interface for browsing generated images
+- Dynamic prompt system with template processing
+
+## Event Handling
+- Use jQuery for DOM manipulation and AJAX requests
+- Centralized event registration in document ready
+- Handle dynamic content with event delegation
+- Use debounced functions for search inputs
+
+## Error Handling
+- Global AJAX error handler for network issues
+- Provider-specific error messages
+- User-friendly notifications with success/error states
+- Graceful fallbacks for missing features
+
+## Build Process
+- TypeScript compiler with watch mode: `tsc --watch`
+- Source maps enabled for debugging
+- Strict type checking enforced
+- Output to [static/js/](mdc:static/js/) directory
+description:
+globs:
+alwaysApply: false
+---

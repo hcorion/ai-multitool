@@ -6,7 +6,6 @@ import json
 import pytest
 from unittest.mock import Mock, patch, mock_open
 from app import app
-from image_models import Provider, Operation, Quality
 
 
 @pytest.fixture

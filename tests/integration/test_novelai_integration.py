@@ -8,7 +8,7 @@ make actual API calls to the NovelAI service. They are marked with the
 
 import pytest
 import os
-from novelai_client import NovelAIClient, NovelAIClientError, NovelAIAPIError
+from novelai_client import NovelAIClient, NovelAIAPIError
 
 
 @pytest.mark.integration

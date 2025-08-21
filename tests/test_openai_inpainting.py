@@ -7,10 +7,9 @@ and various error conditions.
 
 import pytest
 import json
-import io
 import os
 import tempfile
-from unittest.mock import Mock, patch, mock_open
+from unittest.mock import Mock, patch
 from PIL import Image as PILImage
 
 from app import generate_openai_inpaint_image, GeneratedImageData, ModerationException

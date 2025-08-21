@@ -5,7 +5,6 @@ Data models for unified image generation API with strict typing.
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional, Dict, Any, Union
-from pydantic import BaseModel, Field, validator
 
 
 class Provider(str, Enum):
@@ -24,8 +23,9 @@ class Operation(str, Enum):
 
 class Quality(str, Enum):
     """Image quality settings."""
-    STANDARD = "standard"
-    HD = "hd"
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
 
 
 class NovelAIModel(str, Enum):
@@ -50,8 +50,9 @@ class ImageGenerationRequest:
     negative_prompt: Optional[str] = None
     width: int = 1024
     height: int = 1024
-    quality: Quality = Quality.STANDARD
+    quality: Quality = Quality.HIGH
     model: Optional[str] = None
+    character_prompts: Optional[list[dict[str, str]]] = None
     
     def __post_init__(self):
         """Validate request parameters after initialization."""
@@ -63,7 +64,7 @@ class ImageGenerationRequest:
         
         # Validate dimensions for specific providers
         if self.provider == Provider.OPENAI:
-            valid_sizes = [(1024, 1024), (1792, 1024), (1024, 1792)]
+            valid_sizes = [(1024, 1024), (1536, 1024), (1024, 1536)]
             if (self.width, self.height) not in valid_sizes:
                 raise ValueError(f"Invalid dimensions for OpenAI: {self.width}x{self.height}")
 
@@ -174,16 +175,48 @@ def create_request_from_form_data(form_data: Dict[str, Any]) -> Union[ImageGener
     if not ImageRequestValidator.validate_provider_operation_compatibility(provider, operation):
         raise ValueError(f"Provider {provider.value} does not support operation {operation.value}")
     
+    # Extract character prompts from form data
+    character_prompts = []
+    char_index = 0
+    while True:
+        positive_key = f"character_prompts[{char_index}][positive]"
+        negative_key = f"character_prompts[{char_index}][negative]"
+        
+        positive_prompt = form_data.get(positive_key, "").strip()
+        negative_prompt = form_data.get(negative_key, "").strip()
+        
+        # If no positive prompt found, we've reached the end
+        if positive_key not in form_data:
+            break
+            
+        # Only add character if it has at least a positive prompt
+        if positive_prompt:
+            character_prompts.append({
+                "positive": positive_prompt,
+                "negative": negative_prompt
+            })
+            
+        char_index += 1
+    
+    # Parse size from form data (format: "widthxheight")
+    size_str = form_data.get("size", "1024x1024")
+    try:
+        width, height = map(int, size_str.split("x"))
+    except (ValueError, AttributeError):
+        # Fallback to default size if parsing fails
+        width, height = 1024, 1024
+    
     # Common parameters
     common_params = {
         "prompt": form_data.get("prompt", ""),
         "provider": provider,
         "operation": operation,
         "negative_prompt": form_data.get("negative_prompt"),
-        "width": int(form_data.get("width", 1024)),
-        "height": int(form_data.get("height", 1024)),
-        "quality": Quality(form_data.get("quality", Quality.STANDARD.value)),
-        "model": form_data.get("model")
+        "width": width,
+        "height": height,
+        "quality": Quality(form_data.get("quality", Quality.HIGH.value)),
+        "model": form_data.get("model"),
+        "character_prompts": character_prompts if character_prompts else None
     }
     
     # Set default model if not provided

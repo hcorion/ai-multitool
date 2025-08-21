@@ -6,11 +6,10 @@ maintaining backward compatibility with the existing function signature.
 """
 
 import pytest
-import io
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 
 from app import generate_novelai_image, GeneratedImageData
-from novelai_client import NovelAIClient, NovelAIAPIError, NovelAIClientError
+from novelai_client import NovelAIAPIError, NovelAIClientError
 
 
 class TestGenerateNovelAIImageRefactored:

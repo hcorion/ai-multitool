@@ -4,7 +4,6 @@ Basic setup tests to verify pytest configuration and fixtures work correctly.
 
 import pytest
 import os
-from flask import Flask
 
 
 def test_pytest_setup():

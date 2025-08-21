@@ -9,7 +9,6 @@ import pytest
 import os
 import tempfile
 from unittest.mock import Mock, patch
-from flask import Flask
 
 # Mock OpenAI client before importing app to avoid initialization errors
 with patch('openai.OpenAI'):

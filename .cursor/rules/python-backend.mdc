@@ -1,0 +1,45 @@
+# Python Backend Development Guidelines
+
+## File Organization
+- [app.py](mdc:app.py) contains all Flask routes and main application logic
+- [dynamic_prompts.py](mdc:dynamic_prompts.py) handles template-based prompt processing
+- [utils.py](mdc:utils.py) contains utility functions for text processing and file operations
+- [novelai_client.py](mdc:novelai_client.py) handles NovelAI API integration
+
+## Code Conventions
+- Use snake_case for function and variable names
+- Flask routes handle both GET (display) and POST (processing)
+- Image processing functions return structured data objects
+- Use custom exception classes for error handling
+- Store user-specific content under `static/{type}/{username}/`
+
+## API Structure
+- `POST /image` - Image generation endpoint supporting multiple providers
+- `POST /chat` - Chat conversation with OpenAI Assistant
+- `GET /gallery` - User image gallery retrieval
+- `GET /share/<id>` - Shared content display
+- `POST /upload` - File upload endpoint
+- `GET /download/<path>` - File download endpoint
+
+## Testing Patterns
+- Unit tests in [tests/](mdc:tests/) directory
+- Integration tests in [tests/integration/](mdc:tests/integration/)
+- Use [conftest.py](mdc:tests/conftest.py) fixtures for common test setup
+- Mock external dependencies for unit tests
+- Use `@pytest.mark.integration` for real API tests
+
+## Environment Configuration
+- Required API keys: `OPENAI_API_KEY`, `STABILITY_API_KEY`, `NOVELAI_API_KEY`
+- Store in `.env.local` file (gitignored)
+- Use `os.environ.get()` for environment variable access
+- Flask session management with secure secret generation
+
+## Error Handling
+- Return structured JSON responses with `success` and `error` fields
+- Use specific error codes: `INVALID_PROVIDER`, `MISSING_API_KEY`, `API_ERROR`, etc.
+- Validate user input and sanitize prompts
+- Handle API rate limits and timeouts gracefully
+description:
+globs:
+alwaysApply: false
+---

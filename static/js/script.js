@@ -101,15 +101,18 @@ function renderImageResult(response) {
         <div class="result-container">
             <div class="image-container">
                 <img id="generatedImage" src="${response.image_path}" alt="Generated Image" class="generated-image">
-                <button id="generatedImageClose" class="close-button">×</button>
             </div>
             <div class="result-info">
                 <h3>Generated Image</h3>
+                ${response.revised_prompt ? `<p><strong>Revised Prompt:</strong> ${response.revised_prompt}</p>` : ''}
                 <p><strong>Provider:</strong> ${response.provider}</p>
                 <p><strong>Operation:</strong> ${response.operation}</p>
-                ${response.revised_prompt ? `<p><strong>Revised Prompt:</strong> ${response.revised_prompt}</p>` : ''}
                 <p><strong>Image Name:</strong> ${response.image_name}</p>
             </div>
+        </div>
+            <div id="image-modal" style="display:none" class="modal">
+            <span id="generatedImageClose" class="close">&times;</span>
+            <img class="modal-content" id="modal-image">
         </div>
     `;
     $("#result-section").html(resultHtml);
@@ -119,11 +122,9 @@ function renderImageResult(response) {
 }
 function renderImageError(errorMessage) {
     const errorHtml = `
-        <div class="error-container">
-            <div class="error-message">
-                <h3>Error</h3>
-                <p>${errorMessage}</p>
-            </div>
+        <div class="error-dialog">
+            <span class="error-icon">&#9888;</span>
+            <span class="error-text">${errorMessage}</span>
         </div>
     `;
     $("#result-section").html(errorHtml);

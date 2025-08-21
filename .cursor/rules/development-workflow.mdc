@@ -1,0 +1,69 @@
+# Development Workflow
+
+## Quick Commands
+```bash
+# Setup
+npm install && pipenv sync
+npm install -g typescript sass
+
+# Development
+pipenv shell
+.\run-user.ps1
+
+# Testing
+pytest                    # All tests
+pytest -m "not integration"  # Unit tests only
+pytest -m integration     # Integration tests only
+pytest --cov=app         # With coverage
+
+# Building
+tsc                      # Compile TypeScript
+sass static/sass:static/css  # Compile Sass
+```
+
+## Common Development Tasks
+
+### Adding New Image Provider
+1. Add provider functions in [app.py](mdc:app.py)
+2. Update provider selection logic
+3. Add corresponding tests in [tests/](mdc:tests/)
+4. Update frontend in [src/script.ts](mdc:src/script.ts)
+
+### Modifying UI
+1. Edit [templates/index.html](mdc:templates/index.html) for structure
+2. Update [static/sass/style.scss](mdc:static/sass/style.scss) for styling
+3. Modify [src/script.ts](mdc:src/script.ts) for behavior
+4. Recompile: `tsc && sass static/sass:static/css`
+
+### Adding API Endpoints
+1. Add route in [app.py](mdc:app.py)
+2. Create test in [tests/test_app.py](mdc:tests/test_app.py)
+3. Update frontend TypeScript if needed
+4. Test with `pytest tests/test_app.py`
+
+## File Structure
+```
+ai-multitool/
+├── app.py                    # Main Flask app
+├── src/                      # TypeScript source
+├── static/                   # Compiled assets
+├── templates/                # HTML templates
+├── tests/                    # Test files
+└── .env.local               # Environment variables
+```
+
+## Environment Setup
+- Create `.env.local` with API keys
+- Install global tools: `npm install -g typescript sass`
+- Use `pipenv` for Python dependency management
+- Development server runs on `http://localhost:5000`
+
+## Debugging
+- Flask debug mode: `FLASK_ENV=development`
+- TypeScript source maps enabled
+- Sass source maps for CSS debugging
+- Browser developer tools for frontend debugging
+description:
+globs:
+alwaysApply: false
+---

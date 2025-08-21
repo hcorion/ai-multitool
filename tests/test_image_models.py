@@ -37,8 +37,9 @@ class TestEnums:
     
     def test_quality_enum_values(self):
         """Test Quality enum has correct values."""
-        assert Quality.STANDARD == "standard"
-        assert Quality.HD == "hd"
+        assert Quality.HIGH == "high"
+        assert Quality.MEDIUM == "medium"
+        assert Quality.LOW == "low"
 
 
 class TestImageGenerationRequest:
@@ -53,7 +54,7 @@ class TestImageGenerationRequest:
         assert request.operation == Operation.GENERATE
         assert request.width == 1024
         assert request.height == 1024
-        assert request.quality == Quality.STANDARD
+        assert request.quality == Quality.HIGH
         assert request.negative_prompt is None
     
     def test_custom_parameters(self):
@@ -64,7 +65,7 @@ class TestImageGenerationRequest:
             negative_prompt="bad quality",
             width=512,
             height=768,
-            quality=Quality.HD
+            quality=Quality.HIGH
         )
         
         assert request.prompt == "custom prompt"
@@ -72,7 +73,7 @@ class TestImageGenerationRequest:
         assert request.negative_prompt == "bad quality"
         assert request.width == 512
         assert request.height == 768
-        assert request.quality == Quality.HD
+        assert request.quality == Quality.HIGH
     
     def test_empty_prompt_validation(self):
         """Test that empty prompts raise ValueError."""

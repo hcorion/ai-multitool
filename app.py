@@ -1,17 +1,14 @@
 import base64
 import io
 import json
-import math
 import os
 import random
 import re
 import secrets
-import sys
 import tempfile
 import threading
 import time
 import uuid
-import zipfile
 from dataclasses import dataclass, field
 from datetime import datetime
 from queue import Queue
@@ -25,7 +22,6 @@ from novelai_client import NovelAIClient, NovelAIClientError, NovelAIAPIError
 from image_models import (
     Provider,
     Operation,
-    Quality,
     ImageGenerationRequest,
     InpaintingRequest,
     Img2ImgRequest,
@@ -1422,6 +1418,7 @@ def process_image_response(
     if not app.static_folder:
         raise ValueError("Flask static folder not defined")
 
+    image_path_relative = os.path.join("static", "images", username)
     image_path = os.path.join(app.static_folder, "images", username)
     # Make sure the path directory exists first
     os.makedirs(image_path, exist_ok=True)
@@ -1472,7 +1469,7 @@ def process_image_response(
     with open(image_thumb_filename, "wb") as f:
         thumb_image.save(f, "JPEG", quality=75)
 
-    local_image_path = image_filename
+    local_image_path = os.path.join(image_path_relative, image_name)
     return SavedImageData(local_image_path, image_name)
 
 
@@ -1552,7 +1549,8 @@ def generate_image(
     elif provider == "stabilityai":
         negative_prompt = request.form.get("negative_prompt")
         aspect_ratio = request.form.get("aspect_ratio")
-        upscale = bool(request.form.get("upscale"))
+        upscale_str = request.form.get("upscale", "false")
+        upscale = upscale_str.lower() == "true"
 
         if not aspect_ratio:
             raise ValueError("Unable to get 'aspect_ratio' field.")
@@ -1569,7 +1567,8 @@ def generate_image(
     elif provider == "novelai":
         negative_prompt = request.form.get("negative_prompt")
         aspect_ratio = request.form.get("aspect_ratio")
-        upscale = bool(request.form.get("upscale"))
+        upscale_str = request.form.get("upscale", "false")
+        upscale = upscale_str.lower() == "true"
 
         if not size:
             raise ValueError("Unable to get 'size' field.")
@@ -1686,117 +1685,10 @@ def generate_image_grid(
     )
 
 
-@app.route("/", methods=["GET", "POST"])
+@app.route("/", methods=["GET"])
 def index():
     if "username" not in session:
         return redirect(url_for("login"))
-    if request.method == "POST":
-        local_image_path = None
-        image_name = None
-        prompt = None
-        revised_prompt = None
-        error_message = None
-        provider = request.form.get("provider")
-        size = request.form.get("size")
-        prompt = request.form.get("prompt")
-        seed = request.form.get("seed")
-        if seed and seed.strip():
-            seed = int(seed)
-        else:
-            seed = None
-
-        try:
-            if not prompt or not prompt.strip():
-                raise ValueError("Please provide a prompt!")
-            if not provider:
-                raise ValueError("Unable to get provider filed from form!")
-            advanced_generate_grid = bool(request.form.get("advanced-generate-grid"))
-            if advanced_generate_grid:
-                grid_prompt_file = request.form.get("grid-prompt-file")
-                if not grid_prompt_file:
-                    raise ValueError(
-                        f"Generate grid enabled, but no prompt file provided! {grid_prompt_file}"
-                    )
-                generated_image_data = generate_image_grid(
-                    provider, prompt, size, seed, grid_prompt_file, request
-                )
-                local_image_path = generated_image_data.local_image_path
-                image_name = generated_image_data.image_name
-                prompt = generated_image_data.prompt
-                revised_prompt = generated_image_data.revised_prompt
-                return render_template(
-                    "result-section.html",
-                    local_image_path=local_image_path,
-                    revised_prompt=revised_prompt,
-                    prompt=prompt,
-                    image_name=image_name,
-                    error_message=error_message,
-                )
-            else:
-                generated_image_data = generate_image(
-                    provider, prompt, size, request, seed
-                )
-                local_image_path = generated_image_data.local_image_path
-                image_name = generated_image_data.image_name
-                prompt = generated_image_data.prompt
-                revised_prompt = generated_image_data.revised_prompt
-                return render_template(
-                    "result-section.html",
-                    local_image_path=local_image_path,
-                    revised_prompt=revised_prompt,
-                    prompt=prompt,
-                    image_name=image_name,
-                    error_message=error_message,
-                )
-        except ModerationException as e:
-            error_message = f"Your prompt doesn't pass OpenAI moderation. It triggers the following flags: {e.message}. Please adjust your prompt."
-            return render_template(
-                "result-section.html",
-                local_image_path=local_image_path,
-                revised_prompt=revised_prompt,
-                prompt=prompt,
-                image_name=image_name,
-                error_message=error_message,
-            )
-        except openai.BadRequestError as e:
-            error = json.loads(e.response.content)
-            error_message = error["error"]["message"]
-            error_code = error["error"]["code"]
-            if error_code == "content_policy_violation":
-                error_message = "OpenAI Image Generation has generated an image that doesn't pass it's own moderation filters. You may want to adjust your prompt slightly."
-            return render_template(
-                "result-section.html",
-                local_image_path=local_image_path,
-                revised_prompt=revised_prompt,
-                prompt=prompt,
-                image_name=image_name,
-                error_message=error_message,
-            )
-        except Exception as e:
-            error = str(e)
-            exc_type, _, exc_tb = sys.exc_info()
-            fname = (
-                os.path.split(exc_tb.tb_frame.f_code.co_filename)[1] if exc_tb else ""
-            )
-            error_message = f"Error processing request: {exc_type} {error}: {fname}"
-            return render_template(
-                "result-section.html",
-                local_image_path=local_image_path,
-                revised_prompt=revised_prompt,
-                prompt=prompt,
-                image_name=image_name,
-                error_message=error_message,
-            )
-
-        return render_template(
-            "result-section.html",
-            local_image_path=local_image_path,
-            revised_prompt=revised_prompt,
-            prompt=prompt,
-            image_name=image_name,
-            error_message=error_message,
-        )
-
     return render_template("index.html")
 
 
@@ -1921,33 +1813,48 @@ def handle_image_request():
 def _handle_generation_request(image_request: ImageGenerationRequest) -> ImageOperationResponse:
     """Handle image generation requests."""
     try:
-        # Convert to legacy format for existing generate_image function
-        provider_str = image_request.provider.value
-        size_str = f"{image_request.width}x{image_request.height}"
+        # Generate a seed for the provider
+        seed = generate_seed_for_provider(image_request.provider.value)
+        if not seed:
+            raise ValueError("Unable to generate seed for provider")
         
-        # Create a mock request object with the necessary form data
-        class MockRequest:
-            def __init__(self, form_data):
-                self.form = form_data
-        
-        mock_form = {
-            "quality": image_request.quality.value,
-            "negative_prompt": image_request.negative_prompt or "",
-            "aspect_ratio": _get_aspect_ratio_from_dimensions(image_request.width, image_request.height),
-            "upscale": "false",
-            "add-follow-prompt": "false"
-        }
-        
-        mock_request = MockRequest(mock_form)
-        
-        # Use existing generate_image function
-        generated_data = generate_image(
-            provider=provider_str,
-            prompt=image_request.prompt,
-            size=size_str,
-            request=mock_request,
-            seed=None  # Let the function generate a seed
-        )
+        # Route directly to the appropriate generation function based on provider
+        if image_request.provider == Provider.OPENAI:
+            generated_data = generate_openai_image(
+                prompt=image_request.prompt,
+                username=session["username"],
+                size=f"{image_request.width}x{image_request.height}",
+                quality=image_request.quality.value,
+                strict_follow_prompt=False,  # Default to False for new endpoint
+                seed=seed
+            )
+        elif image_request.provider == Provider.STABILITY:
+            generated_data = generate_stability_image(
+                prompt=image_request.prompt,
+                negative_prompt=image_request.negative_prompt,
+                username=session["username"],
+                aspect_ratio=_get_aspect_ratio_from_dimensions(image_request.width, image_request.height),
+                seed=seed,
+                upscale=False  # Default to False for new endpoint
+            )
+        elif image_request.provider == Provider.NOVELAI:
+            # Convert character prompts to the format expected by generate_novelai_image
+            character_prompts = None
+            if image_request.character_prompts:
+                character_prompts = image_request.character_prompts
+            
+            generated_data = generate_novelai_image(
+                prompt=image_request.prompt,
+                negative_prompt=image_request.negative_prompt,
+                username=session["username"],
+                size=(image_request.width, image_request.height),
+                seed=seed,
+                upscale=False,  # Default to False for new endpoint
+                grid_dynamic_prompt=None,
+                character_prompts=character_prompts
+            )
+        else:
+            raise ValueError(f"Unsupported provider: {image_request.provider.value}")
         
         return create_success_response(
             image_path=generated_data.local_image_path,

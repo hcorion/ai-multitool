@@ -1,0 +1,65 @@
+# API Integration Guidelines
+
+## Supported Providers
+- **OpenAI DALL-E 3**: High-quality image generation with style options
+- **StabilityAI**: Stable Diffusion with fine-tuning parameters
+- **NovelAI**: Anime-style generation with specialized models
+
+## Provider-Specific Parameters
+
+### OpenAI (DALL-E 3)
+```python
+{
+    "quality": "standard" | "hd",
+    "style": "vivid" | "natural",
+    "size": "1024x1024" | "1792x1024" | "1024x1792"
+}
+```
+
+### StabilityAI
+```python
+{
+    "negative_prompt": "string",
+    "cfg_scale": 1-20,  # default: 7
+    "steps": 10-50,     # default: 30
+    "seed": "number"
+}
+```
+
+### NovelAI
+```python
+{
+    "negative_prompt": "string",
+    "quality_toggle": "boolean",
+    "uc_preset": "string",
+    "sampler": "string"
+}
+```
+
+## Error Handling
+- Handle API rate limits gracefully
+- Implement retry logic for transient failures
+- Return structured error responses
+- Log API usage for monitoring
+
+## File Storage
+- Generated images: `static/images/{username}/{sequence}-{prompt}.png`
+- Thumbnails: `static/images/{username}/{sequence}-{prompt}.thumb.jpg`
+- Metadata preservation in image files
+- User-specific directory structure
+
+## Security
+- API keys stored in environment variables
+- Never log or expose API keys
+- Validate user input before API calls
+- Implement request sanitization
+
+## Performance
+- Respect provider-specific rate limits
+- Implement request queuing if needed
+- Cache frequently accessed data
+- Monitor API usage and costs
+description:
+globs:
+alwaysApply: false
+---

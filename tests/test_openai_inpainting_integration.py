@@ -7,7 +7,6 @@ OpenAI inpainting workflow with real images and masks.
 
 import pytest
 import os
-import io
 import tempfile
 from PIL import Image as PILImage
 

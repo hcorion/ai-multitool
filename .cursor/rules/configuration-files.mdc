@@ -1,0 +1,41 @@
+# Configuration Files Guide
+
+## TypeScript Configuration
+- [tsconfig.json](mdc:tsconfig.json) - TypeScript compiler settings
+  - Target: ES2024 with strict type checking
+  - Output to [static/js/](mdc:static/js/) directory
+  - Source maps enabled for debugging
+
+## Package Management
+- [package.json](mdc:package.json) - Frontend dependencies
+  - TypeScript, Sass, jQuery, Showdown.js, Highlight.js
+  - Development tools: TypeScript compiler, Sass compiler
+- [Pipfile](mdc:Pipfile) - Python dependencies
+  - Flask, OpenAI, Pydantic, Requests, Pillow, Wand
+  - Development: pytest, ruff, prettier
+
+## Code Quality
+- [ruff.toml](mdc:ruff.toml) - Python linting configuration
+  - Python 3.13 target
+  - Enforce code style and best practices
+- [.prettierrc](mdc:.prettierrc) - Code formatting rules
+  - 4-space tabs, 120 character width
+  - Consistent formatting across the project
+
+## Test Configuration
+- [pytest.ini](mdc:pytest.ini) - Test configuration
+  - Environment variable loading
+  - Test discovery and execution settings
+
+## Environment Variables
+- `.env.local` - API keys and configuration (gitignored)
+  - `OPENAI_API_KEY`, `STABILITY_API_KEY`, `NOVELAI_API_KEY`
+  - `FLASK_ENV`, `FLASK_DEBUG`, `SECRET_KEY`
+
+## Build Scripts
+- [run.ps1](mdc:run.ps1) - Development server startup
+- [run-user.ps1](mdc:run-user.ps1) - User-specific development script
+description:
+globs:
+alwaysApply: false
+---
