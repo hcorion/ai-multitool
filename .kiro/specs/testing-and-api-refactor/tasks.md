@@ -63,7 +63,12 @@
 
 
 
-- [ ] 3.2 Implement OpenAI inpainting functionality with tests
+- [x] 3.2 Implement OpenAI inpainting functionality with tests
+
+
+
+
+
   - Create generate_openai_inpaint_image function using client.images.edit API
   - Reference .venv/Lib/site-packages/openai/resources/images.py for API structure
   - Handle PNG mask and base image file processing
@@ -74,7 +79,9 @@
 
   - _Requirements: 3.1, 3.2, 3.3, 1.3_
 
-- [ ] 3.3 Rename OpenAI generation function with tests
+- [x] 3.3 Rename OpenAI generation function with tests
+
+
   - Rename generate_dalle_image function to generate_openai_image
   - Update function to reflect gpt-image-1 model usage
   - Update all references to the renamed function throughout the codebase
@@ -82,8 +89,14 @@
   - Test integration with existing Flask routes
   - _Requirements: 3.4, 1.3_
 
-- [ ] 4. Add img2img support for NovelAI
-- [ ] 4.1 Implement img2img functionality in NovelAI client with tests
+- [x] 4. Add img2img support for NovelAI
+
+
+
+
+- [x] 4.1 Implement img2img functionality in NovelAI client with tests
+
+
   - Add generate_img2img_image method to NovelAIClient
   - Create appropriate payload structure for img2img operations
   - Handle strength parameter and base image processing

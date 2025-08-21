@@ -18,6 +18,7 @@ from novelai_client import (
     NovelAIAction,
     NovelAIGenerationPayload,
     NovelAIInpaintPayload,
+    NovelAIImg2ImgPayload,
     NovelAIClientError,
     NovelAIAPIError
 )
@@ -244,6 +245,31 @@ class TestNovelAIClient:
             
             assert "Failed to extract image from response" in str(exc_info.value)
     
+    def test_generate_image_with_variety(self):
+        """Test image generation with variety enabled."""
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w') as zip_file:
+            zip_file.writestr("image.png", b"fake image data")
+        zip_content = zip_buffer.getvalue()
+        
+        with patch.object(NovelAIClient, '_make_request') as mock_request:
+            mock_response = Mock()
+            mock_response.content = zip_content
+            mock_request.return_value = mock_response
+            
+            client = NovelAIClient("test-key")
+            result = client.generate_image(
+                "test prompt",
+                variety=True
+            )
+            
+            assert result == b"fake image data"
+            
+            # Verify variety parameter in payload
+            call_args = mock_request.call_args
+            payload = call_args[0][1]
+            assert payload["parameters"]["skip_cfg_above_sigma"] == 58
+    
     def test_generate_inpaint_image_basic(self):
         """Test basic inpainting functionality."""
         # Create a mock ZIP file with inpainted image data
@@ -419,6 +445,112 @@ class TestNovelAIClient:
                     )
                 
                 assert "Failed to extract inpainted image from response" in str(exc_info.value)
+    
+    def test_generate_inpaint_image_with_character_prompts(self):
+        """Test inpainting with character prompts."""
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w') as zip_file:
+            zip_file.writestr("inpainted.png", b"inpainted image data")
+        zip_content = zip_buffer.getvalue()
+        
+        character_prompts = [
+            {"positive": "character 1 positive", "negative": "character 1 negative"},
+            {"positive": "character 2 positive", "negative": ""}
+        ]
+        
+        with patch.object(NovelAIClient, '_make_request') as mock_request:
+            mock_response = Mock()
+            mock_response.content = zip_content
+            mock_request.return_value = mock_response
+            
+            with patch.object(NovelAIClient, '_process_novelai_mask') as mock_process_mask:
+                mock_process_mask.return_value = b"processed mask data"
+                
+                client = NovelAIClient("test-key")
+                result = client.generate_inpaint_image(
+                    base_image=b"base image data",
+                    mask=b"mask image data",
+                    prompt="inpaint this area",
+                    character_prompts=character_prompts
+                )
+                
+                assert result == b"inpainted image data"
+                
+                # Verify character prompts in payload
+                call_args = mock_request.call_args
+                payload = call_args[0][1]
+                
+                char_captions_pos = payload["parameters"]["v4_prompt"]["caption"]["char_captions"]
+                char_captions_neg = payload["parameters"]["v4_negative_prompt"]["caption"]["char_captions"]
+                
+                assert len(char_captions_pos) == 2
+                assert char_captions_pos[0]["char_caption"] == "character 1 positive"
+                assert char_captions_pos[1]["char_caption"] == "character 2 positive"
+                
+                assert len(char_captions_neg) == 1  # Only one has negative prompt
+                assert char_captions_neg[0]["char_caption"] == "character 1 negative"
+    
+    def test_generate_inpaint_image_default_strength(self):
+        """Test that inpainting uses default strength of 1.0."""
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w') as zip_file:
+            zip_file.writestr("inpainted.png", b"inpainted image data")
+        zip_content = zip_buffer.getvalue()
+        
+        with patch.object(NovelAIClient, '_make_request') as mock_request:
+            mock_response = Mock()
+            mock_response.content = zip_content
+            mock_request.return_value = mock_response
+            
+            with patch.object(NovelAIClient, '_process_novelai_mask') as mock_process_mask:
+                mock_process_mask.return_value = b"processed mask data"
+                
+                client = NovelAIClient("test-key")
+                result = client.generate_inpaint_image(
+                    base_image=b"base image data",
+                    mask=b"mask image data",
+                    prompt="inpaint this area"
+                )
+                
+                assert result == b"inpainted image data"
+                
+                # Verify default strength is 1.0 for inpainting
+                call_args = mock_request.call_args
+                payload = call_args[0][1]
+                params = payload["parameters"]
+                
+                assert params["strength"] == 1.0
+                assert params["inpaintImg2ImgStrength"] == 1.0
+    
+    def test_generate_inpaint_image_with_variety(self):
+        """Test inpainting with variety enabled."""
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w') as zip_file:
+            zip_file.writestr("inpainted.png", b"inpainted image data")
+        zip_content = zip_buffer.getvalue()
+        
+        with patch.object(NovelAIClient, '_make_request') as mock_request:
+            mock_response = Mock()
+            mock_response.content = zip_content
+            mock_request.return_value = mock_response
+            
+            with patch.object(NovelAIClient, '_process_novelai_mask') as mock_process_mask:
+                mock_process_mask.return_value = b"processed mask data"
+                
+                client = NovelAIClient("test-key")
+                result = client.generate_inpaint_image(
+                    base_image=b"base image data",
+                    mask=b"mask image data",
+                    prompt="inpaint this area",
+                    variety=True
+                )
+                
+                assert result == b"inpainted image data"
+                
+                # Verify variety parameter in payload
+                call_args = mock_request.call_args
+                payload = call_args[0][1]
+                assert payload["parameters"]["skip_cfg_above_sigma"] == 58
     
     def test_process_novelai_mask(self):
         """Test the NovelAI mask processing function."""
@@ -615,6 +747,381 @@ class TestNovelAIClient:
                 client.upscale_image(b"image data", 512, 512)
             
             assert "Failed to extract upscaled image from response" in str(exc_info.value)
+    
+    def test_build_common_parameters_basic(self):
+        """Test the _build_common_parameters helper method."""
+        client = NovelAIClient("test-key")
+        
+        parameters = client._build_common_parameters(
+            prompt="test prompt",
+            negative_prompt="avoid this",
+            width=512,
+            height=768,
+            seed=12345,
+            steps=20,
+            scale=7.5,
+            strength=0.8
+        )
+        
+        # Verify basic parameters
+        assert parameters["width"] == 512
+        assert parameters["height"] == 768
+        assert parameters["seed"] == 12345
+        assert parameters["steps"] == 20
+        assert parameters["scale"] == 7.5
+        assert parameters["strength"] == 0.8
+        assert parameters["inpaintImg2ImgStrength"] == 0.8
+        
+        # Verify prompt structure
+        assert parameters["v4_prompt"]["caption"]["base_caption"] == "test prompt"
+        assert parameters["v4_negative_prompt"]["caption"]["base_caption"] == "avoid this"
+        
+        # Verify default values
+        assert parameters["add_original_image"] is True
+        assert parameters["autoSmea"] is False
+        assert parameters["cfg_rescale"] == 0.4
+        assert parameters["n_samples"] == 1
+        assert parameters["sampler"] == "k_euler_ancestral"
+    
+    def test_build_common_parameters_with_character_prompts(self):
+        """Test _build_common_parameters with character prompts."""
+        client = NovelAIClient("test-key")
+        
+        character_prompts = [
+            {"positive": "character 1 positive", "negative": "character 1 negative"},
+            {"positive": "character 2 positive", "negative": ""}
+        ]
+        
+        parameters = client._build_common_parameters(
+            prompt="test prompt",
+            character_prompts=character_prompts
+        )
+        
+        # Verify character prompts in positive captions
+        char_captions_pos = parameters["v4_prompt"]["caption"]["char_captions"]
+        assert len(char_captions_pos) == 2
+        assert char_captions_pos[0]["char_caption"] == "character 1 positive"
+        assert char_captions_pos[0]["centers"] == [{"x": 0, "y": 0}]
+        assert char_captions_pos[1]["char_caption"] == "character 2 positive"
+        
+        # Verify character prompts in negative captions
+        char_captions_neg = parameters["v4_negative_prompt"]["caption"]["char_captions"]
+        assert len(char_captions_neg) == 1  # Only one has negative prompt
+        assert char_captions_neg[0]["char_caption"] == "character 1 negative"
+    
+    def test_build_common_parameters_with_kwargs(self):
+        """Test _build_common_parameters with additional kwargs."""
+        client = NovelAIClient("test-key")
+        
+        parameters = client._build_common_parameters(
+            prompt="test prompt",
+            custom_param="custom_value",
+            override_steps=15  # Override default steps
+        )
+        
+        # Verify custom parameters are included
+        assert parameters["custom_param"] == "custom_value"
+        assert parameters["override_steps"] == 15
+        
+        # Verify default steps is still there (kwargs don't override unless key matches)
+        assert parameters["steps"] == 28  # Default value
+    
+    def test_build_common_parameters_empty_character_prompts(self):
+        """Test _build_common_parameters with empty character prompts."""
+        client = NovelAIClient("test-key")
+        
+        character_prompts = [
+            {"positive": "", "negative": ""},  # Empty prompts
+            {"positive": "   ", "negative": "   "}  # Whitespace only
+        ]
+        
+        parameters = client._build_common_parameters(
+            prompt="test prompt",
+            character_prompts=character_prompts
+        )
+        
+        # Should not include empty or whitespace-only character prompts
+        char_captions_pos = parameters["v4_prompt"]["caption"]["char_captions"]
+        char_captions_neg = parameters["v4_negative_prompt"]["caption"]["char_captions"]
+        
+        assert len(char_captions_pos) == 0
+        assert len(char_captions_neg) == 0
+    
+    def test_build_common_parameters_with_variety_enabled(self):
+        """Test _build_common_parameters with variety enabled."""
+        client = NovelAIClient("test-key")
+        
+        parameters = client._build_common_parameters(
+            prompt="test prompt",
+            variety=True
+        )
+        
+        # Verify variety parameter is included
+        assert parameters["skip_cfg_above_sigma"] == 58
+    
+    def test_build_common_parameters_with_variety_disabled(self):
+        """Test _build_common_parameters with variety disabled (default)."""
+        client = NovelAIClient("test-key")
+        
+        parameters = client._build_common_parameters(
+            prompt="test prompt",
+            variety=False
+        )
+        
+        # Verify variety parameter is not included
+        assert "skip_cfg_above_sigma" not in parameters
+    
+    def test_build_common_parameters_variety_default(self):
+        """Test _build_common_parameters with variety default (False)."""
+        client = NovelAIClient("test-key")
+        
+        parameters = client._build_common_parameters(
+            prompt="test prompt"
+        )
+        
+        # Verify variety parameter is not included by default
+        assert "skip_cfg_above_sigma" not in parameters
+    
+    def test_generate_img2img_image_basic(self):
+        """Test basic img2img functionality."""
+        # Create a mock ZIP file with img2img image data
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w') as zip_file:
+            zip_file.writestr("img2img.png", b"img2img image data")
+        zip_content = zip_buffer.getvalue()
+        
+        with patch.object(NovelAIClient, '_make_request') as mock_request:
+            mock_response = Mock()
+            mock_response.content = zip_content
+            mock_request.return_value = mock_response
+            
+            client = NovelAIClient("test-key")
+            result = client.generate_img2img_image(
+                base_image=b"base image data",
+                prompt="transform this image"
+            )
+            
+            assert result == b"img2img image data"
+            
+            # Verify the request payload
+            mock_request.assert_called_once()
+            call_args = mock_request.call_args
+            endpoint, payload = call_args[0]
+            
+            assert endpoint == "ai/generate-image"
+            assert payload["action"] == "img2img"
+            assert payload["model"] == "nai-diffusion-4-5-full"
+            assert payload["parameters"]["v4_prompt"]["caption"]["base_caption"] == "transform this image"
+            assert "image" in payload
+            assert payload["parameters"]["strength"] == 0.7  # Default strength
+            assert payload["parameters"]["inpaintImg2ImgStrength"] == 0.7  # Default strength
+    
+    def test_generate_img2img_image_with_negative_prompt(self):
+        """Test img2img with negative prompt."""
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w') as zip_file:
+            zip_file.writestr("img2img.png", b"img2img image data")
+        zip_content = zip_buffer.getvalue()
+        
+        with patch.object(NovelAIClient, '_make_request') as mock_request:
+            mock_response = Mock()
+            mock_response.content = zip_content
+            mock_request.return_value = mock_response
+            
+            client = NovelAIClient("test-key")
+            result = client.generate_img2img_image(
+                base_image=b"base image data",
+                prompt="transform this image",
+                negative_prompt="avoid this"
+            )
+            
+            assert result == b"img2img image data"
+            
+            # Verify negative prompt in payload
+            call_args = mock_request.call_args
+            payload = call_args[0][1]
+            assert payload["parameters"]["v4_negative_prompt"]["caption"]["base_caption"] == "avoid this"
+    
+    def test_generate_img2img_image_custom_strength(self):
+        """Test img2img with custom strength parameter."""
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w') as zip_file:
+            zip_file.writestr("img2img.png", b"img2img image data")
+        zip_content = zip_buffer.getvalue()
+        
+        with patch.object(NovelAIClient, '_make_request') as mock_request:
+            mock_response = Mock()
+            mock_response.content = zip_content
+            mock_request.return_value = mock_response
+            
+            client = NovelAIClient("test-key")
+            result = client.generate_img2img_image(
+                base_image=b"base image data",
+                prompt="transform this image",
+                strength=0.5
+            )
+            
+            assert result == b"img2img image data"
+            
+            # Verify strength parameter in payload
+            call_args = mock_request.call_args
+            payload = call_args[0][1]
+            assert payload["parameters"]["strength"] == 0.5
+            assert payload["parameters"]["inpaintImg2ImgStrength"] == 0.5
+    
+    def test_generate_img2img_image_custom_parameters(self):
+        """Test img2img with custom parameters."""
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w') as zip_file:
+            zip_file.writestr("img2img.png", b"img2img image data")
+        zip_content = zip_buffer.getvalue()
+        
+        with patch.object(NovelAIClient, '_make_request') as mock_request:
+            mock_response = Mock()
+            mock_response.content = zip_content
+            mock_request.return_value = mock_response
+            
+            client = NovelAIClient("test-key")
+            result = client.generate_img2img_image(
+                base_image=b"base image data",
+                prompt="transform this image",
+                strength=0.8,
+                width=512,
+                height=768,
+                seed=12345,
+                steps=20,
+                scale=7.5
+            )
+            
+            assert result == b"img2img image data"
+            
+            # Verify custom parameters
+            call_args = mock_request.call_args
+            payload = call_args[0][1]
+            params = payload["parameters"]
+            
+            assert params["strength"] == 0.8
+            assert params["inpaintImg2ImgStrength"] == 0.8
+            assert params["width"] == 512
+            assert params["height"] == 768
+            assert params["seed"] == 12345
+            assert params["steps"] == 20
+            assert params["scale"] == 7.5
+    
+    @patch('novelai_client.base64.b64encode')
+    def test_generate_img2img_image_base64_encoding(self, mock_b64encode):
+        """Test that base64 encoding is called correctly for img2img."""
+        # Mock base64 encoding
+        mock_b64encode.return_value = Mock(decode=Mock(return_value="base64_base_image"))
+        
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w') as zip_file:
+            zip_file.writestr("img2img.png", b"img2img image data")
+        zip_content = zip_buffer.getvalue()
+        
+        with patch.object(NovelAIClient, '_make_request') as mock_request:
+            mock_response = Mock()
+            mock_response.content = zip_content
+            mock_request.return_value = mock_response
+            
+            client = NovelAIClient("test-key")
+            result = client.generate_img2img_image(
+                base_image=b"base image data",
+                prompt="transform this image"
+            )
+            
+            assert result == b"img2img image data"
+            
+            # Verify base64 encoding was called for base image
+            mock_b64encode.assert_called_once_with(b"base image data")
+            
+            # Verify encoded data is in payload
+            call_args = mock_request.call_args
+            payload = call_args[0][1]
+            assert payload["image"] == "base64_base_image"
+    
+    def test_generate_img2img_image_zip_extraction_error(self):
+        """Test error handling when img2img ZIP extraction fails."""
+        with patch.object(NovelAIClient, '_make_request') as mock_request:
+            mock_response = Mock()
+            mock_response.content = b"invalid zip data"
+            mock_request.return_value = mock_response
+            
+            client = NovelAIClient("test-key")
+            
+            with pytest.raises(NovelAIClientError) as exc_info:
+                client.generate_img2img_image(
+                    base_image=b"base image data",
+                    prompt="transform this image"
+                )
+            
+            assert "Failed to extract img2img image from response" in str(exc_info.value)
+    
+    def test_generate_img2img_image_with_character_prompts(self):
+        """Test img2img with character prompts."""
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w') as zip_file:
+            zip_file.writestr("img2img.png", b"img2img image data")
+        zip_content = zip_buffer.getvalue()
+        
+        character_prompts = [
+            {"positive": "character 1 positive", "negative": "character 1 negative"},
+            {"positive": "character 2 positive", "negative": ""}
+        ]
+        
+        with patch.object(NovelAIClient, '_make_request') as mock_request:
+            mock_response = Mock()
+            mock_response.content = zip_content
+            mock_request.return_value = mock_response
+            
+            client = NovelAIClient("test-key")
+            result = client.generate_img2img_image(
+                base_image=b"base image data",
+                prompt="transform this image",
+                character_prompts=character_prompts
+            )
+            
+            assert result == b"img2img image data"
+            
+            # Verify character prompts in payload
+            call_args = mock_request.call_args
+            payload = call_args[0][1]
+            
+            char_captions_pos = payload["parameters"]["v4_prompt"]["caption"]["char_captions"]
+            char_captions_neg = payload["parameters"]["v4_negative_prompt"]["caption"]["char_captions"]
+            
+            assert len(char_captions_pos) == 2
+            assert char_captions_pos[0]["char_caption"] == "character 1 positive"
+            assert char_captions_pos[1]["char_caption"] == "character 2 positive"
+            
+            assert len(char_captions_neg) == 1  # Only one has negative prompt
+            assert char_captions_neg[0]["char_caption"] == "character 1 negative"
+    
+    def test_generate_img2img_image_with_variety(self):
+        """Test img2img with variety enabled."""
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w') as zip_file:
+            zip_file.writestr("img2img.png", b"img2img image data")
+        zip_content = zip_buffer.getvalue()
+        
+        with patch.object(NovelAIClient, '_make_request') as mock_request:
+            mock_response = Mock()
+            mock_response.content = zip_content
+            mock_request.return_value = mock_response
+            
+            client = NovelAIClient("test-key")
+            result = client.generate_img2img_image(
+                base_image=b"base image data",
+                prompt="transform this image",
+                variety=True
+            )
+            
+            assert result == b"img2img image data"
+            
+            # Verify variety parameter in payload
+            call_args = mock_request.call_args
+            payload = call_args[0][1]
+            assert payload["parameters"]["skip_cfg_above_sigma"] == 58
 
 
 class TestNovelAIEnums:
@@ -689,6 +1196,38 @@ class TestNovelAIInpaintPayload:
     def test_inpaint_payload_inheritance(self):
         """Test that inpaint payload inherits from generation payload."""
         payload = NovelAIInpaintPayload("test")
+        assert isinstance(payload, NovelAIGenerationPayload)
+
+
+class TestNovelAIImg2ImgPayload:
+    """Test cases for NovelAIImg2ImgPayload dataclass."""
+    
+    def test_img2img_payload_creation(self):
+        """Test basic img2img payload creation."""
+        payload = NovelAIImg2ImgPayload("img2img prompt")
+        
+        assert payload.input == "img2img prompt"
+        assert payload.model == NovelAIModel.DIFFUSION_4_5_FULL
+        assert payload.action == NovelAIAction.IMG2IMG
+        assert payload.parameters == {}
+        assert payload.image == ""
+        assert payload.strength == 0.7
+    
+    def test_img2img_payload_with_image_data(self):
+        """Test img2img payload creation with image data and custom strength."""
+        payload = NovelAIImg2ImgPayload(
+            "img2img prompt",
+            image="base64_image_data",
+            strength=0.5
+        )
+        
+        assert payload.input == "img2img prompt"
+        assert payload.image == "base64_image_data"
+        assert payload.strength == 0.5
+    
+    def test_img2img_payload_inheritance(self):
+        """Test that img2img payload inherits from generation payload."""
+        payload = NovelAIImg2ImgPayload("test")
         assert isinstance(payload, NovelAIGenerationPayload)
 
 

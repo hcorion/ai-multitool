@@ -68,6 +68,16 @@ class NovelAIInpaintPayload(NovelAIGenerationPayload):
     image: str = ""  # Base64 encoded base image
 
 
+@dataclass
+class NovelAIImg2ImgPayload(NovelAIGenerationPayload):
+    """Payload structure for NovelAI img2img requests."""
+
+    model: NovelAIModel = NovelAIModel.DIFFUSION_4_5_FULL
+    action: NovelAIAction = NovelAIAction.IMG2IMG
+    image: str = ""  # Base64 encoded base image
+    strength: float = 0.7  # Strength parameter for img2img
+
+
 class NovelAIClient:
     """Client for interacting with the NovelAI API."""
 
@@ -85,6 +95,117 @@ class NovelAIClient:
         self.session.headers.update(
             {"authorization": f"Bearer {api_key}", "content-type": "application/json"}
         )
+
+    def _build_common_parameters(
+        self,
+        prompt: str,
+        negative_prompt: Optional[str] = None,
+        width: int = 1024,
+        height: int = 1024,
+        seed: int = 0,
+        steps: int = 28,
+        scale: float = 6.0,
+        strength: float = 0.6,
+        variety: bool = False,
+        character_prompts: Optional[List[Dict[str, str]]] = None,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """
+        Build common parameters used across all NovelAI generation methods.
+
+        Args:
+            prompt: Text prompt for image generation
+            negative_prompt: Negative prompt to avoid certain elements
+            width: Image width in pixels
+            height: Image height in pixels
+            seed: Random seed for reproducible generation
+            steps: Number of diffusion steps
+            scale: CFG scale for prompt adherence
+            strength: Strength parameter for img2img/inpainting
+            variety: Enable variety mode for more diverse outputs
+            character_prompts: List of character-specific prompts
+            **kwargs: Additional parameters to override defaults
+
+        Returns:
+            Dictionary of common parameters for NovelAI API
+        """
+        # Build character captions
+        char_captions_positive = []
+        char_captions_negative = []
+
+        if character_prompts:
+            for char_prompt in character_prompts:
+                positive_prompt = char_prompt.get("positive", "")
+                if positive_prompt and str(positive_prompt).strip():
+                    char_captions_positive.append(
+                        {
+                            "centers": [{"x": 0, "y": 0}],
+                            "char_caption": str(positive_prompt).strip(),
+                        }
+                    )
+
+                negative_prompt_char = char_prompt.get("negative", "")
+                if negative_prompt_char and str(negative_prompt_char).strip():
+                    char_captions_negative.append(
+                        {
+                            "centers": [{"x": 0, "y": 0}],
+                            "char_caption": str(negative_prompt_char).strip(),
+                        }
+                    )
+
+        # Build the common parameters
+        parameters = {
+            "add_original_image": True,
+            "autoSmea": False,
+            "cfg_rescale": 0.4,
+            "controlnet_strength": 1,
+            "deliberate_euler_ancestral_bug": False,
+            "dynamic_thresholding": True,
+            "width": width,
+            "height": height,
+            "inpaintImg2ImgStrength": strength,
+            "legacy": False,
+            "legacy_uc": False,
+            "legacy_v3_extend": False,
+            "n_samples": 1,
+            "noise": 0.2,
+            "noise_schedule": "karras",
+            "normalize_reference_strength_multiple": True,
+            "params_version": 3,
+            "prefer_brownian": True,
+            "qualityToggle": True,
+            "sampler": "k_euler_ancestral",
+            "scale": scale,
+            "steps": steps,
+            "strength": strength,
+            "ucPreset": 4,
+            "seed": seed,
+            "v4_prompt": {
+                "caption": {
+                    "base_caption": prompt,
+                    "char_captions": char_captions_positive,
+                },
+                "use_coords": False,
+                "use_order": True,
+            },
+            "v4_negative_prompt": {
+                "caption": {
+                    "base_caption": negative_prompt or "",
+                    "char_captions": char_captions_negative,
+                },
+                "use_coords": False,
+                "use_order": True,
+            },
+        }
+
+        # Add variety setting if enabled
+        if variety:
+            parameters["skip_cfg_above_sigma"] = 58
+
+        # Override with any additional parameters
+        parameters.update(kwargs)
+
+        return parameters
 
     def _make_request(
         self, endpoint: str, payload: Dict[str, Any]
@@ -136,6 +257,7 @@ class NovelAIClient:
         seed: int = 0,
         steps: int = 28,
         scale: float = 6.0,
+        variety: bool = False,
         character_prompts: Optional[List[Dict[str, str]]] = None,
         **kwargs,
     ) -> bytes:
@@ -150,6 +272,7 @@ class NovelAIClient:
             seed: Random seed for reproducible generation
             steps: Number of diffusion steps (max 28 for free tier)
             scale: CFG scale for prompt adherence
+            variety: Enable variety mode for more diverse outputs
             character_prompts: List of character-specific prompts
             **kwargs: Additional parameters for the generation
 
@@ -160,77 +283,20 @@ class NovelAIClient:
             NovelAIAPIError: If the API returns an error
             NovelAIClientError: If there's a client-side error
         """
-        # Build character captions
-        char_captions_positive = []
-        char_captions_negative = []
-
-        if character_prompts:
-            for char_prompt in character_prompts:
-                positive_prompt = char_prompt.get("positive", "")
-                if positive_prompt and str(positive_prompt).strip():
-                    char_captions_positive.append(
-                        {
-                            "centers": [{"x": 0, "y": 0}],
-                            "char_caption": str(positive_prompt).strip(),
-                        }
-                    )
-
-                negative_prompt = char_prompt.get("negative", "")
-                if negative_prompt and str(negative_prompt).strip():
-                    char_captions_negative.append(
-                        {
-                            "centers": [{"x": 0, "y": 0}],
-                            "char_caption": str(negative_prompt).strip(),
-                        }
-                    )
-
-        # Build the request payload
-        parameters = {
-            "add_original_image": True,
-            "autoSmea": False,
-            "cfg_rescale": 0.4,
-            "controlnet_strength": 1,
-            "deliberate_euler_ancestral_bug": False,
-            "dynamic_thresholding": True,
-            "width": width,
-            "height": height,
-            "inpaintImg2ImgStrength": 1,
-            "legacy": False,
-            "legacy_uc": False,
-            "legacy_v3_extend": False,
-            "n_samples": 1,
-            "noise": 0.2,
-            "noise_schedule": "karras",
-            "normalize_reference_strength_multiple": True,
-            "params_version": 3,
-            "prefer_brownian": True,
-            "qualityToggle": True,
-            "sampler": "k_euler_ancestral",
-            "scale": scale,
-            "steps": steps,
-            "strength": 0.6,
-            "ucPreset": 4,
-            "seed": seed,
-            "v4_prompt": {
-                "caption": {
-                    "base_caption": prompt,
-                    "char_captions": char_captions_positive,
-                },
-                "use_coords": False,
-                "use_order": True,
-            },
-            "v4_negative_prompt": {
-                "caption": {
-                    "base_caption": negative_prompt or "",
-                    "char_captions": char_captions_negative,
-                },
-                "use_coords": False,
-                "use_order": True,
-            },
-        }
-
-        # Override with any additional parameters
-        parameters.update(kwargs)
+        # Build the request parameters using common helper
+        parameters = self._build_common_parameters(
+            prompt=prompt,
+            negative_prompt=negative_prompt,
+            width=width,
+            height=height,
+            seed=seed,
+            steps=steps,
+            scale=scale,
+            strength=0.6,  # Default strength for text-to-image
+            variety=variety,
+            character_prompts=character_prompts,
+            **kwargs,
+        )
 
         payload = {
             "action": NovelAIAction.GENERATE.value,
@@ -315,6 +381,8 @@ class NovelAIClient:
         seed: int = 0,
         steps: int = 28,
         scale: float = 6.0,
+        variety: bool = False,
+        character_prompts: Optional[List[Dict[str, str]]] = None,
         **kwargs,
     ) -> bytes:
         """
@@ -330,6 +398,8 @@ class NovelAIClient:
             seed: Random seed for reproducible generation
             steps: Number of diffusion steps (max 28 for free tier)
             scale: CFG scale for prompt adherence
+            variety: Enable variety mode for more diverse outputs
+            character_prompts: List of character-specific prompts
             **kwargs: Additional parameters for the generation
 
         Returns:
@@ -346,53 +416,20 @@ class NovelAIClient:
         base_image_b64 = base64.b64encode(base_image).decode("ascii")
         mask_b64 = base64.b64encode(processed_mask).decode("ascii")
 
-        # Build the request payload
-        parameters = {
-            "add_original_image": True,
-            "autoSmea": False,
-            "cfg_rescale": 0.4,
-            "controlnet_strength": 1,
-            "deliberate_euler_ancestral_bug": False,
-            "dynamic_thresholding": True,
-            "width": width,
-            "height": height,
-            "inpaintImg2ImgStrength": 1,
-            "legacy": False,
-            "legacy_uc": False,
-            "legacy_v3_extend": False,
-            "n_samples": 1,
-            "noise": 0.2,
-            "noise_schedule": "karras",
-            "normalize_reference_strength_multiple": True,
-            "params_version": 3,
-            "prefer_brownian": True,
-            "qualityToggle": True,
-            "sampler": "k_euler_ancestral",
-            "scale": scale,
-            "steps": steps,
-            "strength": 0.6,
-            "ucPreset": 4,
-            "seed": seed,
-            "v4_prompt": {
-                "caption": {
-                    "base_caption": prompt,
-                    "char_captions": [],
-                },
-                "use_coords": False,
-                "use_order": True,
-            },
-            "v4_negative_prompt": {
-                "caption": {
-                    "base_caption": negative_prompt or "",
-                    "char_captions": [],
-                },
-                "use_coords": False,
-                "use_order": True,
-            },
-        }
-
-        # Override with any additional parameters
-        parameters.update(kwargs)
+        # Build the request parameters using common helper
+        parameters = self._build_common_parameters(
+            prompt=prompt,
+            negative_prompt=negative_prompt,
+            width=width,
+            height=height,
+            seed=seed,
+            steps=steps,
+            scale=scale,
+            strength=1.0,  # Default strength for inpainting
+            variety=variety,
+            character_prompts=character_prompts,
+            **kwargs,
+        )
 
         payload = {
             "action": NovelAIAction.INPAINT.value,
@@ -412,6 +449,82 @@ class NovelAIClient:
         except (zipfile.BadZipFile, IndexError) as e:
             raise NovelAIClientError(
                 f"Failed to extract inpainted image from response: {str(e)}"
+            )
+
+    def generate_img2img_image(
+        self,
+        base_image: bytes,
+        prompt: str,
+        negative_prompt: Optional[str] = None,
+        strength: float = 0.7,
+        width: int = 1024,
+        height: int = 1024,
+        seed: int = 0,
+        steps: int = 28,
+        scale: float = 6.0,
+        variety: bool = False,
+        character_prompts: Optional[List[Dict[str, str]]] = None,
+        **kwargs,
+    ) -> bytes:
+        """
+        Generate an image using NovelAI's img2img model.
+
+        Args:
+            base_image: Base image bytes to use as reference
+            prompt: Text prompt for image generation
+            negative_prompt: Negative prompt to avoid certain elements
+            strength: Strength of the transformation (0.0-1.0, higher = more change)
+            width: Image width in pixels
+            height: Image height in pixels
+            seed: Random seed for reproducible generation
+            steps: Number of diffusion steps (max 28 for free tier)
+            scale: CFG scale for prompt adherence
+            variety: Enable variety mode for more diverse outputs
+            character_prompts: List of character-specific prompts
+            **kwargs: Additional parameters for the generation
+
+        Returns:
+            Raw image bytes from the generated image
+
+        Raises:
+            NovelAIAPIError: If the API returns an error
+            NovelAIClientError: If there's a client-side error
+        """
+        # Encode base image to base64
+        base_image_b64 = base64.b64encode(base_image).decode("ascii")
+
+        # Build the request parameters using common helper
+        parameters = self._build_common_parameters(
+            prompt=prompt,
+            negative_prompt=negative_prompt,
+            width=width,
+            height=height,
+            seed=seed,
+            steps=steps,
+            scale=scale,
+            strength=strength,
+            variety=variety,
+            character_prompts=character_prompts,
+            **kwargs,
+        )
+
+        payload = {
+            "action": NovelAIAction.IMG2IMG.value,
+            "model": NovelAIModel.DIFFUSION_4_5_FULL.value,
+            "parameters": parameters,
+            "image": base_image_b64,
+        }
+
+        response = self._make_request("ai/generate-image", payload)
+
+        # Extract image from ZIP response
+        try:
+            zipped_file = zipfile.ZipFile(io.BytesIO(response.content))
+            image_bytes = zipped_file.read(zipped_file.infolist()[0])
+            return image_bytes
+        except (zipfile.BadZipFile, IndexError) as e:
+            raise NovelAIClientError(
+                f"Failed to extract img2img image from response: {str(e)}"
             )
 
     def upscale_image(
