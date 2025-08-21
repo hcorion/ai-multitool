@@ -423,6 +423,23 @@ img {
                 &.character-prompt-value {
                     background-color: rgba($color: $submit-btn-color, $alpha: 0.05);
                     border-left: 2px solid rgba($color: $submit-btn-color, $alpha: 0.5);
+                    
+                    // Subtle styling for processed character prompts when different from base
+                    &.processed-prompt-value {
+                        background-color: rgba($color: #ff9500, $alpha: 0.08);
+                        border-left: 2px solid rgba($color: #ff9500, $alpha: 0.6);
+                        font-style: italic;
+                        position: relative;
+                        
+                        &:before {
+                            content: "📝";
+                            position: absolute;
+                            top: 5px;
+                            right: 8px;
+                            font-size: 0.8rem;
+                            opacity: 0.7;
+                        }
+                    }
                 }
             }
         }

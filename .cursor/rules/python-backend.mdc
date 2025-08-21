@@ -72,5 +72,5 @@
 - Custom exception classes: `ModerationException`, `DownloadError`, `ConversationStorageError`
 description:
 globs:
-alwaysApply: false
+alwaysApply: true
 ---

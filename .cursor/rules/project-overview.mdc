@@ -30,5 +30,5 @@ This is a web-based frontend for interacting with multiple AI image generation s
 - Environment variables stored in `.env.local` for API keys
 description:
 globs:
-alwaysApply: false
+alwaysApply: true
 ---

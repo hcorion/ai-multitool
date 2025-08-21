@@ -53,5 +53,5 @@ def test_endpoint(client):
 - Environment safety (no destructive API calls)
 description:
 globs:
-alwaysApply: false
+alwaysApply: true
 ---

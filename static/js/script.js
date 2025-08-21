@@ -367,8 +367,55 @@ function updateGridModalImage() {
     $.getJSON("/get-image-metadata/" + fileName, function (metadata) {
         const metadataDiv = document.getElementById("grid-info-panel");
         metadataDiv.innerHTML = ""; // Clear previous metadata
-        // Display each metadata key–value pair.
+        // Process character prompts to determine what to display
+        const processedMetadata = {};
+        const characterPromptData = {};
+        // First pass: identify character prompts and compare base vs processed
         for (const key in metadata) {
+            const characterMatch = key.match(/^Character (\d+) (Prompt|Negative)$/);
+            const processedMatch = key.match(/^Character (\d+) Processed (Prompt|Negative)$/);
+            if (characterMatch) {
+                const charNum = characterMatch[1];
+                const promptType = characterMatch[2];
+                const baseKey = `Character ${charNum} ${promptType}`;
+                const processedKey = `Character ${charNum} Processed ${promptType}`;
+                const baseValue = metadata[baseKey] || "";
+                const processedValue = metadata[processedKey] || "";
+                // If both exist, compare them
+                if (baseValue && processedValue) {
+                    const isDifferent = baseValue !== processedValue;
+                    characterPromptData[baseKey] = {
+                        base: baseValue,
+                        processed: processedValue,
+                        isDifferent: isDifferent
+                    };
+                    if (isDifferent) {
+                        // Show both base and processed with different styling
+                        processedMetadata[baseKey] = baseValue;
+                        processedMetadata[processedKey] = processedValue;
+                    }
+                    else {
+                        // Show only the base prompt
+                        processedMetadata[baseKey] = baseValue;
+                    }
+                }
+                else if (baseValue) {
+                    // Only base exists
+                    processedMetadata[baseKey] = baseValue;
+                }
+                else if (processedValue) {
+                    // Only processed exists (shouldn't happen, but handle it)
+                    processedMetadata[processedKey] = processedValue;
+                }
+            }
+            else if (!processedMatch) {
+                // Non-character prompt metadata, add as-is
+                processedMetadata[key] = metadata[key];
+            }
+            // Skip processed prompts in this pass as they're handled above
+        }
+        // Display each metadata key–value pair.
+        for (const key in processedMetadata) {
             const infoItem = document.createElement("div");
             infoItem.className = "info-item";
             // Add special styling for character prompts
@@ -382,8 +429,12 @@ function updateGridModalImage() {
             // Add special styling for character prompt values
             if (key.match(/^Character \d+ (Prompt|Negative|Processed Prompt|Processed Negative)$/)) {
                 infoValue.classList.add("character-prompt-value");
+                // Add additional styling for processed prompts when they differ from base
+                if (key.match(/^Character \d+ Processed (Prompt|Negative)$/)) {
+                    infoValue.classList.add("processed-prompt-value");
+                }
             }
-            infoValue.textContent = metadata[key];
+            infoValue.textContent = processedMetadata[key];
             metadataDiv.appendChild(infoValue);
         }
         // Create (or update) the "Copy Prompt" button.

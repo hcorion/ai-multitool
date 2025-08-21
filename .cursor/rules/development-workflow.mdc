@@ -86,5 +86,5 @@ ai-multitool/
 - Browser developer tools for frontend debugging
 description:
 globs:
-alwaysApply: false
+alwaysApply: true
 ---

@@ -44,5 +44,5 @@
 - **Type definitions**: @types packages for jQuery, Highlight.js, Showdown
 description:
 globs:
-alwaysApply: false
+alwaysApply: true
 ---

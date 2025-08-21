@@ -1,0 +1,231 @@
+---
+globs: *.css,*.ts,*.scss
+alwaysApply: false
+---
+# Sass Style Guide
+
+## Overview
+This project uses Sass (SCSS syntax) for styling with a dark theme. All style changes should be made to the Sass files, not the compiled CSS.
+
+## File Structure
+- **Source**: `static/sass/style.scss` - Main Sass file containing all styles
+- **Compiled**: `static/css/style.css` - Generated CSS file (DO NOT EDIT DIRECTLY)
+- **Source Map**: `static/css/style.css.map` - Generated source map for debugging
+
+## Workflow Rules
+
+### Never Edit CSS Directly
+- **NEVER** edit `static/css/style.css` directly
+- **ALWAYS** edit `static/sass/style.scss` for any style changes
+- The CSS file is automatically generated from the Sass source
+
+### Compilation Process
+- After editing the Sass file, compile it to CSS using: `sass static/sass/style.scss static/css/style.css --source-map`
+- Ensure source maps are generated for debugging
+- Verify the compiled CSS works as expected
+
+## Dark Theme Design System
+
+### Color Variables
+The project uses a consistent dark theme with predefined color variables:
+
+```scss
+// Core theme colors
+$background-color: #121212;        // Main dark background
+$text-color: #fff;                 // Primary white text
+$input-bg-color: #333;             // Dark input backgrounds
+$border-color: #666666;            // Subtle borders
+
+// Modal and UI colors
+$modal-bg-color: rgba(0, 0, 0, 0.9);
+$tab-bg-color: rgb(18, 19, 36);
+$tab-hover-bg-color: rgb(36, 37, 59);
+$tab-active-bg-color: rgba(72, 73, 105);
+
+// Interactive elements
+$submit-btn-color: #0a84ff;        // Primary blue button
+$submit-btn-hover-color: #006edc;   // Darker blue on hover
+```
+
+### Typography
+- **Primary font**: 'Roboto', sans-serif
+- **Code/monospace font**: 'Inter', sans-serif (for prompts and metadata)
+- Use semantic font sizes and weights consistently
+
+### Code Organization
+The Sass file is organized into logical sections with clear comments:
+
+1. **Variables & Imports** - Sass modules and color definitions
+2. **Base Styles** - Typography, forms, and foundational elements
+3. **Component Sections** - Each major UI component has its own section:
+   - Generation Tab
+   - Grid View & Modal
+   - Chat Interface
+   - Character Prompts
+   - Login Forms
+
+### Best Practices
+- Use 4-space indentation consistently
+- Leverage nested selectors to match HTML hierarchy
+- Use Sass color functions: `color.adjust()`, `rgba()` for transparency
+- Add descriptive comments for complex styles or calculations
+- Group related properties logically
+- Use meaningful class names that describe function, not appearance
+
+### Color Usage Guidelines
+- **Background transparency**: Use `rgba($color: $variable, $alpha: 0.x)` for layered backgrounds
+- **Hover states**: Use `color.adjust($color, $lightness: ±N%)` for subtle variations
+- **Borders**: Use transparent variations of main colors for subtle separation
+- **Text contrast**: Ensure sufficient contrast ratios for accessibility
+
+## Example Structure Following Project Pattern
+```scss
+// Use Sass modules
+@use "sass:color";
+
+// Variables section
+$custom-accent: #ff9500;
+
+// Component section with clear hierarchy
+.character-prompt-section {
+    background-color: rgba($color: $input-bg-color, $alpha: 0.8);
+    border: 1px solid $border-color;
+    
+    .character-prompt-item {
+        background-color: rgba($color: $background-color, $alpha: 0.4);
+        
+        .prompt-value {
+            &.processed-prompt-value {
+                background-color: rgba($color: $custom-accent, $alpha: 0.08);
+                border-left: 2px solid rgba($color: $custom-accent, $alpha: 0.6);
+                font-style: italic;
+                
+                &:before {
+                    content: "📝";
+                    opacity: 0.7;
+                }
+            }
+        }
+    }
+}
+```
+
+### Character Prompt Styling Pattern
+When adding new character prompt variations, follow this pattern:
+- Use subtle background tints with low alpha values (0.05-0.1)
+- Add colored left borders for visual distinction
+- Use icons or subtle indicators for state differences
+- Maintain readability with appropriate contrast ratios# Sass Style Guide
+
+## Overview
+This project uses Sass (SCSS syntax) for styling with a dark theme. All style changes should be made to the Sass files, not the compiled CSS.
+
+## File Structure
+- **Source**: `static/sass/style.scss` - Main Sass file containing all styles
+- **Compiled**: `static/css/style.css` - Generated CSS file (DO NOT EDIT DIRECTLY)
+- **Source Map**: `static/css/style.css.map` - Generated source map for debugging
+
+## Workflow Rules
+
+### Never Edit CSS Directly
+- **NEVER** edit `static/css/style.css` directly
+- **ALWAYS** edit `static/sass/style.scss` for any style changes
+- The CSS file is automatically generated from the Sass source
+
+### Compilation Process
+- After editing the Sass file, compile it to CSS using: `sass static/sass/style.scss static/css/style.css --source-map`
+- Ensure source maps are generated for debugging
+- Verify the compiled CSS works as expected
+
+## Dark Theme Design System
+
+### Color Variables
+The project uses a consistent dark theme with predefined color variables:
+
+```scss
+// Core theme colors
+$background-color: #121212;        // Main dark background
+$text-color: #fff;                 // Primary white text
+$input-bg-color: #333;             // Dark input backgrounds
+$border-color: #666666;            // Subtle borders
+
+// Modal and UI colors
+$modal-bg-color: rgba(0, 0, 0, 0.9);
+$tab-bg-color: rgb(18, 19, 36);
+$tab-hover-bg-color: rgb(36, 37, 59);
+$tab-active-bg-color: rgba(72, 73, 105);
+
+// Interactive elements
+$submit-btn-color: #0a84ff;        // Primary blue button
+$submit-btn-hover-color: #006edc;   // Darker blue on hover
+```
+
+### Typography
+- **Primary font**: 'Roboto', sans-serif
+- **Code/monospace font**: 'Inter', sans-serif (for prompts and metadata)
+- Use semantic font sizes and weights consistently
+
+### Code Organization
+The Sass file is organized into logical sections with clear comments:
+
+1. **Variables & Imports** - Sass modules and color definitions
+2. **Base Styles** - Typography, forms, and foundational elements
+3. **Component Sections** - Each major UI component has its own section:
+   - Generation Tab
+   - Grid View & Modal
+   - Chat Interface
+   - Character Prompts
+   - Login Forms
+
+### Best Practices
+- Use 4-space indentation consistently
+- Leverage nested selectors to match HTML hierarchy
+- Use Sass color functions: `color.adjust()`, `rgba()` for transparency
+- Add descriptive comments for complex styles or calculations
+- Group related properties logically
+- Use meaningful class names that describe function, not appearance
+
+### Color Usage Guidelines
+- **Background transparency**: Use `rgba($color: $variable, $alpha: 0.x)` for layered backgrounds
+- **Hover states**: Use `color.adjust($color, $lightness: ±N%)` for subtle variations
+- **Borders**: Use transparent variations of main colors for subtle separation
+- **Text contrast**: Ensure sufficient contrast ratios for accessibility
+
+## Example Structure Following Project Pattern
+```scss
+// Use Sass modules
+@use "sass:color";
+
+// Variables section
+$custom-accent: #ff9500;
+
+// Component section with clear hierarchy
+.character-prompt-section {
+    background-color: rgba($color: $input-bg-color, $alpha: 0.8);
+    border: 1px solid $border-color;
+    
+    .character-prompt-item {
+        background-color: rgba($color: $background-color, $alpha: 0.4);
+        
+        .prompt-value {
+            &.processed-prompt-value {
+                background-color: rgba($color: $custom-accent, $alpha: 0.08);
+                border-left: 2px solid rgba($color: $custom-accent, $alpha: 0.6);
+                font-style: italic;
+                
+                &:before {
+                    content: "📝";
+                    opacity: 0.7;
+                }
+            }
+        }
+    }
+}
+```
+
+### Character Prompt Styling Pattern
+When adding new character prompt variations, follow this pattern:
+- Use subtle background tints with low alpha values (0.05-0.1)
+- Add colored left borders for visual distinction
+- Use icons or subtle indicators for state differences
+- Maintain readability with appropriate contrast ratios
