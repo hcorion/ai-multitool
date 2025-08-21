@@ -104,15 +104,24 @@
   - Write integration test using sample images and actual API key
   - _Requirements: 2.5, 1.3_
 
-- [ ] 5. Create unified image endpoint and request models
-- [ ] 5.1 Create request/response data models with strict typing
+- [x] 5. Create unified image endpoint and request models
+
+
+
+
+
+- [x] 5.1 Create request/response data models with strict typing
+
+
   - Create Provider, Operation, Quality, and other enums
   - Implement ImageGenerationRequest, InpaintingRequest, and Img2ImgRequest dataclasses
   - Create ImageOperationResponse dataclass for unified responses
   - Add validation logic for request parameters
   - _Requirements: 4.3_
 
-- [ ] 5.2 Implement new /image POST endpoint and update frontend with tests
+- [x] 5.2 Implement new /image POST endpoint and update frontend with tests
+
+
   - Create handle_image_request function for the new /image endpoint
   - Implement operation routing logic (generate, inpaint, img2img)
   - Add provider routing to appropriate generation functions

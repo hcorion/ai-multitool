@@ -1,6 +1,20 @@
 import * as utils from "./utils.js";
 import * as chat from "./chat.js";
 
+// TypeScript interfaces for the new image API
+interface ImageOperationResponse {
+    success: boolean;
+    image_path?: string;
+    image_name?: string;
+    revised_prompt?: string;
+    error_message?: string;
+    error_type?: string;
+    provider?: string;
+    operation?: string;
+    timestamp?: number;
+    metadata?: Record<string, any>;
+}
+
 document.addEventListener("DOMContentLoaded", () => {
     $("#loading-spinner").hide();
     $("#prompt-form").on("submit", (event: JQuery.SubmitEvent) => {
@@ -9,18 +23,52 @@ document.addEventListener("DOMContentLoaded", () => {
 
         $("#loading-spinner").show();
 
-        $.ajax({
-            type: "POST",
-            url: "/",
-            data: formData,
-            success: (response: string) => {
-                $("#result-section").html(response);
+        // Check if we should use the new /image endpoint or legacy / endpoint
+        const useNewEndpoint = shouldUseNewImageEndpoint();
+        
+        if (useNewEndpoint) {
+            // Use new /image endpoint with JSON response
+            $.ajax({
+                type: "POST",
+                url: "/image",
+                data: formData,
+                dataType: "json",
+                success: (response: ImageOperationResponse) => {
+                    if (response.success) {
+                        renderImageResult(response);
+                    } else {
+                        renderImageError(response.error_message || "Unknown error occurred");
+                    }
+                    $("#loading-spinner").hide();
+                },
+                error: (xhr: JQuery.jqXHR) => {
+                    let errorMessage = "An error occurred while generating the image.";
+                    if (xhr.responseJSON && xhr.responseJSON.error) {
+                        errorMessage = xhr.responseJSON.error;
+                    }
+                    renderImageError(errorMessage);
+                    $("#loading-spinner").hide();
+                }
+            });
+        } else {
+            // Use legacy / endpoint with HTML response
+            $.ajax({
+                type: "POST",
+                url: "/",
+                data: formData,
+                success: (response: string) => {
+                    $("#result-section").html(response);
 
-                addEventListenerToElement("generatedImage", "click", openGenModal);
-                addEventListenerToElement("generatedImageClose", "click", closeGenModal);
-                $("#loading-spinner").hide();
-            },
-        });
+                    addEventListenerToElement("generatedImage", "click", openGenModal);
+                    addEventListenerToElement("generatedImageClose", "click", closeGenModal);
+                    $("#loading-spinner").hide();
+                },
+                error: () => {
+                    renderImageError("An error occurred while generating the image.");
+                    $("#loading-spinner").hide();
+                }
+            });
+        }
     });
 
     // Image gen elements
@@ -67,6 +115,51 @@ function keyDownEvent(evt: KeyboardEvent) {
     } else if (evt.code == "ArrowLeft") {
         previousGridImage();
     }
+}
+
+// Helper functions for new image API
+function shouldUseNewImageEndpoint(): boolean {
+    // For now, always use the new endpoint for basic generation
+    // In the future, this could check for advanced features like grid generation
+    const advancedGrid = $("#advanced-generate-grid").is(":checked");
+    return !advancedGrid; // Use new endpoint unless advanced grid is enabled
+}
+
+function renderImageResult(response: ImageOperationResponse): void {
+    const resultHtml = `
+        <div class="result-container">
+            <div class="image-container">
+                <img id="generatedImage" src="${response.image_path}" alt="Generated Image" class="generated-image">
+                <button id="generatedImageClose" class="close-button">×</button>
+            </div>
+            <div class="result-info">
+                <h3>Generated Image</h3>
+                <p><strong>Provider:</strong> ${response.provider}</p>
+                <p><strong>Operation:</strong> ${response.operation}</p>
+                ${response.revised_prompt ? `<p><strong>Revised Prompt:</strong> ${response.revised_prompt}</p>` : ''}
+                <p><strong>Image Name:</strong> ${response.image_name}</p>
+            </div>
+        </div>
+    `;
+    
+    $("#result-section").html(resultHtml);
+    
+    // Add event listeners for the new elements
+    addEventListenerToElement("generatedImage", "click", openGenModal);
+    addEventListenerToElement("generatedImageClose", "click", closeGenModal);
+}
+
+function renderImageError(errorMessage: string): void {
+    const errorHtml = `
+        <div class="error-container">
+            <div class="error-message">
+                <h3>Error</h3>
+                <p>${errorMessage}</p>
+            </div>
+        </div>
+    `;
+    
+    $("#result-section").html(errorHtml);
 }
 
 // Function to add an event listener to an element

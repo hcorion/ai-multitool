@@ -22,6 +22,18 @@ import requests
 import wand
 import wand.font
 from novelai_client import NovelAIClient, NovelAIClientError, NovelAIAPIError
+from image_models import (
+    Provider,
+    Operation,
+    Quality,
+    ImageGenerationRequest,
+    InpaintingRequest,
+    Img2ImgRequest,
+    ImageOperationResponse,
+    create_request_from_form_data,
+    create_success_response,
+    create_error_response,
+)
 from flask import (
     Flask,
     Request,
@@ -1854,6 +1866,220 @@ def update_conversation_title():
 
 
 # Old get_message_list function removed - now using ConversationManager.get_message_list()
+
+
+@app.route("/image", methods=["POST"])
+def handle_image_request():
+    """Unified endpoint for all image operations (generate, inpaint, img2img)."""
+    if "username" not in session:
+        return jsonify({"error": "Not authenticated"}), 401
+
+    try:
+        # Create request object from form data
+        image_request = create_request_from_form_data(request.form.to_dict())
+        
+        # Route to appropriate handler based on operation
+        if image_request.operation == Operation.GENERATE:
+            response = _handle_generation_request(image_request)
+        elif image_request.operation == Operation.INPAINT:
+            response = _handle_inpainting_request(image_request)
+        elif image_request.operation == Operation.IMG2IMG:
+            response = _handle_img2img_request(image_request)
+        else:
+            return jsonify({"error": f"Unsupported operation: {image_request.operation}"}), 400
+        
+        # Return JSON response
+        if response.success:
+            return jsonify({
+                "success": True,
+                "image_path": response.image_path,
+                "image_name": response.image_name,
+                "revised_prompt": response.revised_prompt,
+                "provider": response.provider,
+                "operation": response.operation,
+                "timestamp": response.timestamp,
+                "metadata": response.metadata
+            })
+        else:
+            return jsonify({
+                "success": False,
+                "error_message": response.error_message,
+                "error_type": response.error_type,
+                "provider": response.provider,
+                "operation": response.operation,
+                "timestamp": response.timestamp
+            }), 400
+
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        import logging
+        logging.error(f"Error in image request: {e}", exc_info=True)
+        return jsonify({"error": "Internal server error"}), 500
+
+
+def _handle_generation_request(image_request: ImageGenerationRequest) -> ImageOperationResponse:
+    """Handle image generation requests."""
+    try:
+        # Convert to legacy format for existing generate_image function
+        provider_str = image_request.provider.value
+        size_str = f"{image_request.width}x{image_request.height}"
+        
+        # Create a mock request object with the necessary form data
+        class MockRequest:
+            def __init__(self, form_data):
+                self.form = form_data
+        
+        mock_form = {
+            "quality": image_request.quality.value,
+            "negative_prompt": image_request.negative_prompt or "",
+            "aspect_ratio": _get_aspect_ratio_from_dimensions(image_request.width, image_request.height),
+            "upscale": "false",
+            "add-follow-prompt": "false"
+        }
+        
+        mock_request = MockRequest(mock_form)
+        
+        # Use existing generate_image function
+        generated_data = generate_image(
+            provider=provider_str,
+            prompt=image_request.prompt,
+            size=size_str,
+            request=mock_request,
+            seed=None  # Let the function generate a seed
+        )
+        
+        return create_success_response(
+            image_path=generated_data.local_image_path,
+            image_name=generated_data.image_name,
+            provider=image_request.provider,
+            operation=image_request.operation,
+            revised_prompt=generated_data.revised_prompt
+        )
+        
+    except Exception as e:
+        return create_error_response(
+            error=e,
+            provider=image_request.provider,
+            operation=image_request.operation
+        )
+
+
+def _handle_inpainting_request(image_request: InpaintingRequest) -> ImageOperationResponse:
+    """Handle inpainting requests."""
+    try:
+        # Route to appropriate provider inpainting function
+        if image_request.provider == Provider.OPENAI:
+            # Use OpenAI inpainting
+            generated_data = generate_openai_inpaint_image(
+                base_image_path=image_request.base_image_path,
+                mask_path=image_request.mask_path,
+                prompt=image_request.prompt,
+                username=session["username"]
+            )
+        elif image_request.provider == Provider.NOVELAI:
+            # Use NovelAI inpainting
+            novelai_client = NovelAIClient(novelai_api_key)
+            
+            # Read and encode images
+            with open(image_request.base_image_path, 'rb') as f:
+                base_image_data = f.read()
+            with open(image_request.mask_path, 'rb') as f:
+                mask_data = f.read()
+            
+            generated_data = novelai_client.generate_inpaint_image(
+                base_image=base_image_data,
+                mask=mask_data,
+                prompt=image_request.prompt,
+                negative_prompt=image_request.negative_prompt or "",
+                username=session["username"],
+                size=(image_request.width, image_request.height)
+            )
+        else:
+            raise ValueError(f"Provider {image_request.provider.value} does not support inpainting")
+        
+        revised_prompt = getattr(generated_data, 'revised_prompt', None)
+        # Ensure revised_prompt is a string or None, not a Mock object
+        if hasattr(revised_prompt, '_mock_name'):
+            revised_prompt = None
+            
+        return create_success_response(
+            image_path=generated_data.local_image_path,
+            image_name=generated_data.image_name,
+            provider=image_request.provider,
+            operation=image_request.operation,
+            revised_prompt=revised_prompt
+        )
+        
+    except Exception as e:
+        return create_error_response(
+            error=e,
+            provider=image_request.provider,
+            operation=image_request.operation
+        )
+
+
+def _handle_img2img_request(image_request: Img2ImgRequest) -> ImageOperationResponse:
+    """Handle img2img requests."""
+    try:
+        # Only NovelAI supports img2img currently
+        if image_request.provider != Provider.NOVELAI:
+            raise ValueError(f"Provider {image_request.provider.value} does not support img2img")
+        
+        novelai_client = NovelAIClient(novelai_api_key)
+        
+        # Read and encode base image
+        with open(image_request.base_image_path, 'rb') as f:
+            base_image_data = f.read()
+        
+        generated_data = novelai_client.generate_img2img_image(
+            base_image=base_image_data,
+            prompt=image_request.prompt,
+            negative_prompt=image_request.negative_prompt or "",
+            strength=image_request.strength,
+            username=session["username"],
+            size=(image_request.width, image_request.height)
+        )
+        
+        revised_prompt = getattr(generated_data, 'revised_prompt', None)
+        # Ensure revised_prompt is a string or None, not a Mock object
+        if hasattr(revised_prompt, '_mock_name'):
+            revised_prompt = None
+            
+        return create_success_response(
+            image_path=generated_data.local_image_path,
+            image_name=generated_data.image_name,
+            provider=image_request.provider,
+            operation=image_request.operation,
+            revised_prompt=revised_prompt
+        )
+        
+    except Exception as e:
+        return create_error_response(
+            error=e,
+            provider=image_request.provider,
+            operation=image_request.operation
+        )
+
+
+def _get_aspect_ratio_from_dimensions(width: int, height: int) -> str:
+    """Convert width/height to aspect ratio string."""
+    if width == height:
+        return "1:1"
+    elif width > height:
+        if width / height == 16 / 9:
+            return "16:9"
+        elif width / height == 4 / 3:
+            return "4:3"
+        else:
+            return "16:9"  # Default for landscape
+    else:
+        if height / width == 16 / 9:
+            return "9:16"
+        elif height / width == 4 / 3:
+            return "3:4"
+        else:
+            return "9:16"  # Default for portrait
 
 
 eos_str = "␆␄"

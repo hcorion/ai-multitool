@@ -178,7 +178,7 @@ class NovelAIClient:
             "scale": scale,
             "steps": steps,
             "strength": strength,
-            "ucPreset": 4,
+            "ucPreset": 5,
             "seed": seed,
             "v4_prompt": {
                 "caption": {
