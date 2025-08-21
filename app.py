@@ -1058,31 +1058,46 @@ def generate_novelai_image(
     height = size[1]
 
     data = {  # type: ignore
+        # TODO: Use infill action for inpainting
         "action": "generate",
+        # TODO: Use nai-diffusion-4-5-full-inpainting for inpainting
         "model": "nai-diffusion-4-5-full",
         "parameters": {
-            "add_original_image": False,
-            "cfg_rescale": 0.2,
-            "deliberate_euler_ancestral_bug": False,
-            "dynamic_thresholding": True,
+            "add_original_image": True,
+            "autoSmea": False,
+            "cfg_rescale": 0.4,
+            "controlnet_strength": 1,
+		    "deliberate_euler_ancestral_bug": False,
+		    "dynamic_thresholding": True,
             "width": width,
             "height": height,
+            "inpaintImg2ImgStrength": 1,
             "legacy": False,
+            "legacy_uc": False,
             "legacy_v3_extend": False,
             "n_samples": 1,
-            "noise": 0.2,  # Does nothing if no base image
+            "noise": 0.2,
             "noise_schedule": "karras",
-            "extra_noise_seed": 0,
+            "normalize_reference_strength_multiple": True,
             "params_version": 3,
             "prefer_brownian": True,
             "qualityToggle": True,
             "sampler": "k_euler_ancestral",
-            "sm": False,
-            "sm_dyn": False,
-            "steps": 28,  # Max steps before Opus users have to pay money
-            "strength": 0.4,
             "scale": 6,
+            # TODO: Add variety toggle
+            #"skip_cfg_above_sigma": 58,
+            "steps": 28, # Max steps before Opus users have to pay money
+            "strength": 0.6,
             "ucPreset": 4,
+            # TODO: use b64 encoded png string for image to inpaint
+            # "image": "data",
+            # TODO: use b64 encoded png string for image inpainting mask
+            # The setup for this mask is very specific:
+            # - Start with a mask the size of the base image, the generated mask must be completely black or white pixels, no in between.
+            # - You must scale the mask down by 12.5 percent (1/8 scale) using no interpolation (ie just black and white pixels, no shades in between).
+            # - You then must upscale the new small image back up to the regular mask size, also with no interpolation,
+            #   so you have a mask of the same resolution as the image, but each block of color is 8x8 pixels
+            # "mask": "data",
             "seed": seed,
             "v4_prompt": {
                 "caption": {
