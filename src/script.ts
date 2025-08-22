@@ -400,59 +400,129 @@ function openGridModal(evt: Event): void {
 }
 
 /**
- * Highlights differences between base and processed text by finding and highlighting
- * only the parts that actually changed (like __color__ -> violet).
+ * Returns processedText with <span class="highlight">...</span> wrapped around tokens
+ * that differ from baseText. Uses word-level LCS and prefers earlier matches on ties
+ * to avoid mis-highlighting repeated words. Adjacent changed tokens (and separators
+ * between them) are merged into a single highlight span.
  */
 function highlightTextDifferences(baseText: string, processedText: string): string {
-    // Use a more sophisticated approach to find dynamic prompt replacements
-    // This handles cases like "1.5::__color__" -> "1.5::violet" where only "violet" should be highlighted
-    
-    let result = processedText;
-    
-    // Find all dynamic prompt patterns in the base text (like __color__, __style__, etc.)
-    const dynamicPromptPattern = /__([^_]+)__/g;
-    const matches = [...baseText.matchAll(dynamicPromptPattern)];
-    
-    for (const match of matches) {
-        const fullPlaceholder = match[0]; // e.g., "__color__"
-        const placeholderName = match[1]; // e.g., "color"
-        
-        // Find where this placeholder appears in the base text
-        const baseIndex = match.index!;
-        
-        // Get the context around the placeholder to find the corresponding part in processed text
-        const beforePlaceholder = baseText.substring(0, baseIndex);
-        const afterPlaceholder = baseText.substring(baseIndex + fullPlaceholder.length);
-        
-        // Find the corresponding position in the processed text
-        const beforeIndex = beforePlaceholder.length;
-        let afterIndex = processedText.length;
-        
-        if (afterPlaceholder.length > 0) {
-            const afterStart = processedText.indexOf(afterPlaceholder, beforeIndex);
-            if (afterStart !== -1) {
-                afterIndex = afterStart;
-            }
+    const WORD_RE = hasUnicodePropertyEscapes()
+      ? /[\p{L}\p{N}_]+/gu
+      : /[A-Za-z0-9_]+/g;
+  
+    const baseWords = extractWords(baseText, WORD_RE);
+    const processedWords = extractWords(processedText, WORD_RE);
+  
+    // Indices in processedWords that are kept (unchanged)
+    const keptProcessedIdx = lcsKeepIndicesPreferLeft(baseWords, processedWords);
+  
+    const OPEN = '<span class="diff-highlight">';
+    const CLOSE = '</span>';
+  
+    let result = '';
+    let lastIndex = 0;
+    let processedWordIdx = 0;
+    let inHighlight = false;
+  
+    for (const m of matchAll(processedText, WORD_RE)) {
+      const start = m.index!;
+      const end = start + m[0].length;
+      const sep = processedText.slice(lastIndex, start);
+      const isKept = keptProcessedIdx.has(processedWordIdx);
+  
+      if (inHighlight) {
+        if (isKept) {
+          // Close current highlight; separator belongs outside; then the kept token
+          result += CLOSE;
+          inHighlight = false;
+          result += sep + m[0];
+        } else {
+          // Continue the same highlight; separator goes inside to merge adjacent changes
+          result += sep + m[0];
         }
-        
-        // Extract the replacement value from the processed text
-        const replacementValue = processedText.substring(beforeIndex, afterIndex);
-        
-        // Only highlight if the replacement is different and not empty
-        if (replacementValue && replacementValue !== fullPlaceholder) {
-            const highlightedReplacement = `<span class="diff-highlight">${escapeHtml(replacementValue)}</span>`;
-            result = result.substring(0, beforeIndex) + highlightedReplacement + result.substring(afterIndex);
+      } else {
+        if (isKept) {
+          result += sep + m[0];
+        } else {
+          // Start a new highlight span
+          result += sep + OPEN + m[0];
+          inHighlight = true;
         }
+      }
+  
+      processedWordIdx++;
+      lastIndex = end;
     }
-    
-    // If no dynamic prompts were found, fall back to basic word comparison for other changes
-    if (matches.length === 0 && baseText !== processedText) {
-        // Simple fallback: highlight the entire processed text if it's completely different
-        result = `<span class="diff-highlight">${escapeHtml(processedText)}</span>`;
-    }
-    
+  
+    if (inHighlight) result += CLOSE;
+    if (lastIndex < processedText.length) result += processedText.slice(lastIndex);
     return result;
-}
+  
+    // ----- helpers -----
+  
+    function extractWords(text: string, re: RegExp): string[] {
+      const words: string[] = [];
+      for (const m of matchAll(text, re)) words.push(m[0]);
+      return words;
+    }
+  
+    function hasUnicodePropertyEscapes(): boolean {
+      try {
+        new RegExp('\\p{L}', 'u');
+        return true;
+      } catch {
+        return false;
+      }
+    }
+  
+    // Iterates matches like String.prototype.matchAll
+    function* matchAll(text: string, re: RegExp): IterableIterator<RegExpMatchArray> {
+      const flags = re.flags.includes('g') ? re.flags : re.flags + 'g';
+      const rx = new RegExp(re.source, flags);
+      let m: RegExpMatchArray | null;
+      while ((m = rx.exec(text)) !== null) {
+        yield m;
+        if (m[0].length === 0) rx.lastIndex++;
+      }
+    }
+  
+    /**
+     * LCS backtracking that prefers moving LEFT on ties, i.e., it keeps earlier
+     * indices in the processed sequence. This avoids matching the later duplicate
+     * (e.g., the "example" inside a replacement) over the earlier unchanged one.
+     */
+    function lcsKeepIndicesPreferLeft(a: string[], b: string[]): Set<number> {
+      const n = a.length, m = b.length;
+      const dp: number[][] = Array.from({ length: n + 1 }, () => new Array<number>(m + 1).fill(0));
+  
+      for (let i = 1; i <= n; i++) {
+        for (let j = 1; j <= m; j++) {
+          if (a[i - 1] === b[j - 1]) {
+            dp[i][j] = dp[i - 1][j - 1] + 1;
+          } else {
+            const up = dp[i - 1][j];
+            const left = dp[i][j - 1];
+            dp[i][j] = up > left ? up : left; // just max; tie handled in backtrack
+          }
+        }
+      }
+  
+      const kept = new Set<number>();
+      let i = n, j = m;
+      while (i > 0 && j > 0) {
+        if (a[i - 1] === b[j - 1]) {
+          kept.add(j - 1);
+          i--; j--;
+        } else if (dp[i - 1][j] > dp[i][j - 1]) {
+          // Prefer LEFT when equal => choose UP only when strictly better
+          i--;
+        } else {
+          j--;
+        }
+      }
+      return kept;
+    }
+  }
 
 /**
  * Escapes HTML special characters to prevent XSS
@@ -1489,4 +1559,5 @@ async function deletePromptFile(fileName: string): Promise<void> {
 
 // Make prompt file functions globally accessible
 (window as any).editPromptFile = editPromptFile;
+(window as any).deletePromptFile = deletePromptFile;
 (window as any).deletePromptFile = deletePromptFile;
