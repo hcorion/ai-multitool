@@ -19,6 +19,7 @@
         <button id="generationTab" class="tablinks">Image</button>
         <button id="gridViewTab" class="tablinks">Grid View</button>
         <button id="chatTab" class="tablinks">Chat</button>
+        <button id="promptsTab" class="tablinks">Prompts</button>
 
         {% if 'username' in session %}
         <div class="user-info">
@@ -164,6 +165,54 @@
                 <div class="input-area">
                     <textarea id="chat-input" placeholder="Type your message here..."></textarea>
                     <button id="send-chat">Send</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="PromptFiles" class="tabcontent">
+        <div class="prompt-files-container">
+            <div class="prompt-files-header">
+                <h2>Dynamic Prompts</h2>
+                <p>Manage your prompt files for dynamic prompt generation. Reference files using __filename__ syntax.</p>
+                <button id="create-prompt-file-btn" class="primary-button">Create New File</button>
+            </div>
+            
+            <div class="prompt-files-list">
+                <div id="prompt-files-loading" class="loading-message" style="display: none;">
+                    Loading prompt files...
+                </div>
+                <div id="prompt-files-content">
+                    <!-- Prompt files will be loaded here -->
+                </div>
+                <div id="no-prompt-files" class="empty-message" style="display: none;">
+                    No prompt files found. Create your first file to get started!
+                </div>
+            </div>
+        </div>
+        
+        <!-- Create/Edit Prompt File Modal -->
+        <div id="prompt-file-modal" class="modal prompt-file-modal" style="display: none;">
+            <div class="modal-content prompt-modal-content">
+                <div class="modal-header">
+                    <h3 id="prompt-modal-title">Create New Prompt File</h3>
+                    <span class="close" id="prompt-modal-close">&times;</span>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="prompt-file-name">File Name:</label>
+                        <input type="text" id="prompt-file-name" placeholder="colors" class="form-input">
+                        <small class="form-help">File extension (.txt) will be added automatically</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="prompt-file-content">Content:</label>
+                        <textarea id="prompt-file-content" rows="15" class="form-textarea" 
+                                  placeholder="red&#10;blue&#10;green&#10;yellow&#10;purple"></textarea>
+                        <small class="form-help">Enter one option per line</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="prompt-file-save" class="primary-button">Save</button>
+                    <button id="prompt-file-cancel" class="secondary-button">Cancel</button>
                 </div>
             </div>
         </div>

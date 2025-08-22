@@ -60,6 +60,7 @@ document.addEventListener("DOMContentLoaded", () => {
     addEventListenerToElement("generationTab", "click", handleTabClick);
     addEventListenerToElement("gridViewTab", "click", handleTabClick);
     addEventListenerToElement("chatTab", "click", handleTabClick);
+    addEventListenerToElement("promptsTab", "click", handleTabClick);
     addEventListenerToElement("prompt", "input", updateCharacterCount);
     // Grid buttons
     addEventListenerToElement("firstGrid", "click", firstGrid);
@@ -78,6 +79,11 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("generationTab").click();
     // Character prompt event listeners
     addEventListenerToElement("add-character-btn", "click", addCharacterPrompt);
+    // Prompt Files modal event listeners
+    addEventListenerToElement("create-prompt-file-btn", "click", () => showPromptFileModal("create"));
+    addEventListenerToElement("prompt-modal-close", "click", hidePromptFileModal);
+    addEventListenerToElement("prompt-file-cancel", "click", hidePromptFileModal);
+    addEventListenerToElement("prompt-file-save", "click", savePromptFile);
     // Just refresh the image gen provider
     providerChanged();
 });
@@ -163,6 +169,7 @@ function handleTabClick(evt) {
         generationTab: "Generation",
         gridViewTab: "GridView",
         chatTab: "Chat",
+        promptsTab: "PromptFiles",
     };
     if (tabMap[elementId]) {
         openTab(evt, tabMap[elementId]);
@@ -246,6 +253,9 @@ function openTab(evt, tabName) {
             break;
         case "Chat":
             chatTabLoaded();
+            break;
+        case "PromptFiles":
+            promptFilesTabLoaded();
             break;
         default:
             break;
@@ -1132,3 +1142,149 @@ function populateCharacterPrompts(characterPrompts) {
 }
 // Make updateCharacterContentIndicator globally accessible for oninput handlers
 window.updateCharacterContentIndicator = updateCharacterContentIndicator;
+let promptFiles = [];
+let currentEditingFile = null;
+async function promptFilesTabLoaded() {
+    await loadPromptFiles();
+}
+async function loadPromptFiles() {
+    const loadingElement = document.getElementById("prompt-files-loading");
+    const contentElement = document.getElementById("prompt-files-content");
+    const noFilesElement = document.getElementById("no-prompt-files");
+    try {
+        loadingElement.style.display = "block";
+        contentElement.innerHTML = "";
+        noFilesElement.style.display = "none";
+        const response = await fetch("/prompt-files");
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        promptFiles = await response.json();
+        renderPromptFiles();
+    }
+    catch (error) {
+        console.error("Error loading prompt files:", error);
+        contentElement.innerHTML = `<div class="error-message">Error loading prompt files: ${error}</div>`;
+    }
+    finally {
+        loadingElement.style.display = "none";
+    }
+}
+function renderPromptFiles() {
+    const contentElement = document.getElementById("prompt-files-content");
+    const noFilesElement = document.getElementById("no-prompt-files");
+    if (promptFiles.length === 0) {
+        noFilesElement.style.display = "block";
+        contentElement.innerHTML = "";
+        return;
+    }
+    noFilesElement.style.display = "none";
+    const filesHtml = promptFiles.map(file => `
+        <div class="prompt-file-item" data-file-name="${escapeHtml(file.name)}">
+            <div class="prompt-file-header">
+                <h4 class="prompt-file-name">__${escapeHtml(file.name)}__</h4>
+                <div class="prompt-file-meta">
+                    ${file.content.length} line${file.content.length !== 1 ? 's' : ''} • ${file.size} bytes
+                </div>
+            </div>
+            <div class="prompt-file-preview">
+                ${file.content.slice(0, 3).map(line => `<div class="preview-line">${escapeHtml(line)}</div>`).join('')}
+                ${file.content.length > 3 ? `<div class="preview-more">... and ${file.content.length - 3} more lines</div>` : ''}
+            </div>
+            <div class="prompt-file-actions">
+                <button class="action-button edit-button" onclick="editPromptFile('${escapeHtml(file.name)}')">Edit</button>
+                <button class="action-button delete-button" onclick="deletePromptFile('${escapeHtml(file.name)}')">Delete</button>
+            </div>
+        </div>
+    `).join('');
+    contentElement.innerHTML = filesHtml;
+}
+function showPromptFileModal(mode, fileName) {
+    const modal = document.getElementById("prompt-file-modal");
+    const title = document.getElementById("prompt-modal-title");
+    const nameInput = document.getElementById("prompt-file-name");
+    const contentTextarea = document.getElementById("prompt-file-content");
+    if (mode === "create") {
+        title.textContent = "Create New Prompt File";
+        nameInput.value = "";
+        contentTextarea.value = "";
+        nameInput.disabled = false;
+        currentEditingFile = null;
+    }
+    else if (mode === "edit" && fileName) {
+        title.textContent = "Edit Prompt File";
+        nameInput.value = fileName;
+        nameInput.disabled = true;
+        currentEditingFile = fileName;
+        const file = promptFiles.find(f => f.name === fileName);
+        contentTextarea.value = file ? file.content.join('\n') : "";
+    }
+    modal.style.display = "flex";
+    nameInput.focus();
+}
+function hidePromptFileModal() {
+    const modal = document.getElementById("prompt-file-modal");
+    modal.style.display = "none";
+    currentEditingFile = null;
+}
+async function savePromptFile() {
+    const nameInput = document.getElementById("prompt-file-name");
+    const contentTextarea = document.getElementById("prompt-file-content");
+    const fileName = nameInput.value.trim();
+    const content = contentTextarea.value;
+    if (!fileName) {
+        alert("Please enter a file name");
+        return;
+    }
+    if (!/^[a-zA-Z0-9_-]+$/.test(fileName)) {
+        alert("File name can only contain letters, numbers, underscores, and hyphens");
+        return;
+    }
+    try {
+        const response = await fetch("/prompt-files", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                name: fileName,
+                content: content,
+            }),
+        });
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+        }
+        hidePromptFileModal();
+        await loadPromptFiles();
+    }
+    catch (error) {
+        console.error("Error saving prompt file:", error);
+        alert(`Error saving file: ${error}`);
+    }
+}
+async function editPromptFile(fileName) {
+    showPromptFileModal("edit", fileName);
+}
+async function deletePromptFile(fileName) {
+    if (!confirm(`Are you sure you want to delete the file "${fileName}"?`)) {
+        return;
+    }
+    try {
+        const response = await fetch(`/prompt-files/${encodeURIComponent(fileName)}`, {
+            method: "DELETE",
+        });
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+        }
+        await loadPromptFiles();
+    }
+    catch (error) {
+        console.error("Error deleting prompt file:", error);
+        alert(`Error deleting file: ${error}`);
+    }
+}
+// Make prompt file functions globally accessible
+window.editPromptFile = editPromptFile;
+window.deletePromptFile = deletePromptFile;

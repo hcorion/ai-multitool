@@ -2559,5 +2559,114 @@ def get_image_metadata(filename: str):
     return json.dumps(metadata_dict)
 
 
+@app.route("/prompt-files", methods=["GET"])
+def get_prompt_files():
+    """Get all prompt files for the current user."""
+    if "username" not in session:
+        return jsonify({"error": "Not authenticated"}), 401
+
+    if not app.static_folder:
+        return jsonify({"error": "Static folder not configured"}), 500
+
+    username = session["username"]
+    prompt_files_dir = os.path.join(app.static_folder, "prompts", username)
+    
+    try:
+        # Create directory if it doesn't exist
+        os.makedirs(prompt_files_dir, exist_ok=True)
+        
+        files = []
+        for filename in os.listdir(prompt_files_dir):
+            if filename.endswith(".txt"):
+                file_path = os.path.join(prompt_files_dir, filename)
+                try:
+                    with open(file_path, "r", encoding="utf-8") as f:
+                        content_lines = f.read().splitlines()
+                    
+                    file_stats = os.stat(file_path)
+                    files.append({
+                        "name": os.path.splitext(filename)[0],
+                        "content": content_lines,
+                        "size": file_stats.st_size
+                    })
+                except Exception as e:
+                    # Skip files that can't be read
+                    print(f"Warning: Could not read file {filename}: {e}")
+                    continue
+        
+        # Sort files by name
+        files.sort(key=lambda x: x["name"])
+        return jsonify(files)
+        
+    except Exception as e:
+        return jsonify({"error": f"Failed to read prompt files: {str(e)}"}), 500
+
+
+@app.route("/prompt-files", methods=["POST"])
+def save_prompt_file():
+    """Create or update a prompt file."""
+    if "username" not in session:
+        return jsonify({"error": "Not authenticated"}), 401
+
+    if not app.static_folder:
+        return jsonify({"error": "Static folder not configured"}), 500
+
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+
+        filename = data.get("name", "").strip()
+        content = data.get("content", "")
+
+        if not filename:
+            return jsonify({"error": "File name is required"}), 400
+
+        # Validate filename
+        if not re.match(r"^[a-zA-Z0-9_-]+$", filename):
+            return jsonify({"error": "File name can only contain letters, numbers, underscores, and hyphens"}), 400
+
+        username = session["username"]
+        prompt_files_dir = os.path.join(app.static_folder, "prompts", username)
+        os.makedirs(prompt_files_dir, exist_ok=True)
+
+        file_path = os.path.join(prompt_files_dir, f"{filename}.txt")
+        
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write(content)
+
+        return jsonify({"success": True, "message": "File saved successfully"})
+
+    except Exception as e:
+        return jsonify({"error": f"Failed to save file: {str(e)}"}), 500
+
+
+@app.route("/prompt-files/<filename>", methods=["DELETE"])
+def delete_prompt_file(filename: str):
+    """Delete a prompt file."""
+    if "username" not in session:
+        return jsonify({"error": "Not authenticated"}), 401
+
+    if not app.static_folder:
+        return jsonify({"error": "Static folder not configured"}), 500
+
+    try:
+        # Validate filename
+        if not re.match(r"^[a-zA-Z0-9_-]+$", filename):
+            return jsonify({"error": "Invalid file name"}), 400
+
+        username = session["username"]
+        file_path = os.path.join(app.static_folder, "prompts", username, f"{filename}.txt")
+        
+        if not os.path.exists(file_path):
+            return jsonify({"error": "File not found"}), 404
+
+        os.remove(file_path)
+        return jsonify({"success": True, "message": "File deleted successfully"})
+
+    except Exception as e:
+        return jsonify({"error": f"Failed to delete file: {str(e)}"}), 500
+
+
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0")

@@ -695,4 +695,259 @@ button#send-chat:hover {
   cursor: not-allowed;
 }
 
+.prompt-files-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.prompt-files-header {
+  margin-bottom: 30px;
+  text-align: center;
+}
+.prompt-files-header h2 {
+  color: #fff;
+  margin-bottom: 10px;
+  font-size: 2rem;
+}
+.prompt-files-header p {
+  color: rgba(255, 255, 255, 0.8);
+  margin-bottom: 20px;
+  font-size: 1.1rem;
+}
+.prompt-files-header .primary-button {
+  background-color: #0a84ff;
+  color: #fff;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 500;
+  transition: background-color 0.2s ease;
+}
+.prompt-files-header .primary-button:hover {
+  background-color: #006edc;
+}
+
+.prompt-files-list .loading-message,
+.prompt-files-list .empty-message {
+  text-align: center;
+  padding: 40px 20px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 1.1rem;
+}
+.prompt-files-list .error-message {
+  background-color: rgba(255, 68, 68, 0.1);
+  border: 1px solid rgba(255, 68, 68, 0.3);
+  color: #ff8888;
+  padding: 15px;
+  border-radius: 6px;
+  margin: 20px 0;
+  text-align: center;
+}
+
+.prompt-file-item {
+  background-color: rgba(51, 51, 51, 0.8);
+  border: 1px solid #666666;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.prompt-file-item:hover {
+  border-color: rgba(10, 132, 255, 0.5);
+  box-shadow: 0 2px 8px rgba(10, 132, 255, 0.1);
+}
+.prompt-file-item .prompt-file-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 15px;
+}
+.prompt-file-item .prompt-file-header .prompt-file-name {
+  color: #0a84ff;
+  margin: 0;
+  font-family: "Inter", monospace;
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+.prompt-file-item .prompt-file-header .prompt-file-meta {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.9rem;
+  text-align: right;
+}
+.prompt-file-item .prompt-file-preview {
+  background-color: rgba(18, 18, 18, 0.4);
+  border: 1px solid rgba(102, 102, 102, 0.5);
+  border-radius: 4px;
+  padding: 12px;
+  margin-bottom: 15px;
+  font-family: "Inter", monospace;
+  font-size: 0.9rem;
+}
+.prompt-file-item .prompt-file-preview .preview-line {
+  color: rgba(255, 255, 255, 0.9);
+  margin-bottom: 4px;
+  white-space: pre-wrap;
+}
+.prompt-file-item .prompt-file-preview .preview-line:last-child {
+  margin-bottom: 0;
+}
+.prompt-file-item .prompt-file-preview .preview-more {
+  color: rgba(255, 255, 255, 0.5);
+  font-style: italic;
+  margin-top: 8px;
+}
+.prompt-file-item .prompt-file-actions {
+  display: flex;
+  gap: 10px;
+}
+.prompt-file-item .prompt-file-actions .action-button {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background-color 0.2s ease;
+}
+.prompt-file-item .prompt-file-actions .action-button.edit-button {
+  background-color: rgba(10, 132, 255, 0.8);
+  color: #fff;
+}
+.prompt-file-item .prompt-file-actions .action-button.edit-button:hover {
+  background-color: #0a84ff;
+}
+.prompt-file-item .prompt-file-actions .action-button.delete-button {
+  background-color: rgba(255, 68, 68, 0.8);
+  color: #fff;
+}
+.prompt-file-item .prompt-file-actions .action-button.delete-button:hover {
+  background-color: #ff4444;
+}
+
+.prompt-file-modal {
+  display: flex;
+  position: fixed;
+  z-index: 1000;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.9);
+  align-items: center;
+  justify-content: center;
+}
+.prompt-file-modal .prompt-modal-content {
+  background-color: #333;
+  border-radius: 8px;
+  width: 90%;
+  max-width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
+  position: relative;
+}
+.prompt-file-modal .modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid #666666;
+}
+.prompt-file-modal .modal-header h3 {
+  color: #fff;
+  margin: 0;
+  font-size: 1.3rem;
+}
+.prompt-file-modal .modal-header .close {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 28px;
+  font-weight: bold;
+  cursor: pointer;
+  line-height: 1;
+}
+.prompt-file-modal .modal-header .close:hover {
+  color: #fff;
+}
+.prompt-file-modal .modal-body {
+  padding: 20px;
+}
+.prompt-file-modal .modal-body .form-group {
+  margin-bottom: 20px;
+}
+.prompt-file-modal .modal-body .form-group label {
+  display: block;
+  color: #fff;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+.prompt-file-modal .modal-body .form-group .form-input,
+.prompt-file-modal .modal-body .form-group .form-textarea {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #666666;
+  border-radius: 4px;
+  background-color: rgba(18, 18, 18, 0.5);
+  color: #fff;
+  font-family: "Inter", sans-serif;
+}
+.prompt-file-modal .modal-body .form-group .form-input:focus,
+.prompt-file-modal .modal-body .form-group .form-textarea:focus {
+  border-color: #0a84ff;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(10, 132, 255, 0.2);
+}
+.prompt-file-modal .modal-body .form-group .form-input::placeholder,
+.prompt-file-modal .modal-body .form-group .form-textarea::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+}
+.prompt-file-modal .modal-body .form-group .form-input:disabled,
+.prompt-file-modal .modal-body .form-group .form-textarea:disabled {
+  background-color: rgba(102, 102, 102, 0.3);
+  cursor: not-allowed;
+}
+.prompt-file-modal .modal-body .form-group .form-textarea {
+  resize: vertical;
+  font-family: "Inter", monospace;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+.prompt-file-modal .modal-body .form-group .form-help {
+  display: block;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.85rem;
+  margin-top: 5px;
+}
+.prompt-file-modal .modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 20px;
+  border-top: 1px solid #666666;
+}
+.prompt-file-modal .modal-footer .primary-button {
+  background-color: #0a84ff;
+  color: #fff;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.95rem;
+}
+.prompt-file-modal .modal-footer .primary-button:hover {
+  background-color: #006edc;
+}
+.prompt-file-modal .modal-footer .secondary-button {
+  background-color: rgba(102, 102, 102, 0.3);
+  color: #fff;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.95rem;
+}
+.prompt-file-modal .modal-footer .secondary-button:hover {
+  background-color: rgba(102, 102, 102, 0.5);
+}
+
 /*# sourceMappingURL=style.css.map */
