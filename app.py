@@ -1,6 +1,7 @@
 import base64
 import io
 import json
+from json import JSONDecodeError
 import os
 import random
 import re
@@ -12,7 +13,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from queue import Queue
-from typing import Any, AnyStr, Dict, Generator, List, Mapping
+from typing import Any, AnyStr, Dict, Generator, List, Mapping, Optional, NoReturn
 
 import openai
 import requests
@@ -254,12 +255,12 @@ class ConversationManager:
         os.makedirs(self.chats_dir, exist_ok=True)
 
         # Add thread locks for concurrent access protection
-        self._user_locks = {}
+        self._user_locks: Dict[str, threading.Lock] = {}
         self._locks_lock = threading.Lock()
 
         # Add conversation cache for performance optimization
-        self._conversation_cache = {}
-        self._cache_timestamps = {}
+        self._conversation_cache: Dict[str, UserConversations] = {}
+        self._cache_timestamps: Dict[str, float] = {}
         self._cache_ttl = 300  # 5 minutes cache TTL
 
     def _get_user_lock(self, username: str) -> threading.Lock:
@@ -399,7 +400,7 @@ class ConversationManager:
                 raise ConversationStorageError(
                     f"Failed to save conversations for {username}: {e}"
                 )
-            except json.JSONEncodeError as e:
+            except JSONDecodeError as e:
                 import logging
 
                 logging.error(
@@ -498,7 +499,7 @@ class ConversationManager:
         return None
 
     def update_conversation_metadata(
-        self, username: str, conversation_id: str, **kwargs
+        self, username: str, conversation_id: str, **kwargs: Any
     ) -> None:
         """Update conversation metadata."""
         user_conversations = self._load_user_conversations(username)
@@ -532,7 +533,7 @@ class ConversationManager:
                 return False
 
             # Validate and sanitize the title
-            if not title or not isinstance(title, str):
+            if not title:
                 import logging
 
                 logging.warning(
@@ -608,7 +609,7 @@ class ResponsesAPIClient:
     ) -> Any:
         """Create a response using the Responses API with o4-mini model."""
         try:
-            params = {
+            params: Dict[str, Any] = {
                 "model": self.model,
                 "input": input_text,
                 "stream": stream,
@@ -655,7 +656,7 @@ code
         return {
             "error": "rate_limit",
             "message": message,
-            "retry_after": retry_after,
+            "retry_after": str(retry_after) if retry_after is not None else "",
             "user_action": "Please wait before sending another message.",
         }
 
@@ -700,13 +701,14 @@ code
 
         # Handle HTTP status codes
         if hasattr(error, "status_code"):
-            if error.status_code == 503:
+            status_code = getattr(error, "status_code", None)
+            if status_code == 503:
                 return {
                     "error": "service_unavailable",
                     "message": "The AI service is temporarily unavailable. Please try again in a few minutes.",
                     "user_action": "Wait a few minutes and try again.",
                 }
-            elif error.status_code == 502 or error.status_code == 504:
+            elif status_code == 502 or status_code == 504:
                 return {
                     "error": "gateway_error",
                     "message": "Connection to AI service failed. Please try again.",
@@ -960,28 +962,6 @@ def upscale_stability_creative(
         raise Exception(error_message)
 
 
-def _build_char_captions(character_prompts: List[dict], prompt_type: str) -> List[dict]:
-    """
-    Build char_captions array for NovelAI API request.
-    Only includes non-empty character prompts.
-    """
-    char_captions = []
-
-    for char_prompt in character_prompts:
-        prompt_value = char_prompt.get(prompt_type, "")
-        # Handle None values by converting to empty string
-        if prompt_value is None:
-            prompt_value = ""
-        prompt_text = str(prompt_value).strip()
-        if prompt_text:  # Only include non-empty prompts
-            char_captions.append(
-                {
-                    "centers": [{"x": 0, "y": 0}],
-                    "char_caption": prompt_text,
-                }
-            )
-
-    return char_captions
 
 
 def generate_novelai_image(
@@ -992,7 +972,7 @@ def generate_novelai_image(
     seed: int = 0,
     upscale: bool = False,
     grid_dynamic_prompt: GridDynamicPromptInfo | None = None,
-    character_prompts: List[dict] | None = None,
+    character_prompts: Optional[List[Dict[str, str]]] = None,
 ) -> GeneratedImageData:
     if not app.static_folder:
         raise ValueError("Flask static folder not defined")
@@ -1026,7 +1006,7 @@ def generate_novelai_image(
 
     try:
         # Generate image using the client
-        image_bytes = client.generate_image(
+        image_bytes = client.generate_image(  # type: ignore
             prompt=revised_prompt,
             negative_prompt=negative_prompt,
             width=width,
@@ -1092,6 +1072,139 @@ def generate_novelai_image(
         raise Exception(error_message)
     except NovelAIClientError as e:
         error_message = f"NovelAI Generate Image Error: {str(e)}"
+        raise Exception(error_message)
+
+
+def generate_novelai_inpaint_image(
+    base_image: bytes,
+    mask: bytes,
+    prompt: str,
+    negative_prompt: Optional[str],
+    username: str,
+    size: tuple[int, int],
+    seed: int = 0,
+) -> GeneratedImageData:
+    """Generate an inpainted image using NovelAI and return processed data."""
+    if not app.static_folder:
+        raise ValueError("Flask static folder not defined")
+
+    if not novelai_api_key:
+        raise ValueError("NovelAI API key not configured")
+
+    revised_prompt = make_prompt_dynamic(prompt, username, app.static_folder, seed)
+    width, height = size
+
+    # Create NovelAI client
+    client = NovelAIClient(novelai_api_key)
+
+    try:
+        # Generate inpainted image using the client
+        image_bytes = client.generate_inpaint_image(  # type: ignore
+            base_image=base_image,
+            mask=mask,
+            prompt=revised_prompt,
+            negative_prompt=negative_prompt,
+            width=width,
+            height=height,
+            seed=seed,
+        )
+
+        file_bytes = io.BytesIO(image_bytes)
+
+        # Build image metadata
+        image_metadata: Dict[str, str] = {
+            "Prompt": prompt,
+            "Revised Prompt": revised_prompt,
+            "Operation": "inpaint",
+            "Provider": "novelai",
+            "seed": str(seed),
+        }
+        if negative_prompt:
+            image_metadata["Negative Prompt"] = negative_prompt
+
+        saved_data = process_image_response(
+            file_bytes, prompt, revised_prompt, username, image_metadata
+        )
+        return GeneratedImageData(
+            saved_data.local_image_path,
+            revised_prompt,
+            prompt,
+            saved_data.image_name,
+            image_metadata,
+        )
+
+    except NovelAIAPIError as e:
+        error_message = f"NovelAI Inpaint Image {e.status_code}: {e.message}"
+        raise Exception(error_message)
+    except NovelAIClientError as e:
+        error_message = f"NovelAI Inpaint Image Error: {str(e)}"
+        raise Exception(error_message)
+
+
+def generate_novelai_img2img_image(
+    base_image: bytes,
+    prompt: str,
+    negative_prompt: Optional[str],
+    username: str,
+    size: tuple[int, int],
+    seed: int = 0,
+    strength: float = 0.7,
+) -> GeneratedImageData:
+    """Generate an img2img image using NovelAI and return processed data."""
+    if not app.static_folder:
+        raise ValueError("Flask static folder not defined")
+
+    if not novelai_api_key:
+        raise ValueError("NovelAI API key not configured")
+
+    revised_prompt = make_prompt_dynamic(prompt, username, app.static_folder, seed)
+    width, height = size
+
+    # Create NovelAI client
+    client = NovelAIClient(novelai_api_key)
+
+    try:
+        # Generate img2img image using the client
+        image_bytes = client.generate_img2img_image(  # type: ignore
+            base_image=base_image,
+            prompt=revised_prompt,
+            negative_prompt=negative_prompt,
+            strength=strength,
+            width=width,
+            height=height,
+            seed=seed,
+        )
+
+        file_bytes = io.BytesIO(image_bytes)
+
+        # Build image metadata
+        image_metadata: Dict[str, str] = {
+            "Prompt": prompt,
+            "Revised Prompt": revised_prompt,
+            "Operation": "img2img",
+            "Provider": "novelai",
+            "seed": str(seed),
+            "strength": str(strength),
+        }
+        if negative_prompt:
+            image_metadata["Negative Prompt"] = negative_prompt
+
+        saved_data = process_image_response(
+            file_bytes, prompt, revised_prompt, username, image_metadata
+        )
+        return GeneratedImageData(
+            saved_data.local_image_path,
+            revised_prompt,
+            prompt,
+            saved_data.image_name,
+            image_metadata,
+        )
+
+    except NovelAIAPIError as e:
+        error_message = f"NovelAI Img2Img Image {e.status_code}: {e.message}"
+        raise Exception(error_message)
+    except NovelAIClientError as e:
+        error_message = f"NovelAI Img2Img Image Error: {str(e)}"
         raise Exception(error_message)
 
 
@@ -1216,7 +1329,7 @@ def _process_openai_prompt(
 
 def _handle_openai_api_errors(
     e: Exception, operation: str = "Image Generation"
-) -> None:
+) -> NoReturn:
     """
     Handle OpenAI API errors with consistent error messages.
 
@@ -1495,7 +1608,7 @@ def generate_seed_for_provider(provider: str) -> int | None:
     return
 
 
-def _extract_character_prompts_from_form(request: Request) -> List[dict]:
+def _extract_character_prompts_from_form(request: Request) -> List[Dict[str, str]]:
     """
     Extract character prompt data from form submission.
     Expected form format: character_prompts[0][positive], character_prompts[0][negative], etc.
@@ -1517,13 +1630,13 @@ def _extract_character_prompts_from_form(request: Request) -> List[dict]:
 
         # Only add character if it has at least a positive prompt
         if positive_prompt:
-            character_prompts.append(
+            character_prompts.append(  # type: ignore
                 {"positive": positive_prompt, "negative": negative_prompt}
             )
 
         char_index += 1
 
-    return character_prompts
+    return character_prompts  # type: ignore
 
 
 def generate_image(
@@ -1655,7 +1768,7 @@ def generate_image_grid(
         ".thumb.png", ".thumb.apng"
     )
 
-    with WandImage() as img:
+    with WandImage() as img:  # type: ignore
         for dynamic_prompt, image_data in image_data_list.items():
             with WandImage() as wand_image:  # type: ignore
                 wand_image.options["label"] = dynamic_prompt  # type: ignore
@@ -1673,15 +1786,15 @@ def generate_image_grid(
     target_image = PILImage.open(image_filename)
     target_image.save(image_filename, pnginfo=png_info)
 
-    with WandImage() as animated_img:
+    with WandImage() as animated_img:  # type: ignore
         for dynamic_prompt, image_data in image_data_list.items():
             with WandImage(
                 filename=image_data.local_image_path.replace(".png", ".thumb.jpg")
             ) as frame_image:  # type: ignore
-                frame_image.delay = 100
+                frame_image.delay = 100  # type: ignore
                 animated_img.sequence.append(frame_image)  # type: ignore
-        animated_img.coalesce()
-        animated_img.optimize_layers()
+        animated_img.coalesce()  # type: ignore
+        animated_img.optimize_layers()  # type: ignore
         animated_img.format = "apng"
         animated_img.save(filename=image_thumb_filename_apng)  # type: ignore
     # This is really weird but ImageMagick refuses to write an animated apng if it doesn't end in .apng
@@ -1784,10 +1897,14 @@ def handle_image_request():
         
         # Route to appropriate handler based on operation
         if image_request.operation == Operation.GENERATE:
-            response = _handle_generation_request(image_request)
+            response = _handle_generation_request(image_request)  # type: ignore
         elif image_request.operation == Operation.INPAINT:
+            if not isinstance(image_request, InpaintingRequest):
+                raise ValueError("Invalid request type for inpainting operation")
             response = _handle_inpainting_request(image_request)
         elif image_request.operation == Operation.IMG2IMG:
+            if not isinstance(image_request, Img2ImgRequest):
+                raise ValueError("Invalid request type for img2img operation")
             response = _handle_img2img_request(image_request)
         else:
             return jsonify({"error": f"Unsupported operation: {image_request.operation}"}), 400
@@ -1899,19 +2016,17 @@ def _handle_inpainting_request(image_request: InpaintingRequest) -> ImageOperati
             )
         elif image_request.provider == Provider.NOVELAI:
             # Use NovelAI inpainting
-            novelai_client = NovelAIClient(novelai_api_key)
-            
             # Read and encode images
             with open(image_request.base_image_path, 'rb') as f:
                 base_image_data = f.read()
             with open(image_request.mask_path, 'rb') as f:
                 mask_data = f.read()
             
-            generated_data = novelai_client.generate_inpaint_image(
+            generated_data = generate_novelai_inpaint_image(
                 base_image=base_image_data,
                 mask=mask_data,
                 prompt=image_request.prompt,
-                negative_prompt=image_request.negative_prompt or "",
+                negative_prompt=image_request.negative_prompt,
                 username=session["username"],
                 size=(image_request.width, image_request.height)
             )
@@ -1946,16 +2061,14 @@ def _handle_img2img_request(image_request: Img2ImgRequest) -> ImageOperationResp
         if image_request.provider != Provider.NOVELAI:
             raise ValueError(f"Provider {image_request.provider.value} does not support img2img")
         
-        novelai_client = NovelAIClient(novelai_api_key)
-        
         # Read and encode base image
         with open(image_request.base_image_path, 'rb') as f:
             base_image_data = f.read()
         
-        generated_data = novelai_client.generate_img2img_image(
+        generated_data = generate_novelai_img2img_image(
             base_image=base_image_data,
             prompt=image_request.prompt,
-            negative_prompt=image_request.negative_prompt or "",
+            negative_prompt=image_request.negative_prompt,
             strength=image_request.strength,
             username=session["username"],
             size=(image_request.width, image_request.height)
