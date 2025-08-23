@@ -235,7 +235,7 @@
     
     &.overlay-canvas {
         z-index: 2;
-        pointer-events: none; // Allow events to pass through to image canvas
+        pointer-events: auto; // Enable pointer events for drawing
     }
 }
 

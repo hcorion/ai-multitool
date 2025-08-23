@@ -209,14 +209,17 @@ export class InpaintingMaskCanvas {
         );
 
         // Create input engine for the overlay canvas (drawing surface)
+        console.log('Creating input engine for overlay canvas:', this.overlayCanvas);
         this.inputEngine = new InputEngine(this.overlayCanvas, {
             enableDrawing: true,
             preventScrolling: true,
             capturePointer: true
         });
+        console.log('Input engine created:', this.inputEngine);
 
         // Set up input event handler
         this.inputEngine.setEventHandler(this.handleInputEvent.bind(this));
+        console.log('Input event handler set');
 
         // Set up resize handler
         window.addEventListener('resize', this.handleResize.bind(this));
@@ -278,9 +281,13 @@ export class InpaintingMaskCanvas {
 
             // Enable input handling after image is loaded
             if (this.inputEngine) {
+                console.log('Enabling input engine');
                 this.inputEngine.enable();
                 this.inputEngine.updateCursorSize(this.currentBrushSize);
                 this.inputEngine.updateCursorMode('paint'); // Default to paint mode
+                console.log('Input engine enabled and configured');
+            } else {
+                console.error('Input engine not found when trying to enable');
             }
         } catch (error) {
             throw error;
@@ -327,7 +334,7 @@ export class InpaintingMaskCanvas {
         if (this.popupElement) {
             const slider = this.popupElement.querySelector('.brush-size-slider') as HTMLInputElement;
             const valueDisplay = this.popupElement.querySelector('.brush-size-value') as HTMLSpanElement;
-            
+
             if (slider) {
                 slider.value = newSize.toString();
             }
@@ -353,7 +360,7 @@ export class InpaintingMaskCanvas {
             startSize = this.currentBrushSize;
             dragHandle.classList.add('dragging');
             document.body.style.cursor = 'ew-resize';
-            
+
             // Prevent text selection during drag
             document.body.style.userSelect = 'none';
         };
@@ -364,7 +371,7 @@ export class InpaintingMaskCanvas {
             const deltaX = clientX - startX;
             const sensitivity = 0.5; // Pixels per pixel of mouse movement
             const newSize = Math.max(1, Math.min(200, startSize + deltaX * sensitivity));
-            
+
             // Update slider and display
             slider.value = newSize.toString();
             valueDisplay.textContent = `${Math.round(newSize)}px`;
@@ -373,7 +380,7 @@ export class InpaintingMaskCanvas {
 
         const endDrag = () => {
             if (!isDragging) return;
-            
+
             isDragging = false;
             dragHandle.classList.remove('dragging');
             document.body.style.cursor = '';
@@ -383,10 +390,10 @@ export class InpaintingMaskCanvas {
         // Mouse events for drag handle
         dragHandle.addEventListener('mousedown', (e) => {
             e.preventDefault();
-            
+
             // Start drag immediately on mouse down
             startDrag(e.clientX);
-            
+
             // Add global mouse move and up listeners
             const handleMouseMove = (e: MouseEvent) => updateDrag(e.clientX);
             const handleMouseUp = () => {
@@ -394,7 +401,7 @@ export class InpaintingMaskCanvas {
                 document.removeEventListener('mousemove', handleMouseMove);
                 document.removeEventListener('mouseup', handleMouseUp);
             };
-            
+
             document.addEventListener('mousemove', handleMouseMove);
             document.addEventListener('mouseup', handleMouseUp);
         });
@@ -402,24 +409,24 @@ export class InpaintingMaskCanvas {
         // Touch events for drag handle
         dragHandle.addEventListener('touchstart', (e) => {
             e.preventDefault();
-            
+
             if (e.touches.length === 1) {
                 startDrag(e.touches[0].clientX);
-                
+
                 const handleTouchMove = (e: TouchEvent) => {
                     e.preventDefault();
                     if (e.touches.length === 1) {
                         updateDrag(e.touches[0].clientX);
                     }
                 };
-                
+
                 const handleTouchEnd = () => {
                     endDrag();
                     document.removeEventListener('touchmove', handleTouchMove);
                     document.removeEventListener('touchend', handleTouchEnd);
                     document.removeEventListener('touchcancel', handleTouchEnd);
                 };
-                
+
                 document.addEventListener('touchmove', handleTouchMove, { passive: false });
                 document.addEventListener('touchend', handleTouchEnd);
                 document.addEventListener('touchcancel', handleTouchEnd);
@@ -507,17 +514,30 @@ export class InpaintingMaskCanvas {
      * Handle input events from the InputEngine
      */
     private handleInputEvent: InputEventHandler = (event) => {
-        if (!this.canvasManager) return;
+        console.log('Input event:', event.type, 'at', event.screenX, event.screenY);
+
+        if (!this.canvasManager) {
+            console.log('No canvas manager');
+            return;
+        }
 
         // Convert screen coordinates to image coordinates
         const imageCoords = this.canvasManager.screenToImage(event.screenX, event.screenY);
-        if (!imageCoords) return; // Outside canvas bounds
+        if (!imageCoords) {
+            console.log('Outside canvas bounds');
+            return; // Outside canvas bounds
+        }
+
+        console.log('Image coords:', imageCoords);
 
         const brushEngine = this.canvasManager.getBrushEngine();
         const settings = brushEngine.getSettings();
 
+        console.log('Brush settings:', settings);
+
         switch (event.type) {
             case 'start':
+                console.log('Starting brush stroke');
                 // Start a new brush stroke
                 this.canvasManager.startBrushStroke(
                     imageCoords.x,
@@ -528,16 +548,19 @@ export class InpaintingMaskCanvas {
                 break;
 
             case 'move':
+                console.log('Continuing brush stroke');
                 // Continue the brush stroke
                 this.canvasManager.continueBrushStroke(imageCoords.x, imageCoords.y);
                 break;
 
             case 'end':
+                console.log('Ending brush stroke');
                 // End the brush stroke
                 this.canvasManager.endBrushStroke();
                 break;
 
             case 'cancel':
+                console.log('Cancelling brush stroke');
                 // Cancel the brush stroke
                 this.canvasManager.endBrushStroke();
                 break;

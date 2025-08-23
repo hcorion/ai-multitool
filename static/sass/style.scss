@@ -2,8 +2,8 @@
 @use "sass:color";
 @use "sass:string";
 
-// Import inpainting mask canvas styles
-@import "inpainting-mask-canvas";
+// use inpainting mask canvas styles (import is deprecated)
+@use "./inpainting-mask-canvas" as *;
 
 $background-color: #121212;
 $text-color: #fff;
@@ -647,6 +647,25 @@ button#send-chat {
 
     &:hover {
         background-color: $submit-btn-hover-color;
+    }
+}
+
+.edit-mask-btn {
+    background-color: #28a745;
+    color: $text-color;
+    border: none;
+    padding: 10px 15px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.2s ease;
+
+    &:hover {
+        background-color: #218838;
+    }
+
+    &:active {
+        background-color: #1e7e34;
     }
 }
 

@@ -121,7 +121,9 @@
   - Write tests to verify exported mask binary invariant
   - _Requirements: 1.4, 9.1_
 
-- [ ] 13. Integrate with existing inpainting workflow
+- [x] 13. Integrate with existing inpainting workflow
+
+
   - Add "Edit Mask" button to existing image generation results
   - Create integration points with current script.ts image handling
   - Implement mask canvas trigger from grid view modal

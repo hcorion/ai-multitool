@@ -970,8 +970,6 @@ def upscale_stability_creative(
         raise Exception(error_message)
 
 
-
-
 def generate_novelai_image(
     prompt: str,
     negative_prompt: str | None,
@@ -1418,7 +1416,7 @@ def generate_openai_image(
             "Operation": "generate",
             "Size": size,
         }
-        
+
         saved_data = process_image_response(
             io.BytesIO(decoded_data),
             before_prompt,
@@ -1504,7 +1502,7 @@ def generate_openai_inpaint_image(
             "Mask Image": os.path.basename(mask_path),
             "Size": size,
         }
-        
+
         saved_data = process_image_response(
             io.BytesIO(decoded_data),
             before_prompt,
@@ -1550,7 +1548,7 @@ def process_image_response(
     if not app.static_folder:
         raise ValueError("Flask static folder not defined")
 
-    image_path_relative = os.path.join("static", "images", username)
+    image_path_relative = "static/images/" + username
     image_path = os.path.join(app.static_folder, "images", username)
     # Make sure the path directory exists first
     os.makedirs(image_path, exist_ok=True)
@@ -1602,6 +1600,8 @@ def process_image_response(
         thumb_image.save(f, "JPEG", quality=75)
 
     local_image_path = os.path.join(image_path_relative, image_name)
+    # Convert Windows backslashes to forward slashes for web URLs
+    local_image_path = local_image_path.replace("\\", "/")
     return SavedImageData(local_image_path, image_name)
 
 
@@ -1809,8 +1809,11 @@ def generate_image_grid(
     # So we have to do this song and dance to get our animated .thumb.png
     os.rename(image_thumb_filename_apng, image_thumb_filename)
 
+    # Convert to web-relative path
+    local_image_path = f"static/images/{username}/{image_name}"
+
     return GeneratedImageData(
-        local_image_path=image_filename,
+        local_image_path=local_image_path,
         revised_prompt=image_data_list[dynamic_prompts[0]].revised_prompt,
         prompt=prompt,
         image_name=image_name,
@@ -1902,7 +1905,7 @@ def handle_image_request():
     try:
         # Create request object from form data
         image_request = create_request_from_form_data(request.form.to_dict())
-        
+
         # Route to appropriate handler based on operation
         if image_request.operation == Operation.GENERATE:
             response = _handle_generation_request(image_request)  # type: ignore
@@ -1915,46 +1918,55 @@ def handle_image_request():
                 raise ValueError("Invalid request type for img2img operation")
             response = _handle_img2img_request(image_request)
         else:
-            return jsonify({"error": f"Unsupported operation: {image_request.operation}"}), 400
-        
+            return jsonify(
+                {"error": f"Unsupported operation: {image_request.operation}"}
+            ), 400
+
         # Return JSON response
         if response.success:
-            return jsonify({
-                "success": True,
-                "image_path": response.image_path,
-                "image_name": response.image_name,
-                "revised_prompt": response.revised_prompt,
-                "provider": response.provider,
-                "operation": response.operation,
-                "timestamp": response.timestamp,
-                "metadata": response.metadata
-            })
+            return jsonify(
+                {
+                    "success": True,
+                    "image_path": response.image_path,
+                    "image_name": response.image_name,
+                    "revised_prompt": response.revised_prompt,
+                    "provider": response.provider,
+                    "operation": response.operation,
+                    "timestamp": response.timestamp,
+                    "metadata": response.metadata,
+                }
+            )
         else:
-            return jsonify({
-                "success": False,
-                "error_message": response.error_message,
-                "error_type": response.error_type,
-                "provider": response.provider,
-                "operation": response.operation,
-                "timestamp": response.timestamp
-            }), 400
+            return jsonify(
+                {
+                    "success": False,
+                    "error_message": response.error_message,
+                    "error_type": response.error_type,
+                    "provider": response.provider,
+                    "operation": response.operation,
+                    "timestamp": response.timestamp,
+                }
+            ), 400
 
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
     except Exception as e:
         import logging
+
         logging.error(f"Error in image request: {e}", exc_info=True)
         return jsonify({"error": "Internal server error"}), 500
 
 
-def _handle_generation_request(image_request: ImageGenerationRequest) -> ImageOperationResponse:
+def _handle_generation_request(
+    image_request: ImageGenerationRequest,
+) -> ImageOperationResponse:
     """Handle image generation requests."""
     try:
         # Generate a seed for the provider
         seed = generate_seed_for_provider(image_request.provider.value)
         if not seed:
             raise ValueError("Unable to generate seed for provider")
-        
+
         # Route directly to the appropriate generation function based on provider
         if image_request.provider == Provider.OPENAI:
             generated_data = generate_openai_image(
@@ -1963,23 +1975,25 @@ def _handle_generation_request(image_request: ImageGenerationRequest) -> ImageOp
                 size=f"{image_request.width}x{image_request.height}",
                 quality=image_request.quality.value,
                 strict_follow_prompt=False,  # Default to False for new endpoint
-                seed=seed
+                seed=seed,
             )
         elif image_request.provider == Provider.STABILITY:
             generated_data = generate_stability_image(
                 prompt=image_request.prompt,
                 negative_prompt=image_request.negative_prompt,
                 username=session["username"],
-                aspect_ratio=_get_aspect_ratio_from_dimensions(image_request.width, image_request.height),
+                aspect_ratio=_get_aspect_ratio_from_dimensions(
+                    image_request.width, image_request.height
+                ),
                 seed=seed,
-                upscale=False  # Default to False for new endpoint
+                upscale=False,  # Default to False for new endpoint
             )
         elif image_request.provider == Provider.NOVELAI:
             # Convert character prompts to the format expected by generate_novelai_image
             character_prompts = None
             if image_request.character_prompts:
                 character_prompts = image_request.character_prompts
-            
+
             generated_data = generate_novelai_image(
                 prompt=image_request.prompt,
                 negative_prompt=image_request.negative_prompt,
@@ -1988,29 +2002,29 @@ def _handle_generation_request(image_request: ImageGenerationRequest) -> ImageOp
                 seed=seed,
                 upscale=False,  # Default to False for new endpoint
                 grid_dynamic_prompt=None,
-                character_prompts=character_prompts
+                character_prompts=character_prompts,
             )
         else:
             raise ValueError(f"Unsupported provider: {image_request.provider.value}")
-        
+
         return create_success_response(
             image_path=generated_data.local_image_path,
             image_name=generated_data.image_name,
             provider=image_request.provider,
             operation=image_request.operation,
             revised_prompt=generated_data.revised_prompt,
-            metadata=generated_data.metadata
+            metadata=generated_data.metadata,
         )
-        
+
     except Exception as e:
         return create_error_response(
-            error=e,
-            provider=image_request.provider,
-            operation=image_request.operation
+            error=e, provider=image_request.provider, operation=image_request.operation
         )
 
 
-def _handle_inpainting_request(image_request: InpaintingRequest) -> ImageOperationResponse:
+def _handle_inpainting_request(
+    image_request: InpaintingRequest,
+) -> ImageOperationResponse:
     """Handle inpainting requests."""
     try:
         # Route to appropriate provider inpainting function
@@ -2020,45 +2034,45 @@ def _handle_inpainting_request(image_request: InpaintingRequest) -> ImageOperati
                 base_image_path=image_request.base_image_path,
                 mask_path=image_request.mask_path,
                 prompt=image_request.prompt,
-                username=session["username"]
+                username=session["username"],
             )
         elif image_request.provider == Provider.NOVELAI:
             # Use NovelAI inpainting
             # Read and encode images
-            with open(image_request.base_image_path, 'rb') as f:
+            with open(image_request.base_image_path, "rb") as f:
                 base_image_data = f.read()
-            with open(image_request.mask_path, 'rb') as f:
+            with open(image_request.mask_path, "rb") as f:
                 mask_data = f.read()
-            
+
             generated_data = generate_novelai_inpaint_image(
                 base_image=base_image_data,
                 mask=mask_data,
                 prompt=image_request.prompt,
                 negative_prompt=image_request.negative_prompt,
                 username=session["username"],
-                size=(image_request.width, image_request.height)
+                size=(image_request.width, image_request.height),
             )
         else:
-            raise ValueError(f"Provider {image_request.provider.value} does not support inpainting")
-        
-        revised_prompt = getattr(generated_data, 'revised_prompt', None)
+            raise ValueError(
+                f"Provider {image_request.provider.value} does not support inpainting"
+            )
+
+        revised_prompt = getattr(generated_data, "revised_prompt", None)
         # Ensure revised_prompt is a string or None, not a Mock object
-        if hasattr(revised_prompt, '_mock_name'):
+        if hasattr(revised_prompt, "_mock_name"):
             revised_prompt = None
-            
+
         return create_success_response(
             image_path=generated_data.local_image_path,
             image_name=generated_data.image_name,
             provider=image_request.provider,
             operation=image_request.operation,
-            revised_prompt=revised_prompt
+            revised_prompt=revised_prompt,
         )
-        
+
     except Exception as e:
         return create_error_response(
-            error=e,
-            provider=image_request.provider,
-            operation=image_request.operation
+            error=e, provider=image_request.provider, operation=image_request.operation
         )
 
 
@@ -2067,39 +2081,39 @@ def _handle_img2img_request(image_request: Img2ImgRequest) -> ImageOperationResp
     try:
         # Only NovelAI supports img2img currently
         if image_request.provider != Provider.NOVELAI:
-            raise ValueError(f"Provider {image_request.provider.value} does not support img2img")
-        
+            raise ValueError(
+                f"Provider {image_request.provider.value} does not support img2img"
+            )
+
         # Read and encode base image
-        with open(image_request.base_image_path, 'rb') as f:
+        with open(image_request.base_image_path, "rb") as f:
             base_image_data = f.read()
-        
+
         generated_data = generate_novelai_img2img_image(
             base_image=base_image_data,
             prompt=image_request.prompt,
             negative_prompt=image_request.negative_prompt,
             strength=image_request.strength,
             username=session["username"],
-            size=(image_request.width, image_request.height)
+            size=(image_request.width, image_request.height),
         )
-        
-        revised_prompt = getattr(generated_data, 'revised_prompt', None)
+
+        revised_prompt = getattr(generated_data, "revised_prompt", None)
         # Ensure revised_prompt is a string or None, not a Mock object
-        if hasattr(revised_prompt, '_mock_name'):
+        if hasattr(revised_prompt, "_mock_name"):
             revised_prompt = None
-            
+
         return create_success_response(
             image_path=generated_data.local_image_path,
             image_name=generated_data.image_name,
             provider=image_request.provider,
             operation=image_request.operation,
-            revised_prompt=revised_prompt
+            revised_prompt=revised_prompt,
         )
-        
+
     except Exception as e:
         return create_error_response(
-            error=e,
-            provider=image_request.provider,
-            operation=image_request.operation
+            error=e, provider=image_request.provider, operation=image_request.operation
         )
 
 
@@ -2691,11 +2705,11 @@ def get_prompt_files():
 
     username = session["username"]
     prompt_files_dir = os.path.join(app.static_folder, "prompts", username)
-    
+
     try:
         # Create directory if it doesn't exist
         os.makedirs(prompt_files_dir, exist_ok=True)
-        
+
         files = []
         for filename in os.listdir(prompt_files_dir):
             if filename.endswith(".txt"):
@@ -2703,22 +2717,24 @@ def get_prompt_files():
                 try:
                     with open(file_path, "r", encoding="utf-8") as f:
                         content_lines = f.read().splitlines()
-                    
+
                     file_stats = os.stat(file_path)
-                    files.append({
-                        "name": os.path.splitext(filename)[0],
-                        "content": content_lines,
-                        "size": file_stats.st_size
-                    })
+                    files.append(
+                        {
+                            "name": os.path.splitext(filename)[0],
+                            "content": content_lines,
+                            "size": file_stats.st_size,
+                        }
+                    )
                 except Exception as e:
                     # Skip files that can't be read
                     print(f"Warning: Could not read file {filename}: {e}")
                     continue
-        
+
         # Sort files by name
         files.sort(key=lambda x: x["name"])
         return jsonify(files)
-        
+
     except Exception as e:
         return jsonify({"error": f"Failed to read prompt files: {str(e)}"}), 500
 
@@ -2745,14 +2761,18 @@ def save_prompt_file():
 
         # Validate filename
         if not re.match(r"^[a-zA-Z0-9_-]+$", filename):
-            return jsonify({"error": "File name can only contain letters, numbers, underscores, and hyphens"}), 400
+            return jsonify(
+                {
+                    "error": "File name can only contain letters, numbers, underscores, and hyphens"
+                }
+            ), 400
 
         username = session["username"]
         prompt_files_dir = os.path.join(app.static_folder, "prompts", username)
         os.makedirs(prompt_files_dir, exist_ok=True)
 
         file_path = os.path.join(prompt_files_dir, f"{filename}.txt")
-        
+
         with open(file_path, "w", encoding="utf-8") as f:
             f.write(content)
 
@@ -2777,8 +2797,10 @@ def delete_prompt_file(filename: str):
             return jsonify({"error": "Invalid file name"}), 400
 
         username = session["username"]
-        file_path = os.path.join(app.static_folder, "prompts", username, f"{filename}.txt")
-        
+        file_path = os.path.join(
+            app.static_folder, "prompts", username, f"{filename}.txt"
+        )
+
         if not os.path.exists(file_path):
             return jsonify({"error": "File not found"}), 404
 

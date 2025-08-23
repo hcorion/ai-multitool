@@ -203,7 +203,7 @@
 }
 .inpainting-canvas.overlay-canvas {
   z-index: 2;
-  pointer-events: none;
+  pointer-events: auto;
 }
 
 @media (max-width: 768px) {
@@ -861,6 +861,23 @@ button#send-chat:hover {
 }
 #copy-prompt-btn:hover {
   background-color: #006edc;
+}
+
+.edit-mask-btn {
+  background-color: #28a745;
+  color: #fff;
+  border: none;
+  padding: 10px 15px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s ease;
+}
+.edit-mask-btn:hover {
+  background-color: #218838;
+}
+.edit-mask-btn:active {
+  background-color: #1e7e34;
 }
 
 .character-prompt-section {

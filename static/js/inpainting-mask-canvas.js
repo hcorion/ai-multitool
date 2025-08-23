@@ -162,13 +162,16 @@ export class InpaintingMaskCanvas {
         // Create canvas manager
         this.canvasManager = new CanvasManager(this.imageCanvas, this.overlayCanvas, this.maskAlphaCanvas);
         // Create input engine for the overlay canvas (drawing surface)
+        console.log('Creating input engine for overlay canvas:', this.overlayCanvas);
         this.inputEngine = new InputEngine(this.overlayCanvas, {
             enableDrawing: true,
             preventScrolling: true,
             capturePointer: true
         });
+        console.log('Input engine created:', this.inputEngine);
         // Set up input event handler
         this.inputEngine.setEventHandler(this.handleInputEvent.bind(this));
+        console.log('Input event handler set');
         // Set up resize handler
         window.addEventListener('resize', this.handleResize.bind(this));
     }
@@ -218,9 +221,14 @@ export class InpaintingMaskCanvas {
             this.hideError();
             // Enable input handling after image is loaded
             if (this.inputEngine) {
+                console.log('Enabling input engine');
                 this.inputEngine.enable();
                 this.inputEngine.updateCursorSize(this.currentBrushSize);
                 this.inputEngine.updateCursorMode('paint'); // Default to paint mode
+                console.log('Input engine enabled and configured');
+            }
+            else {
+                console.error('Input engine not found when trying to enable');
             }
         }
         catch (error) {
@@ -413,28 +421,39 @@ export class InpaintingMaskCanvas {
      * Handle input events from the InputEngine
      */
     handleInputEvent = (event) => {
-        if (!this.canvasManager)
+        console.log('Input event:', event.type, 'at', event.screenX, event.screenY);
+        if (!this.canvasManager) {
+            console.log('No canvas manager');
             return;
+        }
         // Convert screen coordinates to image coordinates
         const imageCoords = this.canvasManager.screenToImage(event.screenX, event.screenY);
-        if (!imageCoords)
+        if (!imageCoords) {
+            console.log('Outside canvas bounds');
             return; // Outside canvas bounds
+        }
+        console.log('Image coords:', imageCoords);
         const brushEngine = this.canvasManager.getBrushEngine();
         const settings = brushEngine.getSettings();
+        console.log('Brush settings:', settings);
         switch (event.type) {
             case 'start':
+                console.log('Starting brush stroke');
                 // Start a new brush stroke
                 this.canvasManager.startBrushStroke(imageCoords.x, imageCoords.y, this.currentBrushSize, settings.mode);
                 break;
             case 'move':
+                console.log('Continuing brush stroke');
                 // Continue the brush stroke
                 this.canvasManager.continueBrushStroke(imageCoords.x, imageCoords.y);
                 break;
             case 'end':
+                console.log('Ending brush stroke');
                 // End the brush stroke
                 this.canvasManager.endBrushStroke();
                 break;
             case 'cancel':
+                console.log('Cancelling brush stroke');
                 // Cancel the brush stroke
                 this.canvasManager.endBrushStroke();
                 break;

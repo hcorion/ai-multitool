@@ -163,6 +163,12 @@ function renderImageResult(response: ImageOperationResponse): void {
                 <p><strong>Provider:</strong> ${response.provider}</p>
                 <p><strong>Operation:</strong> ${response.operation}</p>
                 <p><strong>Image Name:</strong> ${response.image_name}</p>
+                
+                <div class="image-actions" style="margin-top: 15px;">
+                    <button id="editMaskBtn" class="edit-mask-btn" onclick="openInpaintingMaskCanvas('${response.image_path}')">
+                        🎨 Edit Mask for Inpainting
+                    </button>
+                </div>
             </div>
         </div>
             <div id="image-modal" style="display:none" class="modal">
@@ -811,6 +817,9 @@ async function openInpaintingMaskCanvas(imageUrl: string): Promise<void> {
         console.error('Failed to open inpainting mask canvas:', error);
     }
 }
+
+// Make the function globally available
+(window as any).openInpaintingMaskCanvas = openInpaintingMaskCanvas;
 
 function toggleShowAdvanced(event: Event): void {
     console.log("show advanced")

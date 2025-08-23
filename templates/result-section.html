@@ -9,6 +9,12 @@
     <h2>Generated Image:</h2>
     <img id="generatedImage" class="gen-image" width="512" height="512" src="{{ url_for('static', filename='images/' + session['username'] + '/' + image_name) }}" alt="Click for fullscreen."><br>
     <p>Local Image Path: {{ url_for('static', filename='images/' + session['username'] + '/' + image_name) }}</p>
+    
+    <div class="image-actions" style="margin: 10px 0;">
+        <button id="editMaskBtn" class="edit-mask-btn" onclick="openInpaintingMaskCanvas('{{ url_for('static', filename='images/' + session['username'] + '/' + image_name) }}')">
+            🎨 Edit Mask for Inpainting
+        </button>
+    </div>
     {% if revised_prompt %}
         <p><strong>Revised Prompt:</strong> {{ revised_prompt }}</p>
     {% endif %}

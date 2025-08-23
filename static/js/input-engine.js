@@ -10,6 +10,7 @@ export class InputEngine {
     isEnabled = false;
     cursorElement = null;
     constructor(canvas, settings = {}) {
+        console.log('InputEngine constructor called with canvas:', canvas);
         this.canvas = canvas;
         this.settings = {
             enableDrawing: true,
@@ -17,13 +18,16 @@ export class InputEngine {
             capturePointer: true,
             ...settings
         };
+        console.log('InputEngine settings:', this.settings);
         this.setupEventListeners();
         this.setupTouchAction();
+        console.log('InputEngine initialization complete');
     }
     /**
      * Set up pointer event listeners
      */
     setupEventListeners() {
+        console.log('Setting up event listeners on canvas:', this.canvas);
         // Pointer Events API handlers
         this.canvas.addEventListener('pointerdown', this.handlePointerDown.bind(this));
         this.canvas.addEventListener('pointermove', this.handlePointerMove.bind(this));
@@ -35,6 +39,7 @@ export class InputEngine {
         // Mouse cursor tracking for brush preview
         this.canvas.addEventListener('mouseenter', this.handleMouseEnter.bind(this));
         this.canvas.addEventListener('mouseleave', this.handleMouseLeave.bind(this));
+        console.log('Event listeners attached');
     }
     /**
      * Set up touch-action CSS property to prevent scrolling
@@ -48,6 +53,7 @@ export class InputEngine {
      * Handle pointer down events
      */
     handlePointerDown(event) {
+        console.log('Pointer down event received:', event.type, 'enabled:', this.isEnabled, 'enableDrawing:', this.settings.enableDrawing);
         if (!this.isEnabled || !this.settings.enableDrawing)
             return;
         // Prevent default behavior
