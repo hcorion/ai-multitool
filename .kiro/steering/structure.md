@@ -1,8 +1,10 @@
 # Project Structure
 
 ## Root Level
-- `app.py` - Main Flask application with all routes and image generation logic
-- `dynamic_prompts.py` - Dynamic prompt system for template-based generation
+- `app.py` - Main Flask application with unified image API and Responses API chat integration
+- `image_models.py` - Pydantic data models for unified image generation API
+- `novelai_client.py` - Dedicated NovelAI API client for all image operations
+- `dynamic_prompts.py` - Dynamic prompt system with multi-character prompt support
 - `utils.py` - Utility functions (stop word removal, text processing)
 - `secret-key.txt` - Auto-generated Flask session secret (gitignored)
 
@@ -19,13 +21,19 @@
 - `share.html` - Shared content display
 
 ## Static Assets (`static/`)
-- `css/` - Compiled CSS from Sass
-- `sass/` - Sass source files
-- `js/` - Compiled TypeScript output
-- `images/` - User-generated images organized by username
+- `css/` - Compiled CSS from Sass with character prompt styling
+- `sass/` - Sass source files with responsive design for multi-character interface
+- `js/` - Compiled TypeScript output with unified image API integration
+- `images/` - User-generated images with comprehensive metadata including character prompts
 - `prompts/` - User-specific dynamic prompt files
-- `chats/` - Chat conversation storage
+- `chats/` - Local conversation storage with response ID tracking and auto-generated titles
 - `assets/` - Static assets and resources
+
+## Testing Structure (`tests/`)
+- `tests/` - Unit tests for core functionality
+- `tests/integration/` - Integration tests with real API calls
+- `conftest.py` - Shared fixtures and test configuration
+- Test files organized by module: `test_app.py`, `test_novelai_client.py`, `test_image_models.py`
 
 ## Configuration Files
 - `tsconfig.json` - TypeScript compiler configuration
@@ -49,7 +57,17 @@
 - Thumbnails: `{sequence}-{cleaned_prompt}.thumb.jpg`
 
 ### Code Organization
-- Flask routes handle both GET (display) and POST (processing)
-- TypeScript modules export functions and types
-- Image processing functions return structured data objects
-- Error handling with custom exception classes
+- **Flask routes**: Unified `/image` endpoint for all image operations, `/chat` for streaming responses
+- **TypeScript modules**: Provider-specific UI logic with character prompt management
+- **Image processing**: Structured request/response objects with comprehensive error handling
+- **API clients**: Dedicated client classes (NovelAIClient, ResponsesAPIClient) with proper abstraction
+- **Data models**: Pydantic models for type safety and validation across all operations
+- **Conversation management**: Local thread storage with ConversationManager class and response ID tracking
+
+### Advanced Features
+- **Multi-character prompts**: Character-specific positive/negative prompts for NovelAI
+- **Inpainting operations**: Mask-based image editing with provider-specific processing
+- **Img2img transformations**: Image-to-image generation with strength parameters
+- **Auto-generated titles**: AI-powered conversation title generation using gpt-5-nano
+- **Diff highlighting**: Visual comparison between original and processed prompts
+- **Metadata preservation**: Comprehensive image metadata including character prompt tracking

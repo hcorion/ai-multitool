@@ -2,10 +2,11 @@
 
 ## Backend
 - **Python 3.13** Latest idiomatic python with Flask web framework
-- **OpenAI Python SDK** for Image and Responses API integration
+- **OpenAI Python SDK** for GPT-Image-1 generation, inpainting, and Responses API (gpt-5/gpt-5-nano models)
 - **Pydantic** for data validation and serialization with type safety
 - **Requests** library for StabilityAI and NovelAI API calls
-- **Pillow (PIL)** for image processing and metadata handling
+- **NovelAI Client** custom client for text-to-image, inpainting, and img2img operations
+- **Pillow (PIL)** for image processing, metadata handling, and mask processing
 - **Wand (ImageMagick)** for advanced image operations and grid generation
 - **Pygments** and **Markdown** for syntax highlighting and text processing
 
@@ -71,9 +72,27 @@ pytest --cov=app --cov-report=html
 ```
 
 ## Environment Variables
-- `OPENAI_API_KEY`: Required for OpenAI Image and chat functionality
+- `OPENAI_API_KEY`: Required for OpenAI GPT-Image-1 generation, inpainting, and Responses API chat functionality
 - `STABILITY_API_KEY`: Required for StabilityAI image generation
-- `NOVELAI_API_KEY`: Required for NovelAI image generation
+- `NOVELAI_API_KEY`: Required for NovelAI text-to-image, inpainting, and img2img operations
+
+## API Models and Endpoints
+
+### OpenAI Integration
+- **Chat Model**: gpt-5 via Responses API (`client.responses.create()`)
+- **Title Generation**: gpt-5-nano for automatic conversation titles
+- **Image Model**: gpt-image-1 for text-to-image and inpainting operations
+- **Endpoints**: `/image` (unified), `/chat` (streaming), `/update-conversation-title`
+
+### NovelAI Integration
+- **Models**: nai-diffusion-4-5-full, nai-diffusion-4-5-full-inpainting
+- **Operations**: Text-to-image, inpainting with mask processing, img2img transformations
+- **Features**: Multi-character prompts, negative prompting, image upscaling
+
+### Image Operations
+- **Unified API**: Single `/image` endpoint handles all providers and operations
+- **Request Types**: ImageGenerationRequest, InpaintingRequest, Img2ImgRequest
+- **Response Format**: Structured JSON with success/error handling and metadata
 ## Testing Guidelines
 
 ### Test Structure
