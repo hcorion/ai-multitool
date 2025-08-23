@@ -159,6 +159,40 @@
             min-width: 40px;
             text-align: right;
         }
+        
+        .brush-size-drag-handle {
+            width: 20px;
+            height: 20px;
+            background: #404040;
+            border: 1px solid #666666;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: ew-resize;
+            color: #cccccc;
+            font-size: 12px;
+            user-select: none;
+            transition: all 0.2s ease;
+            margin-left: 4px;
+            
+            &:hover {
+                background: #505050;
+                border-color: #0066cc;
+                color: #ffffff;
+            }
+            
+            &.dragging {
+                background: #0066cc;
+                border-color: #0077dd;
+                color: #ffffff;
+                box-shadow: 0 2px 8px rgba(0, 102, 204, 0.4);
+            }
+            
+            &:active {
+                transform: scale(0.95);
+            }
+        }
     }
 }
 
@@ -302,9 +336,29 @@
     }
 }
 
+// Brush cursor preview
+.brush-cursor-preview {
+    position: fixed;
+    pointer-events: none;
+    z-index: 10001;
+    border: 2px solid rgba(255, 255, 255, 0.8);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    display: none;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
+    transition: width 0.1s ease, height 0.1s ease;
+    
+    // Ensure cursor is always visible
+    mix-blend-mode: difference;
+}
+
 // Print styles (hide the popup)
 @media print {
     .inpainting-mask-popup {
+        display: none !important;
+    }
+    
+    .brush-cursor-preview {
         display: none !important;
     }
 }

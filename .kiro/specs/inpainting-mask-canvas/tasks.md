@@ -26,7 +26,8 @@
 
   - _Requirements: 6.1, 6.2, 6.3, 6.4_
 
-- [ ] 3. Create basic brush engine with binary mask enforcement
+- [x] 3. Create basic brush engine with binary mask enforcement
+
   - Implement BrushEngine class with hard-edge circular stamp functionality
   - Create binary mask data structure using Uint8Array (0 or 255 values only)
   - Add stamp spacing logic at 0.35 × brush diameter intervals
@@ -34,7 +35,13 @@
   - Write unit tests to verify binary mask invariant is maintained
   - _Requirements: 1.4, 9.1, 9.2, 9.3, 9.5_
 
-- [ ] 4. Implement unified pointer input handling
+- [x] 4. Implement unified pointer input handling
+
+
+
+
+
+
   - Create InputEngine class using Pointer Events API for mouse/pen/touch
   - Add pointer capture during drawing with preventDefault on pointermove
   - Implement pointercancel handling for robust input management
@@ -42,7 +49,10 @@
   - Add touch-action: none styling to prevent page scrolling
   - _Requirements: 5.1, 5.2, 5.4, 2.4, 2.5_
 
-- [ ] 5. Add paint and erase tools with brush size control
+- [x] 5. Add paint and erase tools with brush size control
+
+
+
   - Implement paint tool that stamps white (255) values to mask
   - Implement erase tool that stamps black (0) values to mask
   - Create brush size slider with 1-200 pixel range

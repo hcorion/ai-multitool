@@ -93,6 +93,10 @@
         <button class="test-button" onclick="testBrushEngine()">
             🖌️ Test Brush Engine
         </button>
+        
+        <button class="test-button" onclick="testPaintEraseTools()">
+            🎨 Test Paint/Erase Tools
+        </button>
 
         <div id="result" class="result-container">
             <h3>Result:</h3>
@@ -109,6 +113,10 @@
                 <li><strong>Keyboard Shortcuts:</strong>
                     <ul>
                         <li>Escape - Cancel and close</li>
+                        <li>P - Switch to Paint tool</li>
+                        <li>E - Switch to Erase tool</li>
+                        <li>[ - Decrease brush size</li>
+                        <li>] - Increase brush size</li>
                         <li>Ctrl+Z - Undo (placeholder)</li>
                         <li>Ctrl+Shift+Z - Redo (placeholder)</li>
                     </ul>
@@ -292,6 +300,157 @@
                 } catch (error) {
                     resultText.textContent = `❌ Brush Engine Test Failed: ${error.message}`;
                     console.error('Brush engine test error:', error);
+                }
+            }).catch(error => {
+                const resultDiv = document.getElementById('result');
+                const resultText = document.getElementById('result-text');
+                resultDiv.style.display = 'block';
+                resultText.textContent = `❌ Failed to load brush engine: ${error.message}`;
+            });
+        };
+        
+        window.testPaintEraseTools = function() {
+            // Test paint and erase functionality
+            import('{{ url_for("static", filename="js/brush-engine.js") }}').then(({ BrushEngine }) => {
+                const resultDiv = document.getElementById('result');
+                const resultText = document.getElementById('result-text');
+                const maskPreview = document.getElementById('mask-preview');
+                
+                resultDiv.style.display = 'block';
+                resultText.textContent = '🎨 Testing Paint and Erase Tools...';
+                
+                try {
+                    // Create test mask data
+                    const width = 100;
+                    const height = 100;
+                    const maskData = new Uint8Array(width * height);
+                    
+                    // Create brush engine
+                    const engine = new BrushEngine({ size: 20, mode: 'paint' });
+                    
+                    // Test paint tool (should stamp white/255 values)
+                    engine.updateSettings({ mode: 'paint' });
+                    const paintResult = engine.applyStamp(maskData, width, height, 30, 30, 20, 'paint');
+                    
+                    // Count painted pixels
+                    let paintedPixels = 0;
+                    for (let i = 0; i < maskData.length; i++) {
+                        if (maskData[i] === 255) paintedPixels++;
+                    }
+                    
+                    // Test erase tool (should stamp black/0 values)
+                    engine.updateSettings({ mode: 'erase' });
+                    const eraseResult = engine.applyStamp(maskData, width, height, 30, 30, 15, 'erase');
+                    
+                    // Count remaining painted pixels after erase
+                    let remainingPixels = 0;
+                    for (let i = 0; i < maskData.length; i++) {
+                        if (maskData[i] === 255) remainingPixels++;
+                    }
+                    
+                    // Test brush size range (1-200)
+                    const testSizes = [1, 50, 100, 200];
+                    const sizeResults = testSizes.map(size => {
+                        const testMask = new Uint8Array(200 * 200);
+                        engine.updateSettings({ size });
+                        const hasChanges = engine.applyStamp(testMask, 200, 200, 100, 100, size, 'paint');
+                        
+                        let pixelCount = 0;
+                        for (let i = 0; i < testMask.length; i++) {
+                            if (testMask[i] === 255) pixelCount++;
+                        }
+                        
+                        return { size, hasChanges, pixelCount };
+                    });
+                    
+                    // Validate binary invariant
+                    const isValid = BrushEngine.validateBinaryMask(maskData);
+                    
+                    // Create visual preview
+                    const canvas = document.createElement('canvas');
+                    canvas.width = width;
+                    canvas.height = height;
+                    canvas.style.maxWidth = '200px';
+                    canvas.style.border = '1px solid #666';
+                    canvas.style.borderRadius = '4px';
+                    canvas.style.imageRendering = 'pixelated';
+                    
+                    const ctx = canvas.getContext('2d');
+                    const imageData = ctx.createImageData(width, height);
+                    
+                    // Convert mask to RGBA for display
+                    for (let i = 0; i < maskData.length; i++) {
+                        const pixelIndex = i * 4;
+                        const value = maskData[i];
+                        imageData.data[pixelIndex] = value;     // R
+                        imageData.data[pixelIndex + 1] = value; // G
+                        imageData.data[pixelIndex + 2] = value; // B
+                        imageData.data[pixelIndex + 3] = 255;   // A
+                    }
+                    
+                    ctx.putImageData(imageData, 0, 0);
+                    
+                    // Create size test visualization
+                    const sizeCanvas = document.createElement('canvas');
+                    sizeCanvas.width = 400;
+                    sizeCanvas.height = 100;
+                    sizeCanvas.style.maxWidth = '400px';
+                    sizeCanvas.style.border = '1px solid #666';
+                    sizeCanvas.style.borderRadius = '4px';
+                    sizeCanvas.style.imageRendering = 'pixelated';
+                    
+                    const sizeCtx = sizeCanvas.getContext('2d');
+                    sizeCtx.fillStyle = '#333';
+                    sizeCtx.fillRect(0, 0, 400, 100);
+                    
+                    // Draw circles for different brush sizes
+                    sizeCtx.fillStyle = '#fff';
+                    testSizes.forEach((size, index) => {
+                        const x = 50 + index * 80;
+                        const y = 50;
+                        sizeCtx.beginPath();
+                        sizeCtx.arc(x, y, size / 2, 0, Math.PI * 2);
+                        sizeCtx.fill();
+                        
+                        sizeCtx.fillStyle = '#ccc';
+                        sizeCtx.font = '12px Arial';
+                        sizeCtx.textAlign = 'center';
+                        sizeCtx.fillText(`${size}px`, x, y + size/2 + 15);
+                        sizeCtx.fillStyle = '#fff';
+                    });
+                    
+                    resultText.textContent = `✅ Paint/Erase Tools Test Results:
+• Paint tool: ${paintResult ? 'Working' : 'Failed'} (${paintedPixels} pixels painted)
+• Erase tool: ${eraseResult ? 'Working' : 'Failed'} (${remainingPixels} pixels remaining)
+• Binary invariant: ${isValid ? 'Valid' : 'Invalid'}
+• Size range tests: ${sizeResults.every(r => r.hasChanges) ? 'All passed' : 'Some failed'}`;
+                    
+                    maskPreview.innerHTML = '<h4>Paint/Erase Test Results:</h4>';
+                    
+                    const paintEraseDiv = document.createElement('div');
+                    paintEraseDiv.innerHTML = '<p><strong>Paint then Erase Test:</strong></p>';
+                    paintEraseDiv.appendChild(canvas);
+                    maskPreview.appendChild(paintEraseDiv);
+                    
+                    const sizeDiv = document.createElement('div');
+                    sizeDiv.innerHTML = '<p><strong>Brush Size Range Test (1px, 50px, 100px, 200px):</strong></p>';
+                    sizeDiv.appendChild(sizeCanvas);
+                    maskPreview.appendChild(sizeDiv);
+                    
+                    // Add detailed results
+                    const detailsDiv = document.createElement('div');
+                    detailsDiv.style.marginTop = '10px';
+                    detailsDiv.style.fontSize = '12px';
+                    detailsDiv.style.color = '#ccc';
+                    detailsDiv.innerHTML = `
+                        <p><strong>Size Test Details:</strong></p>
+                        ${sizeResults.map(r => `<p>Size ${r.size}px: ${r.pixelCount} pixels painted</p>`).join('')}
+                    `;
+                    maskPreview.appendChild(detailsDiv);
+                    
+                } catch (error) {
+                    resultText.textContent = `❌ Paint/Erase Tools Test Failed: ${error.message}`;
+                    console.error('Paint/erase tools test error:', error);
                 }
             }).catch(error => {
                 const resultDiv = document.getElementById('result');

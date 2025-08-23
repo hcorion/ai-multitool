@@ -3,6 +3,7 @@
  * for image inpainting operations with full-screen popup overlay.
  */
 import { CanvasManager } from './canvas-manager.js';
+import { InputEngine } from './input-engine.js';
 export class InpaintingMaskCanvas {
     config;
     popupElement = null;
@@ -10,7 +11,9 @@ export class InpaintingMaskCanvas {
     overlayCanvas = null;
     maskAlphaCanvas = null;
     canvasManager = null;
+    inputEngine = null;
     isVisible = false;
+    currentBrushSize = 20;
     constructor(config) {
         this.config = config;
     }
@@ -92,9 +95,15 @@ export class InpaintingMaskCanvas {
         const brushSizeValue = document.createElement('span');
         brushSizeValue.className = 'brush-size-value';
         brushSizeValue.textContent = '20px';
+        // Create drag handle for press-and-hold resize
+        const brushSizeDragHandle = document.createElement('div');
+        brushSizeDragHandle.className = 'brush-size-drag-handle';
+        brushSizeDragHandle.innerHTML = '⟷';
+        brushSizeDragHandle.title = 'Press and hold to drag resize';
         brushSizeContainer.appendChild(brushSizeLabel);
         brushSizeContainer.appendChild(brushSizeSlider);
         brushSizeContainer.appendChild(brushSizeValue);
+        brushSizeContainer.appendChild(brushSizeDragHandle);
         const undoButton = document.createElement('button');
         undoButton.className = 'toolbar-btn undo-btn';
         undoButton.innerHTML = '↶ Undo';
@@ -152,6 +161,14 @@ export class InpaintingMaskCanvas {
         }
         // Create canvas manager
         this.canvasManager = new CanvasManager(this.imageCanvas, this.overlayCanvas, this.maskAlphaCanvas);
+        // Create input engine for the overlay canvas (drawing surface)
+        this.inputEngine = new InputEngine(this.overlayCanvas, {
+            enableDrawing: true,
+            preventScrolling: true,
+            capturePointer: true
+        });
+        // Set up input event handler
+        this.inputEngine.setEventHandler(this.handleInputEvent.bind(this));
         // Set up resize handler
         window.addEventListener('resize', this.handleResize.bind(this));
     }
@@ -176,6 +193,11 @@ export class InpaintingMaskCanvas {
             brushSizeValue.textContent = `${size}px`;
             this.setBrushSize(parseInt(size));
         });
+        // Press-and-hold drag resize functionality
+        const brushSizeDragHandle = this.popupElement.querySelector('.brush-size-drag-handle');
+        if (brushSizeDragHandle && brushSizeSlider && brushSizeValue) {
+            this.setupBrushSizeDragResize(brushSizeDragHandle, brushSizeSlider, brushSizeValue);
+        }
         // History controls
         undoBtn?.addEventListener('click', () => this.undo());
         redoBtn?.addEventListener('click', () => this.redo());
@@ -194,6 +216,12 @@ export class InpaintingMaskCanvas {
         try {
             await this.canvasManager.loadImage(imageUrl);
             this.hideError();
+            // Enable input handling after image is loaded
+            if (this.inputEngine) {
+                this.inputEngine.enable();
+                this.inputEngine.updateCursorSize(this.currentBrushSize);
+                this.inputEngine.updateCursorMode('paint'); // Default to paint mode
+            }
         }
         catch (error) {
             throw error;
@@ -210,11 +238,107 @@ export class InpaintingMaskCanvas {
         if (this.canvasManager) {
             this.canvasManager.getBrushEngine().updateSettings({ mode: tool });
         }
+        // Update cursor preview
+        if (this.inputEngine) {
+            this.inputEngine.updateCursorMode(tool);
+        }
     }
     setBrushSize(size) {
+        this.currentBrushSize = size;
         if (this.canvasManager) {
             this.canvasManager.getBrushEngine().updateSettings({ size });
         }
+        if (this.inputEngine) {
+            this.inputEngine.updateCursorSize(size);
+        }
+    }
+    adjustBrushSize(delta) {
+        const newSize = Math.max(1, Math.min(200, this.currentBrushSize + delta));
+        this.setBrushSize(newSize);
+        // Update UI elements
+        if (this.popupElement) {
+            const slider = this.popupElement.querySelector('.brush-size-slider');
+            const valueDisplay = this.popupElement.querySelector('.brush-size-value');
+            if (slider) {
+                slider.value = newSize.toString();
+            }
+            if (valueDisplay) {
+                valueDisplay.textContent = `${newSize}px`;
+            }
+        }
+    }
+    setupBrushSizeDragResize(dragHandle, slider, valueDisplay) {
+        let isDragging = false;
+        let startX = 0;
+        let startSize = 0;
+        let dragTimeout = null;
+        const startDrag = (clientX) => {
+            isDragging = true;
+            startX = clientX;
+            startSize = this.currentBrushSize;
+            dragHandle.classList.add('dragging');
+            document.body.style.cursor = 'ew-resize';
+            // Prevent text selection during drag
+            document.body.style.userSelect = 'none';
+        };
+        const updateDrag = (clientX) => {
+            if (!isDragging)
+                return;
+            const deltaX = clientX - startX;
+            const sensitivity = 0.5; // Pixels per pixel of mouse movement
+            const newSize = Math.max(1, Math.min(200, startSize + deltaX * sensitivity));
+            // Update slider and display
+            slider.value = newSize.toString();
+            valueDisplay.textContent = `${Math.round(newSize)}px`;
+            this.setBrushSize(Math.round(newSize));
+        };
+        const endDrag = () => {
+            if (!isDragging)
+                return;
+            isDragging = false;
+            dragHandle.classList.remove('dragging');
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+        };
+        // Mouse events for drag handle
+        dragHandle.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            // Start drag immediately on mouse down
+            startDrag(e.clientX);
+            // Add global mouse move and up listeners
+            const handleMouseMove = (e) => updateDrag(e.clientX);
+            const handleMouseUp = () => {
+                endDrag();
+                document.removeEventListener('mousemove', handleMouseMove);
+                document.removeEventListener('mouseup', handleMouseUp);
+            };
+            document.addEventListener('mousemove', handleMouseMove);
+            document.addEventListener('mouseup', handleMouseUp);
+        });
+        // Touch events for drag handle
+        dragHandle.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (e.touches.length === 1) {
+                startDrag(e.touches[0].clientX);
+                const handleTouchMove = (e) => {
+                    e.preventDefault();
+                    if (e.touches.length === 1) {
+                        updateDrag(e.touches[0].clientX);
+                    }
+                };
+                const handleTouchEnd = () => {
+                    endDrag();
+                    document.removeEventListener('touchmove', handleTouchMove);
+                    document.removeEventListener('touchend', handleTouchEnd);
+                    document.removeEventListener('touchcancel', handleTouchEnd);
+                };
+                document.addEventListener('touchmove', handleTouchMove, { passive: false });
+                document.addEventListener('touchend', handleTouchEnd);
+                document.addEventListener('touchcancel', handleTouchEnd);
+            }
+        });
+        // Prevent context menu on drag handle
+        dragHandle.addEventListener('contextmenu', (e) => e.preventDefault());
     }
     undo() {
         // Undo logic will be implemented in later tasks
@@ -256,6 +380,28 @@ export class InpaintingMaskCanvas {
                     event.preventDefault();
                 }
                 break;
+            case 'p':
+            case 'P':
+                // Switch to paint tool
+                this.setTool('paint');
+                event.preventDefault();
+                break;
+            case 'e':
+            case 'E':
+                // Switch to erase tool
+                this.setTool('erase');
+                event.preventDefault();
+                break;
+            case '[':
+                // Decrease brush size
+                this.adjustBrushSize(-5);
+                event.preventDefault();
+                break;
+            case ']':
+                // Increase brush size
+                this.adjustBrushSize(5);
+                event.preventDefault();
+                break;
         }
     }
     handleResize() {
@@ -263,6 +409,37 @@ export class InpaintingMaskCanvas {
             this.canvasManager.handleResize();
         }
     }
+    /**
+     * Handle input events from the InputEngine
+     */
+    handleInputEvent = (event) => {
+        if (!this.canvasManager)
+            return;
+        // Convert screen coordinates to image coordinates
+        const imageCoords = this.canvasManager.screenToImage(event.screenX, event.screenY);
+        if (!imageCoords)
+            return; // Outside canvas bounds
+        const brushEngine = this.canvasManager.getBrushEngine();
+        const settings = brushEngine.getSettings();
+        switch (event.type) {
+            case 'start':
+                // Start a new brush stroke
+                this.canvasManager.startBrushStroke(imageCoords.x, imageCoords.y, this.currentBrushSize, settings.mode);
+                break;
+            case 'move':
+                // Continue the brush stroke
+                this.canvasManager.continueBrushStroke(imageCoords.x, imageCoords.y);
+                break;
+            case 'end':
+                // End the brush stroke
+                this.canvasManager.endBrushStroke();
+                break;
+            case 'cancel':
+                // Cancel the brush stroke
+                this.canvasManager.endBrushStroke();
+                break;
+        }
+    };
     showError(message) {
         if (!this.popupElement)
             return;
@@ -314,6 +491,11 @@ export class InpaintingMaskCanvas {
     cleanup() {
         // Remove resize handler
         window.removeEventListener('resize', this.handleResize.bind(this));
+        // Cleanup input engine
+        if (this.inputEngine) {
+            this.inputEngine.cleanup();
+            this.inputEngine = null;
+        }
         if (this.popupElement) {
             this.popupElement.remove();
             this.popupElement = null;
