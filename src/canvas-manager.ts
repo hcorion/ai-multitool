@@ -3,6 +3,8 @@
  * for the inpainting mask canvas system.
  */
 
+import { BrushEngine, BrushStroke } from './brush-engine.js';
+
 export interface CanvasState {
     imageWidth: number;
     imageHeight: number;
@@ -26,6 +28,7 @@ export class CanvasManager implements CoordinateTransform {
     private maskAlphaCanvas: OffscreenCanvas | HTMLCanvasElement;
     private state: CanvasState | null = null;
     private loadedImage: HTMLImageElement | null = null;
+    private brushEngine: BrushEngine;
 
     constructor(
         imageCanvas: HTMLCanvasElement,
@@ -35,6 +38,7 @@ export class CanvasManager implements CoordinateTransform {
         this.imageCanvas = imageCanvas;
         this.overlayCanvas = overlayCanvas;
         this.maskAlphaCanvas = maskAlphaCanvas;
+        this.brushEngine = new BrushEngine();
     }
 
     /**
@@ -405,6 +409,135 @@ export class CanvasManager implements CoordinateTransform {
         }
 
         return imageData;
+    }
+
+    /**
+     * Start a brush stroke at the given image coordinates
+     */
+    public startBrushStroke(imageX: number, imageY: number, brushSize: number, mode: 'paint' | 'erase'): BrushStroke | null {
+        if (!this.state) return null;
+
+        // Update brush engine settings
+        this.brushEngine.updateSettings({ size: brushSize, mode });
+
+        // Start the stroke
+        const stroke = this.brushEngine.startStroke(imageX, imageY);
+
+        // Apply initial stamp
+        const hasChanges = this.brushEngine.applyStamp(
+            this.state.maskData,
+            this.state.imageWidth,
+            this.state.imageHeight,
+            imageX,
+            imageY,
+            brushSize,
+            mode
+        );
+
+        if (hasChanges) {
+            this.state.isDirty = true;
+        }
+
+        return stroke;
+    }
+
+    /**
+     * Continue a brush stroke to the given image coordinates
+     */
+    public continueBrushStroke(imageX: number, imageY: number): boolean {
+        if (!this.state) return false;
+
+        try {
+            // Get stamp positions along the path
+            const stampPositions = this.brushEngine.continueStroke(imageX, imageY);
+            
+            if (stampPositions.length === 0) return false;
+
+            const settings = this.brushEngine.getSettings();
+            let hasChanges = false;
+
+            // Apply each stamp
+            for (const pos of stampPositions) {
+                if (this.brushEngine.applyStamp(
+                    this.state.maskData,
+                    this.state.imageWidth,
+                    this.state.imageHeight,
+                    pos.x,
+                    pos.y,
+                    settings.size,
+                    settings.mode
+                )) {
+                    hasChanges = true;
+                }
+            }
+
+            if (hasChanges) {
+                this.state.isDirty = true;
+            }
+
+            return hasChanges;
+        } catch (error) {
+            console.error('Error continuing brush stroke:', error);
+            return false;
+        }
+    }
+
+    /**
+     * End the current brush stroke
+     */
+    public endBrushStroke(): BrushStroke | null {
+        return this.brushEngine.endStroke();
+    }
+
+    /**
+     * Apply a complete brush stroke path
+     */
+    public applyBrushStroke(stroke: BrushStroke): boolean {
+        if (!this.state) return false;
+
+        const hasChanges = this.brushEngine.applyStrokePath(
+            this.state.maskData,
+            this.state.imageWidth,
+            this.state.imageHeight,
+            stroke.points,
+            stroke.brushSize,
+            stroke.mode
+        );
+
+        if (hasChanges) {
+            this.state.isDirty = true;
+            // Validate binary invariant
+            if (!BrushEngine.validateBinaryMask(this.state.maskData)) {
+                console.warn('Binary mask invariant violated, enforcing binary values');
+                BrushEngine.enforceBinaryMask(this.state.maskData);
+            }
+        }
+
+        return hasChanges;
+    }
+
+    /**
+     * Get the brush engine instance
+     */
+    public getBrushEngine(): BrushEngine {
+        return this.brushEngine;
+    }
+
+    /**
+     * Validate that the current mask maintains binary invariant
+     */
+    public validateMaskBinary(): boolean {
+        if (!this.state) return true;
+        return BrushEngine.validateBinaryMask(this.state.maskData);
+    }
+
+    /**
+     * Enforce binary values in the current mask
+     */
+    public enforceMaskBinary(): void {
+        if (!this.state) return;
+        BrushEngine.enforceBinaryMask(this.state.maskData);
+        this.state.isDirty = true;
     }
 
     /**

@@ -262,11 +262,17 @@ export class InpaintingMaskCanvas {
         
         paintBtn?.classList.toggle('active', tool === 'paint');
         eraseBtn?.classList.toggle('active', tool === 'erase');
+        
+        // Update brush engine mode
+        if (this.canvasManager) {
+            this.canvasManager.getBrushEngine().updateSettings({ mode: tool });
+        }
     }
 
     private setBrushSize(size: number): void {
-        // Brush size logic will be implemented in later tasks
-        console.log(`Brush size set to: ${size}`);
+        if (this.canvasManager) {
+            this.canvasManager.getBrushEngine().updateSettings({ size });
+        }
     }
 
     private undo(): void {

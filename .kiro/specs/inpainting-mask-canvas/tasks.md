@@ -21,6 +21,9 @@
   - Add "contain" scaling with letterboxing to maintain aspect ratio
   - Create coordinate transformation system between screen and image pixels
   - Write unit tests for coordinate mapping accuracy
+
+
+
   - _Requirements: 6.1, 6.2, 6.3, 6.4_
 
 - [ ] 3. Create basic brush engine with binary mask enforcement

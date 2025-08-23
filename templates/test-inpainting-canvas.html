@@ -89,6 +89,10 @@
         <button class="test-button" onclick="testWithLocalImage()">
             🖼️ Test with Local Image
         </button>
+        
+        <button class="test-button" onclick="testBrushEngine()">
+            🖌️ Test Brush Engine
+        </button>
 
         <div id="result" class="result-container">
             <h3>Result:</h3>
@@ -219,6 +223,82 @@
 
             document.body.appendChild(fileInput);
             fileInput.click();
+        };
+        
+        window.testBrushEngine = function() {
+            // Test the brush engine directly
+            import('{{ url_for("static", filename="js/brush-engine.js") }}').then(({ BrushEngine }) => {
+                const resultDiv = document.getElementById('result');
+                const resultText = document.getElementById('result-text');
+                const maskPreview = document.getElementById('mask-preview');
+                
+                resultDiv.style.display = 'block';
+                resultText.textContent = '🧪 Testing Brush Engine...';
+                
+                try {
+                    // Create a test mask
+                    const width = 100;
+                    const height = 100;
+                    const maskData = new Uint8Array(width * height);
+                    
+                    // Create brush engine
+                    const engine = new BrushEngine({ size: 20, mode: 'paint' });
+                    
+                    // Test single stamp
+                    const hasChanges = engine.applyStamp(maskData, width, height, 50, 50, 20, 'paint');
+                    
+                    // Validate binary invariant
+                    const isValid = BrushEngine.validateBinaryMask(maskData);
+                    
+                    // Count painted pixels
+                    let paintedPixels = 0;
+                    for (let i = 0; i < maskData.length; i++) {
+                        if (maskData[i] === 255) paintedPixels++;
+                    }
+                    
+                    // Create preview canvas
+                    const canvas = document.createElement('canvas');
+                    canvas.width = width;
+                    canvas.height = height;
+                    canvas.style.maxWidth = '200px';
+                    canvas.style.border = '1px solid #666';
+                    canvas.style.borderRadius = '4px';
+                    canvas.style.imageRendering = 'pixelated';
+                    
+                    const ctx = canvas.getContext('2d');
+                    const imageData = ctx.createImageData(width, height);
+                    
+                    // Convert mask to RGBA
+                    for (let i = 0; i < maskData.length; i++) {
+                        const pixelIndex = i * 4;
+                        const value = maskData[i];
+                        imageData.data[pixelIndex] = value;     // R
+                        imageData.data[pixelIndex + 1] = value; // G
+                        imageData.data[pixelIndex + 2] = value; // B
+                        imageData.data[pixelIndex + 3] = 255;   // A
+                    }
+                    
+                    ctx.putImageData(imageData, 0, 0);
+                    
+                    resultText.textContent = `✅ Brush Engine Test Results:
+• Changes detected: ${hasChanges}
+• Binary invariant valid: ${isValid}
+• Painted pixels: ${paintedPixels}
+• Circular stamp applied successfully!`;
+                    
+                    maskPreview.innerHTML = '<h4>Brush Test Result:</h4>';
+                    maskPreview.appendChild(canvas);
+                    
+                } catch (error) {
+                    resultText.textContent = `❌ Brush Engine Test Failed: ${error.message}`;
+                    console.error('Brush engine test error:', error);
+                }
+            }).catch(error => {
+                const resultDiv = document.getElementById('result');
+                const resultText = document.getElementById('result-text');
+                resultDiv.style.display = 'block';
+                resultText.textContent = `❌ Failed to load brush engine: ${error.message}`;
+            });
         };
     </script>
 </body>
