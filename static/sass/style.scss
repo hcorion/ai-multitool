@@ -2,6 +2,9 @@
 @use "sass:color";
 @use "sass:string";
 
+// Import inpainting mask canvas styles
+@import "inpainting-mask-canvas";
+
 $background-color: #121212;
 $text-color: #fff;
 $modal-bg-color: rgba(0, 0, 0, 0.9);

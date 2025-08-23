@@ -1,5 +1,6 @@
 import * as utils from "./utils.js";
 import * as chat from "./chat.js";
+import { InpaintingMaskCanvas } from "./inpainting-mask-canvas.js";
 
 // TypeScript interfaces for the new image API
 interface ImageOperationResponse {
@@ -144,7 +145,7 @@ function renderImageResult(response: ImageOperationResponse): void {
                 characterPrompts.push(value);
             }
         }
-        
+
         if (characterPrompts.length > 0) {
             characterPromptsHtml = `<p><strong>Character Prompts:</strong> ${characterPrompts.join(', ')}</p>`;
         }
@@ -407,122 +408,122 @@ function openGridModal(evt: Event): void {
  */
 function highlightTextDifferences(baseText: string, processedText: string): string {
     const WORD_RE = hasUnicodePropertyEscapes()
-      ? /[\p{L}\p{N}_]+/gu
-      : /[A-Za-z0-9_]+/g;
-  
+        ? /[\p{L}\p{N}_]+/gu
+        : /[A-Za-z0-9_]+/g;
+
     const baseWords = extractWords(baseText, WORD_RE);
     const processedWords = extractWords(processedText, WORD_RE);
-  
+
     // Indices in processedWords that are kept (unchanged)
     const keptProcessedIdx = lcsKeepIndicesPreferLeft(baseWords, processedWords);
-  
+
     const OPEN = '<span class="diff-highlight">';
     const CLOSE = '</span>';
-  
+
     let result = '';
     let lastIndex = 0;
     let processedWordIdx = 0;
     let inHighlight = false;
-  
+
     for (const m of matchAll(processedText, WORD_RE)) {
-      const start = m.index!;
-      const end = start + m[0].length;
-      const sep = processedText.slice(lastIndex, start);
-      const isKept = keptProcessedIdx.has(processedWordIdx);
-  
-      if (inHighlight) {
-        if (isKept) {
-          // Close current highlight; separator belongs outside; then the kept token
-          result += CLOSE;
-          inHighlight = false;
-          result += sep + m[0];
+        const start = m.index!;
+        const end = start + m[0].length;
+        const sep = processedText.slice(lastIndex, start);
+        const isKept = keptProcessedIdx.has(processedWordIdx);
+
+        if (inHighlight) {
+            if (isKept) {
+                // Close current highlight; separator belongs outside; then the kept token
+                result += CLOSE;
+                inHighlight = false;
+                result += sep + m[0];
+            } else {
+                // Continue the same highlight; separator goes inside to merge adjacent changes
+                result += sep + m[0];
+            }
         } else {
-          // Continue the same highlight; separator goes inside to merge adjacent changes
-          result += sep + m[0];
+            if (isKept) {
+                result += sep + m[0];
+            } else {
+                // Start a new highlight span
+                result += sep + OPEN + m[0];
+                inHighlight = true;
+            }
         }
-      } else {
-        if (isKept) {
-          result += sep + m[0];
-        } else {
-          // Start a new highlight span
-          result += sep + OPEN + m[0];
-          inHighlight = true;
-        }
-      }
-  
-      processedWordIdx++;
-      lastIndex = end;
+
+        processedWordIdx++;
+        lastIndex = end;
     }
-  
+
     if (inHighlight) result += CLOSE;
     if (lastIndex < processedText.length) result += processedText.slice(lastIndex);
     return result;
-  
+
     // ----- helpers -----
-  
+
     function extractWords(text: string, re: RegExp): string[] {
-      const words: string[] = [];
-      for (const m of matchAll(text, re)) words.push(m[0]);
-      return words;
+        const words: string[] = [];
+        for (const m of matchAll(text, re)) words.push(m[0]);
+        return words;
     }
-  
+
     function hasUnicodePropertyEscapes(): boolean {
-      try {
-        new RegExp('\\p{L}', 'u');
-        return true;
-      } catch {
-        return false;
-      }
+        try {
+            new RegExp('\\p{L}', 'u');
+            return true;
+        } catch {
+            return false;
+        }
     }
-  
+
     // Iterates matches like String.prototype.matchAll
     function* matchAll(text: string, re: RegExp): IterableIterator<RegExpMatchArray> {
-      const flags = re.flags.includes('g') ? re.flags : re.flags + 'g';
-      const rx = new RegExp(re.source, flags);
-      let m: RegExpMatchArray | null;
-      while ((m = rx.exec(text)) !== null) {
-        yield m;
-        if (m[0].length === 0) rx.lastIndex++;
-      }
+        const flags = re.flags.includes('g') ? re.flags : re.flags + 'g';
+        const rx = new RegExp(re.source, flags);
+        let m: RegExpMatchArray | null;
+        while ((m = rx.exec(text)) !== null) {
+            yield m;
+            if (m[0].length === 0) rx.lastIndex++;
+        }
     }
-  
+
     /**
      * LCS backtracking that prefers moving LEFT on ties, i.e., it keeps earlier
      * indices in the processed sequence. This avoids matching the later duplicate
      * (e.g., the "example" inside a replacement) over the earlier unchanged one.
      */
     function lcsKeepIndicesPreferLeft(a: string[], b: string[]): Set<number> {
-      const n = a.length, m = b.length;
-      const dp: number[][] = Array.from({ length: n + 1 }, () => new Array<number>(m + 1).fill(0));
-  
-      for (let i = 1; i <= n; i++) {
-        for (let j = 1; j <= m; j++) {
-          if (a[i - 1] === b[j - 1]) {
-            dp[i][j] = dp[i - 1][j - 1] + 1;
-          } else {
-            const up = dp[i - 1][j];
-            const left = dp[i][j - 1];
-            dp[i][j] = up > left ? up : left; // just max; tie handled in backtrack
-          }
+        const n = a.length, m = b.length;
+        const dp: number[][] = Array.from({ length: n + 1 }, () => new Array<number>(m + 1).fill(0));
+
+        for (let i = 1; i <= n; i++) {
+            for (let j = 1; j <= m; j++) {
+                if (a[i - 1] === b[j - 1]) {
+                    dp[i][j] = dp[i - 1][j - 1] + 1;
+                } else {
+                    const up = dp[i - 1][j];
+                    const left = dp[i][j - 1];
+                    dp[i][j] = up > left ? up : left; // just max; tie handled in backtrack
+                }
+            }
         }
-      }
-  
-      const kept = new Set<number>();
-      let i = n, j = m;
-      while (i > 0 && j > 0) {
-        if (a[i - 1] === b[j - 1]) {
-          kept.add(j - 1);
-          i--; j--;
-        } else if (dp[i - 1][j] > dp[i][j - 1]) {
-          // Prefer LEFT when equal => choose UP only when strictly better
-          i--;
-        } else {
-          j--;
+
+        const kept = new Set<number>();
+        let i = n, j = m;
+        while (i > 0 && j > 0) {
+            if (a[i - 1] === b[j - 1]) {
+                kept.add(j - 1);
+                i--; j--;
+            } else if (dp[i - 1][j] > dp[i][j - 1]) {
+                // Prefer LEFT when equal => choose UP only when strictly better
+                i--;
+            } else {
+                j--;
+            }
         }
-      }
-      return kept;
+        return kept;
     }
-  }
+}
 
 /**
  * Escapes HTML special characters to prevent XSS
@@ -588,10 +589,10 @@ function updateGridModalImage(): void {
                 const promptType = characterMatch[2];
                 const baseKey = `Character ${charNum} ${promptType}`;
                 const processedKey = `Character ${charNum} Processed ${promptType}`;
-                
+
                 const baseValue = metadata[baseKey] || "";
                 const processedValue = metadata[processedKey] || "";
-                
+
                 // If both exist, compare them
                 if (baseValue && processedValue) {
                     const isDifferent = baseValue !== processedValue;
@@ -600,7 +601,7 @@ function updateGridModalImage(): void {
                         processed: processedValue,
                         isDifferent: isDifferent
                     };
-                    
+
                     if (isDifferent) {
                         // Show both base and processed with different styling
                         processedMetadata[baseKey] = baseValue;
@@ -621,10 +622,10 @@ function updateGridModalImage(): void {
                 const promptType = mainPromptMatch[1];
                 const baseKey = promptType;
                 const processedKey = `Revised ${promptType}`;
-                
+
                 const baseValue = metadata[baseKey] || "";
                 const processedValue = metadata[processedKey] || "";
-                
+
                 // If both exist, compare them
                 if (baseValue && processedValue) {
                     const isDifferent = baseValue !== processedValue;
@@ -633,7 +634,7 @@ function updateGridModalImage(): void {
                         processed: processedValue,
                         isDifferent: isDifferent
                     };
-                    
+
                     if (isDifferent) {
                         // Show both base and processed with different styling
                         processedMetadata[baseKey] = baseValue;
@@ -675,15 +676,15 @@ function updateGridModalImage(): void {
             // Add special styling for character prompt values
             if (key.match(/^Character \d+ (Prompt|Negative|Processed Prompt|Processed Negative)$/)) {
                 infoValue.classList.add("character-prompt-value");
-                
+
                 // Add additional styling for processed prompts when they differ from base
                 if (key.match(/^Character \d+ Processed (Prompt|Negative)$/)) {
                     infoValue.classList.add("processed-prompt-value");
-                    
+
                     // Find the corresponding base prompt to highlight differences
                     const baseKey = key.replace(" Processed ", " ");
                     const basePromptData = characterPromptData[baseKey];
-                    
+
                     if (basePromptData && basePromptData.isDifferent) {
                         // Use diff highlighting for processed prompts
                         infoValue.innerHTML = highlightTextDifferences(basePromptData.base, basePromptData.processed);
@@ -696,11 +697,11 @@ function updateGridModalImage(): void {
             } else if (key.match(/^Revised (Prompt|Negative Prompt)$/)) {
                 // Handle main revised prompts
                 infoValue.classList.add("character-prompt-value", "processed-prompt-value");
-                
+
                 // Find the corresponding base prompt to highlight differences
                 const baseKey = key.replace("Revised ", "");
                 const basePromptData = mainPromptData[baseKey];
-                
+
                 if (basePromptData && basePromptData.isDifferent) {
                     // Use diff highlighting for processed main prompts
                     infoValue.innerHTML = highlightTextDifferences(basePromptData.base, basePromptData.processed);
@@ -784,6 +785,31 @@ function closeGridModal(): void {
 
 function closeGenModal(): void {
     document.getElementById("image-modal")!.style.display = "none";
+}
+
+/**
+ * Opens the inpainting mask canvas for the given image
+ * @param imageUrl - URL of the image to edit
+ */
+async function openInpaintingMaskCanvas(imageUrl: string): Promise<void> {
+    const canvas = new InpaintingMaskCanvas({
+        imageUrl: imageUrl,
+        containerElement: document.body,
+        onMaskComplete: (maskDataUrl: string) => {
+            console.log('Mask completed:', maskDataUrl);
+            // TODO: Integrate with existing inpainting workflow
+            // This will be implemented in later tasks
+        },
+        onCancel: () => {
+            console.log('Mask editing cancelled');
+        }
+    });
+
+    try {
+        await canvas.show();
+    } catch (error) {
+        console.error('Failed to open inpainting mask canvas:', error);
+    }
 }
 
 function toggleShowAdvanced(event: Event): void {
@@ -1434,7 +1460,7 @@ function renderPromptFiles(): void {
     }
 
     noFilesElement.style.display = "none";
-    
+
     const filesHtml = promptFiles.map(file => `
         <div class="prompt-file-item" data-file-name="${escapeHtml(file.name)}">
             <div class="prompt-file-header">
@@ -1474,7 +1500,7 @@ function showPromptFileModal(mode: "create" | "edit", fileName?: string): void {
         nameInput.value = fileName;
         nameInput.disabled = true;
         currentEditingFile = fileName;
-        
+
         const file = promptFiles.find(f => f.name === fileName);
         contentTextarea.value = file ? file.content.join('\n') : "";
     }

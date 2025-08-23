@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inpainting Mask Canvas Test</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        body {
+            padding: 20px;
+            font-family: 'Roboto', sans-serif;
+        }
+
+        .test-container {
+            max-width: 800px;
+            margin: 0 auto;
+            text-align: center;
+        }
+
+        .test-button {
+            background-color: #0066cc;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px;
+        }
+
+        .test-button:hover {
+            background-color: #0077dd;
+        }
+
+        .test-image {
+            max-width: 300px;
+            margin: 20px;
+            border: 2px solid #666;
+            border-radius: 8px;
+        }
+
+        .result-container {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #333;
+            border-radius: 8px;
+            color: #fff;
+            display: none;
+        }
+
+        .result-container h3 {
+            margin-top: 0;
+            color: #0066cc;
+        }
+
+        .back-link {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: #0066cc;
+            text-decoration: none;
+            font-size: 16px;
+        }
+
+        .back-link:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+
+<body>
+    <a href="{{ url_for('index') }}" class="back-link">← Back to Main App</a>
+
+    <div class="test-container">
+        <h1>Inpainting Mask Canvas Test</h1>
+        <p>This is a test page for the inpainting mask canvas functionality.</p>
+        <p>Click the button below to test the mask canvas with a sample image.</p>
+
+        <img src="{{ url_for('static', filename='images/0xmanga/0000000296-ai-generated_0_2_john_kafka_0_.png') }}"
+            alt="Test Image" class="test-image" id="test-image">
+
+        <br>
+
+        <button class="test-button" onclick="testInpaintingCanvas()">
+            🎨 Open Mask Canvas
+        </button>
+
+        <button class="test-button" onclick="testWithLocalImage()">
+            🖼️ Test with Local Image
+        </button>
+
+        <div id="result" class="result-container">
+            <h3>Result:</h3>
+            <p id="result-text"></p>
+            <div id="mask-preview" style="margin-top: 10px;"></div>
+        </div>
+
+        <div style="margin-top: 30px; text-align: left; max-width: 600px; margin-left: auto; margin-right: auto;">
+            <h3>Instructions:</h3>
+            <ul>
+                <li><strong>Paint Tool:</strong> Click and drag to paint mask areas (white)</li>
+                <li><strong>Erase Tool:</strong> Click and drag to erase mask areas (black)</li>
+                <li><strong>Brush Size:</strong> Use the slider to adjust brush size</li>
+                <li><strong>Keyboard Shortcuts:</strong>
+                    <ul>
+                        <li>Escape - Cancel and close</li>
+                        <li>Ctrl+Z - Undo (placeholder)</li>
+                        <li>Ctrl+Shift+Z - Redo (placeholder)</li>
+                    </ul>
+                </li>
+                <li><strong>Complete:</strong> Click the green "Complete" button to finish</li>
+                <li><strong>Cancel:</strong> Click the red "Cancel" button to abort</li>
+            </ul>
+        </div>
+    </div>
+
+    <script type="module">
+        import { InpaintingMaskCanvas } from '{{ url_for("static", filename="js/inpainting-mask-canvas.js") }}';
+
+        window.testInpaintingCanvas = async function () {
+            const imageUrl = document.getElementById('test-image').src;
+            const resultDiv = document.getElementById('result');
+            const resultText = document.getElementById('result-text');
+            const maskPreview = document.getElementById('mask-preview');
+
+            const canvas = new InpaintingMaskCanvas({
+                imageUrl: imageUrl,
+                containerElement: document.body,
+                onMaskComplete: (maskDataUrl) => {
+                    resultDiv.style.display = 'block';
+                    resultText.textContent = `✅ Mask completed successfully! Data URL length: ${maskDataUrl.length} characters`;
+
+                    // Show a preview of the mask
+                    maskPreview.innerHTML = `
+                        <h4>Mask Preview:</h4>
+                        <img src="${maskDataUrl}" style="max-width: 200px; border: 1px solid #666; border-radius: 4px;" alt="Generated Mask">
+                    `;
+
+                    console.log('Mask completed:', maskDataUrl);
+                },
+                onCancel: () => {
+                    resultDiv.style.display = 'block';
+                    resultText.textContent = '❌ Mask editing was cancelled.';
+                    maskPreview.innerHTML = '';
+                    console.log('Mask editing cancelled');
+                }
+            });
+
+            try {
+                // Show loading state
+                resultDiv.style.display = 'block';
+                resultText.textContent = '⏳ Loading image...';
+                maskPreview.innerHTML = '';
+
+                await canvas.show();
+
+                // Hide loading state
+                resultDiv.style.display = 'none';
+            } catch (error) {
+                resultDiv.style.display = 'block';
+                resultText.textContent = `❌ Error opening canvas: ${error.message}`;
+                console.error('Error opening canvas:', error);
+            }
+        };
+
+        window.testWithLocalImage = function () {
+            // Create a file input for testing with local images
+            const fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.accept = 'image/*';
+            fileInput.style.display = 'none';
+
+            fileInput.onchange = function (e) {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function (e) {
+                        const imageUrl = e.target.result;
+
+                        const canvas = new InpaintingMaskCanvas({
+                            imageUrl: imageUrl,
+                            containerElement: document.body,
+                            onMaskComplete: (maskDataUrl) => {
+                                const resultDiv = document.getElementById('result');
+                                const resultText = document.getElementById('result-text');
+                                const maskPreview = document.getElementById('mask-preview');
+
+                                resultDiv.style.display = 'block';
+                                resultText.textContent = `✅ Mask completed for local image! Data URL length: ${maskDataUrl.length} characters`;
+
+                                maskPreview.innerHTML = `
+                                    <h4>Mask Preview:</h4>
+                                    <img src="${maskDataUrl}" style="max-width: 200px; border: 1px solid #666; border-radius: 4px;" alt="Generated Mask">
+                                `;
+
+                                console.log('Mask completed for local image:', maskDataUrl);
+                            },
+                            onCancel: () => {
+                                const resultDiv = document.getElementById('result');
+                                const resultText = document.getElementById('result-text');
+                                const maskPreview = document.getElementById('mask-preview');
+
+                                resultDiv.style.display = 'block';
+                                resultText.textContent = '❌ Mask editing was cancelled.';
+                                maskPreview.innerHTML = '';
+                                console.log('Mask editing cancelled');
+                            }
+                        });
+
+                        canvas.show();
+                    };
+                    reader.readAsDataURL(file);
+                }
+
+                // Clean up
+                document.body.removeChild(fileInput);
+            };
+
+            document.body.appendChild(fileInput);
+            fileInput.click();
+        };
+    </script>
+</body>
+
+</html>

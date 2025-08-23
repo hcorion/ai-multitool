@@ -1,5 +1,6 @@
 import * as utils from "./utils.js";
 import * as chat from "./chat.js";
+import { InpaintingMaskCanvas } from "./inpainting-mask-canvas.js";
 document.addEventListener("DOMContentLoaded", () => {
     $("#loading-spinner").hide();
     $("#prompt-form").on("submit", (event) => {
@@ -703,6 +704,30 @@ function closeGridModal() {
 }
 function closeGenModal() {
     document.getElementById("image-modal").style.display = "none";
+}
+/**
+ * Opens the inpainting mask canvas for the given image
+ * @param imageUrl - URL of the image to edit
+ */
+async function openInpaintingMaskCanvas(imageUrl) {
+    const canvas = new InpaintingMaskCanvas({
+        imageUrl: imageUrl,
+        containerElement: document.body,
+        onMaskComplete: (maskDataUrl) => {
+            console.log('Mask completed:', maskDataUrl);
+            // TODO: Integrate with existing inpainting workflow
+            // This will be implemented in later tasks
+        },
+        onCancel: () => {
+            console.log('Mask editing cancelled');
+        }
+    });
+    try {
+        await canvas.show();
+    }
+    catch (error) {
+        console.error('Failed to open inpainting mask canvas:', error);
+    }
 }
 function toggleShowAdvanced(event) {
     console.log("show advanced");

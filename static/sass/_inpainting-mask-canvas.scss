@@ -1,0 +1,310 @@
+// Inpainting Mask Canvas Styles
+// Full-screen popup overlay with dark background and professional UI
+
+.inpainting-mask-popup {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(0, 0, 0, 0.9);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(2px);
+    
+    // Prevent scrolling and selection
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+}
+
+.inpainting-mask-content {
+    display: flex;
+    flex-direction: column;
+    width: 95vw;
+    height: 95vh;
+    max-width: 1400px;
+    max-height: 1000px;
+    background-color: #2a2a2a;
+    border-radius: 8px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    overflow: hidden;
+}
+
+.inpainting-mask-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background-color: #1e1e1e;
+    border-bottom: 1px solid #404040;
+    flex-shrink: 0;
+    
+    .toolbar-btn {
+        padding: 8px 16px;
+        background-color: #404040;
+        color: #ffffff;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        transition: all 0.2s ease;
+        white-space: nowrap;
+        
+        &:hover {
+            background-color: #505050;
+            transform: translateY(-1px);
+        }
+        
+        &:active {
+            transform: translateY(0);
+        }
+        
+        &.active {
+            background-color: #0066cc;
+            
+            &:hover {
+                background-color: #0077dd;
+            }
+        }
+        
+        &.complete-btn {
+            background-color: #28a745;
+            margin-left: auto;
+            
+            &:hover {
+                background-color: #34ce57;
+            }
+        }
+        
+        &.cancel-btn {
+            background-color: #dc3545;
+            
+            &:hover {
+                background-color: #e74c3c;
+            }
+        }
+        
+        &:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            
+            &:hover {
+                background-color: #404040;
+                transform: none;
+            }
+        }
+    }
+    
+    .brush-size-container {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-left: 16px;
+        
+        label {
+            color: #cccccc;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        
+        .brush-size-slider {
+            width: 120px;
+            height: 6px;
+            background: #404040;
+            border-radius: 3px;
+            outline: none;
+            cursor: pointer;
+            
+            &::-webkit-slider-thumb {
+                appearance: none;
+                width: 18px;
+                height: 18px;
+                background: #0066cc;
+                border-radius: 50%;
+                cursor: pointer;
+                transition: all 0.2s ease;
+                
+                &:hover {
+                    background: #0077dd;
+                    transform: scale(1.1);
+                }
+            }
+            
+            &::-moz-range-thumb {
+                width: 18px;
+                height: 18px;
+                background: #0066cc;
+                border-radius: 50%;
+                border: none;
+                cursor: pointer;
+                transition: all 0.2s ease;
+                
+                &:hover {
+                    background: #0077dd;
+                    transform: scale(1.1);
+                }
+            }
+        }
+        
+        .brush-size-value {
+            color: #cccccc;
+            font-size: 14px;
+            font-weight: 500;
+            min-width: 40px;
+            text-align: right;
+        }
+    }
+}
+
+.inpainting-mask-canvas-container {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #1a1a1a;
+    
+    // Prevent touch actions that could interfere with drawing
+    touch-action: none;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
+.inpainting-canvas {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    border: 1px solid #404040;
+    border-radius: 4px;
+    
+    // Ensure crisp pixel rendering
+    image-rendering: -moz-crisp-edges;
+    image-rendering: -webkit-crisp-edges;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    
+    &.image-canvas {
+        z-index: 1;
+    }
+    
+    &.overlay-canvas {
+        z-index: 2;
+        pointer-events: none; // Allow events to pass through to image canvas
+    }
+}
+
+// Responsive design for smaller screens
+@media (max-width: 768px) {
+    .inpainting-mask-content {
+        width: 100vw;
+        height: 100vh;
+        border-radius: 0;
+    }
+    
+    .inpainting-mask-toolbar {
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 8px 12px;
+        
+        .toolbar-btn {
+            padding: 6px 12px;
+            font-size: 13px;
+        }
+        
+        .brush-size-container {
+            margin-left: 0;
+            
+            .brush-size-slider {
+                width: 80px;
+            }
+        }
+    }
+}
+
+// High contrast mode support
+@media (prefers-contrast: high) {
+    .inpainting-mask-popup {
+        background-color: rgba(0, 0, 0, 0.95);
+    }
+    
+    .inpainting-mask-content {
+        background-color: #000000;
+        border: 2px solid #ffffff;
+    }
+    
+    .inpainting-mask-toolbar {
+        background-color: #000000;
+        border-bottom: 2px solid #ffffff;
+        
+        .toolbar-btn {
+            background-color: #ffffff;
+            color: #000000;
+            border: 1px solid #000000;
+            
+            &:hover {
+                background-color: #cccccc;
+            }
+            
+            &.active {
+                background-color: #0066cc;
+                color: #ffffff;
+            }
+        }
+    }
+}
+
+// Reduced motion support
+@media (prefers-reduced-motion: reduce) {
+    .inpainting-mask-popup {
+        backdrop-filter: none;
+    }
+    
+    .toolbar-btn {
+        transition: none;
+        
+        &:hover {
+            transform: none;
+        }
+        
+        &:active {
+            transform: none;
+        }
+    }
+    
+    .brush-size-slider {
+        &::-webkit-slider-thumb {
+            transition: none;
+            
+            &:hover {
+                transform: none;
+            }
+        }
+        
+        &::-moz-range-thumb {
+            transition: none;
+            
+            &:hover {
+                transform: none;
+            }
+        }
+    }
+}
+
+// Print styles (hide the popup)
+@media print {
+    .inpainting-mask-popup {
+        display: none !important;
+    }
+}

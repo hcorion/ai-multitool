@@ -1,4 +1,259 @@
 @charset "UTF-8";
+.inpainting-mask-popup {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.9);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(2px);
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+
+.inpainting-mask-content {
+  display: flex;
+  flex-direction: column;
+  width: 95vw;
+  height: 95vh;
+  max-width: 1400px;
+  max-height: 1000px;
+  background-color: #2a2a2a;
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+
+.inpainting-mask-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background-color: #1e1e1e;
+  border-bottom: 1px solid #404040;
+  flex-shrink: 0;
+}
+.inpainting-mask-toolbar .toolbar-btn {
+  padding: 8px 16px;
+  background-color: #404040;
+  color: #ffffff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+.inpainting-mask-toolbar .toolbar-btn:hover {
+  background-color: #505050;
+  transform: translateY(-1px);
+}
+.inpainting-mask-toolbar .toolbar-btn:active {
+  transform: translateY(0);
+}
+.inpainting-mask-toolbar .toolbar-btn.active {
+  background-color: #0066cc;
+}
+.inpainting-mask-toolbar .toolbar-btn.active:hover {
+  background-color: #0077dd;
+}
+.inpainting-mask-toolbar .toolbar-btn.complete-btn {
+  background-color: #28a745;
+  margin-left: auto;
+}
+.inpainting-mask-toolbar .toolbar-btn.complete-btn:hover {
+  background-color: #34ce57;
+}
+.inpainting-mask-toolbar .toolbar-btn.cancel-btn {
+  background-color: #dc3545;
+}
+.inpainting-mask-toolbar .toolbar-btn.cancel-btn:hover {
+  background-color: #e74c3c;
+}
+.inpainting-mask-toolbar .toolbar-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.inpainting-mask-toolbar .toolbar-btn:disabled:hover {
+  background-color: #404040;
+  transform: none;
+}
+.inpainting-mask-toolbar .brush-size-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 16px;
+}
+.inpainting-mask-toolbar .brush-size-container label {
+  color: #cccccc;
+  font-size: 14px;
+  font-weight: 500;
+}
+.inpainting-mask-toolbar .brush-size-container .brush-size-slider {
+  width: 120px;
+  height: 6px;
+  background: #404040;
+  border-radius: 3px;
+  outline: none;
+  cursor: pointer;
+}
+.inpainting-mask-toolbar .brush-size-container .brush-size-slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  background: #0066cc;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.inpainting-mask-toolbar .brush-size-container .brush-size-slider::-webkit-slider-thumb:hover {
+  background: #0077dd;
+  transform: scale(1.1);
+}
+.inpainting-mask-toolbar .brush-size-container .brush-size-slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  background: #0066cc;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.inpainting-mask-toolbar .brush-size-container .brush-size-slider::-moz-range-thumb:hover {
+  background: #0077dd;
+  transform: scale(1.1);
+}
+.inpainting-mask-toolbar .brush-size-container .brush-size-value {
+  color: #cccccc;
+  font-size: 14px;
+  font-weight: 500;
+  min-width: 40px;
+  text-align: right;
+}
+
+.inpainting-mask-canvas-container {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #1a1a1a;
+  touch-action: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -khtml-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+.inpainting-canvas {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  border: 1px solid #404040;
+  border-radius: 4px;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: -webkit-crisp-edges;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+.inpainting-canvas.image-canvas {
+  z-index: 1;
+}
+.inpainting-canvas.overlay-canvas {
+  z-index: 2;
+  pointer-events: none;
+}
+
+@media (max-width: 768px) {
+  .inpainting-mask-content {
+    width: 100vw;
+    height: 100vh;
+    border-radius: 0;
+  }
+  .inpainting-mask-toolbar {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 8px 12px;
+  }
+  .inpainting-mask-toolbar .toolbar-btn {
+    padding: 6px 12px;
+    font-size: 13px;
+  }
+  .inpainting-mask-toolbar .brush-size-container {
+    margin-left: 0;
+  }
+  .inpainting-mask-toolbar .brush-size-container .brush-size-slider {
+    width: 80px;
+  }
+}
+@media (prefers-contrast: high) {
+  .inpainting-mask-popup {
+    background-color: rgba(0, 0, 0, 0.95);
+  }
+  .inpainting-mask-content {
+    background-color: #000000;
+    border: 2px solid #ffffff;
+  }
+  .inpainting-mask-toolbar {
+    background-color: #000000;
+    border-bottom: 2px solid #ffffff;
+  }
+  .inpainting-mask-toolbar .toolbar-btn {
+    background-color: #ffffff;
+    color: #000000;
+    border: 1px solid #000000;
+  }
+  .inpainting-mask-toolbar .toolbar-btn:hover {
+    background-color: #cccccc;
+  }
+  .inpainting-mask-toolbar .toolbar-btn.active {
+    background-color: #0066cc;
+    color: #ffffff;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .inpainting-mask-popup {
+    backdrop-filter: none;
+  }
+  .toolbar-btn {
+    transition: none;
+  }
+  .toolbar-btn:hover {
+    transform: none;
+  }
+  .toolbar-btn:active {
+    transform: none;
+  }
+  .brush-size-slider::-webkit-slider-thumb {
+    transition: none;
+  }
+  .brush-size-slider::-webkit-slider-thumb:hover {
+    transform: none;
+  }
+  .brush-size-slider::-moz-range-thumb {
+    transition: none;
+  }
+  .brush-size-slider::-moz-range-thumb:hover {
+    transform: none;
+  }
+}
+@media print {
+  .inpainting-mask-popup {
+    display: none !important;
+  }
+}
 body {
   font-family: "Roboto", sans-serif;
   background-color: #121212;
