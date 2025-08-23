@@ -79,6 +79,16 @@
 
 
 
+
+
+
+
+
+
+
+
+
+
   - Create ZoomPanController class for view transformation management
   - Add pinch-to-zoom gesture support for touch devices
   - Implement wheel+modifier zoom for mouse users

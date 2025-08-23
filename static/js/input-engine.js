@@ -224,13 +224,17 @@ export class InputEngine {
                 this.cursorElement.style.display = 'none';
                 return;
             }
-            // Now convert the image coordinates back to screen coordinates
-            // This accounts for all canvas transforms (zoom, pan, centering)
-            if ('imageToScreen' in this.coordinateTransformer) {
-                const transformedScreen = this.coordinateTransformer.imageToScreen(imageCoords.x, imageCoords.y);
-                cursorX = transformedScreen.x;
-                cursorY = transformedScreen.y;
-            }
+            // TEMPORARY FIX: Don't do round-trip conversion to avoid cursor teleporting
+            // The imageToScreen method is causing the cursor to teleport
+            // Just use the original screen coordinates for now
+            cursorX = screenX;
+            cursorY = screenY;
+            // TODO: Fix imageToScreen method and re-enable this:
+            // if ('imageToScreen' in this.coordinateTransformer) {
+            //     const transformedScreen = (this.coordinateTransformer as any).imageToScreen(imageCoords.x, imageCoords.y);
+            //     cursorX = transformedScreen.x;
+            //     cursorY = transformedScreen.y;
+            // }
         }
         // Position cursor at the transformed screen coordinates
         this.cursorElement.style.left = `${cursorX}px`;

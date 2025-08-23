@@ -17,6 +17,7 @@ export class InpaintingMaskCanvas {
     isVisible = false;
     currentBrushSize = 20;
     isZoomPanActive = false;
+    coordinateTransformer = null;
     constructor(config) {
         this.config = config;
     }
@@ -195,12 +196,26 @@ export class InpaintingMaskCanvas {
         this.inputEngine.setEventHandler(this.handleInputEvent.bind(this));
         console.log('Input event handler set');
         // Set up coordinate transformer for cursor preview
+        // IMPORTANT: This must use the SAME logic as the actual drawing system
         const coordinateTransformer = (screenX, screenY) => {
+            // Only log cursor coordinate transformation for debugging when needed
+            // (This gets called on every mouse move, so it's very spammy)
             if (this.zoomPanController) {
-                return this.zoomPanController.screenToImage(screenX, screenY);
+                const transform = this.zoomPanController.getTransform();
+                const isDefaultState = (Math.abs(transform.scale - 1.0) < 0.001 &&
+                    Math.abs(transform.translateX) < 0.001 &&
+                    Math.abs(transform.translateY) < 0.001);
+                if (isDefaultState) {
+                    // Use CanvasManager for default state (same as drawing logic)
+                    return this.canvasManager?.screenToImage(screenX, screenY, false) || null;
+                }
+                else {
+                    // Use ZoomPanController for transformed state (same as drawing logic)
+                    return this.zoomPanController.screenToImage(screenX, screenY, false);
+                }
             }
             else if (this.canvasManager) {
-                return this.canvasManager.screenToImage(screenX, screenY);
+                return this.canvasManager.screenToImage(screenX, screenY, false);
             }
             return null;
         };
@@ -212,13 +227,30 @@ export class InpaintingMaskCanvas {
             return { scale: 1, translateX: 0, translateY: 0 };
         };
         // Add imageToScreen method to convert image coordinates back to screen coordinates
+        // IMPORTANT: This must use the SAME logic as the coordinate transformer above
         coordinateTransformer.imageToScreen = (imageX, imageY) => {
             if (this.zoomPanController) {
-                return this.zoomPanController.imageToScreen(imageX, imageY);
+                const transform = this.zoomPanController.getTransform();
+                const isDefaultState = (Math.abs(transform.scale - 1.0) < 0.001 &&
+                    Math.abs(transform.translateX) < 0.001 &&
+                    Math.abs(transform.translateY) < 0.001);
+                if (isDefaultState) {
+                    // Use CanvasManager for default state (same as coordinate transformer)
+                    return this.canvasManager?.imageToScreen(imageX, imageY) || { x: imageX, y: imageY };
+                }
+                else {
+                    // Use ZoomPanController for transformed state (same as coordinate transformer)
+                    return this.zoomPanController.imageToScreen(imageX, imageY);
+                }
             }
-            // Fallback if no zoom/pan controller
+            else if (this.canvasManager) {
+                return this.canvasManager.imageToScreen(imageX, imageY);
+            }
+            // Fallback if no coordinate system available
             return { x: imageX, y: imageY };
         };
+        // Store the coordinate transformer for debugging comparisons
+        this.coordinateTransformer = coordinateTransformer;
         this.inputEngine.setCoordinateTransformer(coordinateTransformer);
         // Create zoom/pan controller for the overlay canvas
         this.zoomPanController = new ZoomPanController(this.overlayCanvas, {
@@ -229,13 +261,64 @@ export class InpaintingMaskCanvas {
             enablePinchZoom: true,
             enableWheelZoom: true,
             enablePan: true,
-            wheelZoomModifier: 'ctrl'
+            wheelZoomModifier: 'none' // Remove Ctrl requirement for better UX
         });
         // Set up zoom/pan event handler
         this.zoomPanController.setEventHandler(this.handleZoomPanEvent);
         console.log('Zoom/pan controller created');
+        // Add additional event listeners to the container for better UX
+        // This allows zoom/pan to work anywhere in the container, not just on the canvas
+        this.setupContainerEventListeners();
         // Set up resize handler
         window.addEventListener('resize', this.handleResize.bind(this));
+    }
+    setupContainerEventListeners() {
+        const canvasContainer = this.overlayCanvas?.parentElement;
+        if (!canvasContainer || !this.overlayCanvas)
+            return;
+        // Prevent browser zoom/scroll when interacting with the container
+        canvasContainer.addEventListener('wheel', (event) => {
+            // Always prevent default to stop browser zoom
+            event.preventDefault();
+            // Forward the event to the ZoomPanController if it's over the canvas area
+            // or if the user is already in a zoom/pan gesture
+            if (!this.overlayCanvas)
+                return;
+            const rect = this.overlayCanvas.getBoundingClientRect();
+            const isOverCanvas = (event.clientX >= rect.left && event.clientX <= rect.right &&
+                event.clientY >= rect.top && event.clientY <= rect.bottom);
+            if (isOverCanvas || this.isZoomPanActive) {
+                // Create a synthetic wheel event on the canvas
+                const syntheticEvent = new WheelEvent('wheel', {
+                    deltaX: event.deltaX,
+                    deltaY: event.deltaY,
+                    deltaZ: event.deltaZ,
+                    deltaMode: event.deltaMode,
+                    clientX: event.clientX,
+                    clientY: event.clientY,
+                    ctrlKey: event.ctrlKey,
+                    shiftKey: event.shiftKey,
+                    altKey: event.altKey,
+                    metaKey: event.metaKey,
+                    bubbles: false,
+                    cancelable: true
+                });
+                this.overlayCanvas.dispatchEvent(syntheticEvent);
+            }
+        }, { passive: false });
+        // Handle touch events for mobile pan/zoom
+        canvasContainer.addEventListener('touchstart', (event) => {
+            // Prevent default touch behavior that might cause browser zoom/scroll
+            if (event.touches.length > 1) {
+                event.preventDefault();
+            }
+        }, { passive: false });
+        canvasContainer.addEventListener('touchmove', (event) => {
+            // Prevent default for multi-touch (pinch zoom) and when already in gesture
+            if (event.touches.length > 1 || this.isZoomPanActive) {
+                event.preventDefault();
+            }
+        }, { passive: false });
     }
     attachEventListeners() {
         if (!this.popupElement)
@@ -566,27 +649,77 @@ export class InpaintingMaskCanvas {
      * Handle input events from the InputEngine
      */
     handleInputEvent = (event) => {
-        console.log('Input event:', event.type, 'at', event.screenX, event.screenY);
+        console.log('🖌️ DRAWING Input event:', event.type, 'at', event.screenX, event.screenY);
         if (!this.canvasManager) {
-            console.log('No canvas manager');
+            console.log('❌ DRAWING: No canvas manager');
             return;
         }
         // Don't process drawing events if zoom/pan is active
         if (this.isZoomPanActive) {
-            console.log('Zoom/pan active, ignoring drawing input');
+            console.log('⏸️ DRAWING: Zoom/pan active, ignoring drawing input');
             return;
         }
         // Convert screen coordinates to image coordinates
-        // FIXED: Always use CanvasManager for coordinate conversion as it gives correct results
-        // The ZoomPanController's coordinate transformation has issues with the current canvas setup
+        // Use ZoomPanController when transforms are active, CanvasManager when at default state
         let imageCoords = null;
-        imageCoords = this.canvasManager.screenToImage(event.screenX, event.screenY);
-        console.log('Using CanvasManager for coordinate conversion (FIXED)');
+        // Only log on actual drawing events (start, move, end), not on every mouse move
+        const shouldLog = event.type === 'start' || event.type === 'end';
+        if (this.zoomPanController) {
+            const transform = this.zoomPanController.getTransform();
+            const isDefaultState = (Math.abs(transform.scale - 1.0) < 0.001 &&
+                Math.abs(transform.translateX) < 0.001 &&
+                Math.abs(transform.translateY) < 0.001);
+            if (shouldLog)
+                console.log('🖌️ DRAWING transform state:', { transform, isDefaultState });
+            if (isDefaultState) {
+                if (shouldLog)
+                    console.log('🖌️ DRAWING: Using CanvasManager for default state');
+                // Use CanvasManager for default state (works perfectly)
+                imageCoords = this.canvasManager.screenToImage(event.screenX, event.screenY, shouldLog);
+                if (shouldLog)
+                    console.log('🖌️ DRAWING CanvasManager result:', imageCoords);
+            }
+            else {
+                if (shouldLog)
+                    console.log('🖌️ DRAWING: Using ZoomPanController for transformed state');
+                // Use ZoomPanController for transformed state
+                imageCoords = this.zoomPanController.screenToImage(event.screenX, event.screenY, shouldLog);
+                if (shouldLog)
+                    console.log('🖌️ DRAWING ZoomPanController result:', imageCoords);
+            }
+        }
+        else {
+            if (shouldLog)
+                console.log('🖌️ DRAWING: Using CanvasManager fallback');
+            // Fallback to CanvasManager
+            imageCoords = this.canvasManager.screenToImage(event.screenX, event.screenY, shouldLog);
+            if (shouldLog)
+                console.log('🖌️ DRAWING CanvasManager fallback result:', imageCoords);
+        }
         if (!imageCoords) {
-            console.log('Outside canvas bounds');
+            console.log('❌ DRAWING: Outside canvas bounds');
             return; // Outside canvas bounds
         }
-        console.log('Image coords:', imageCoords);
+        if (shouldLog)
+            console.log('✅ DRAWING: Final image coords:', imageCoords);
+        // 🔍 COMPARISON LOG: Show the difference between cursor and drawing coordinates
+        // This will help us identify any misalignment (only on actual drawing events)
+        if (shouldLog) {
+            const cursorCoords = this.coordinateTransformer?.(event.screenX, event.screenY);
+            if (cursorCoords) {
+                const coordDiff = {
+                    x: Math.abs(imageCoords.x - cursorCoords.x),
+                    y: Math.abs(imageCoords.y - cursorCoords.y)
+                };
+                console.log('🔍 COORDINATE COMPARISON:', {
+                    screen: { x: event.screenX, y: event.screenY },
+                    cursor: cursorCoords,
+                    drawing: imageCoords,
+                    difference: coordDiff,
+                    aligned: coordDiff.x === 0 && coordDiff.y === 0
+                });
+            }
+        }
         const brushEngine = this.canvasManager.getBrushEngine();
         const settings = brushEngine.getSettings();
         console.log('Brush settings:', settings);

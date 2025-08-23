@@ -242,15 +242,33 @@ export class CanvasManager {
     /**
      * Convert screen coordinates to image pixel coordinates
      */
-    screenToImage(screenX, screenY) {
-        if (!this.state)
+    screenToImage(screenX, screenY, debug = false) {
+        if (debug)
+            console.log('🔍 CanvasManager.screenToImage called:', { screenX, screenY });
+        if (!this.state) {
+            if (debug)
+                console.log('❌ CanvasManager: No state available');
             return null;
+        }
         const canvasRect = this.imageCanvas.getBoundingClientRect();
         // Convert to canvas-relative coordinates
         const canvasX = screenX - canvasRect.left;
         const canvasY = screenY - canvasRect.top;
+        if (debug)
+            console.log('📐 CanvasManager: Canvas rect and relative coords', {
+                rect: { left: canvasRect.left, top: canvasRect.top, width: canvasRect.width, height: canvasRect.height },
+                canvasX,
+                canvasY,
+                state: {
+                    scale: this.state.scale,
+                    imageWidth: this.state.imageWidth,
+                    imageHeight: this.state.imageHeight
+                }
+            });
         // Check if point is within canvas bounds (using actual displayed canvas size)
         if (canvasX < 0 || canvasY < 0 || canvasX >= canvasRect.width || canvasY >= canvasRect.height) {
+            if (debug)
+                console.log('❌ CanvasManager: Point outside canvas bounds');
             return null;
         }
         // Convert to image coordinates using the scale factor
@@ -259,7 +277,17 @@ export class CanvasManager {
         // Clamp to image bounds
         const clampedX = Math.max(0, Math.min(this.state.imageWidth - 1, imageX));
         const clampedY = Math.max(0, Math.min(this.state.imageHeight - 1, imageY));
-        return { x: clampedX, y: clampedY };
+        if (debug)
+            console.log('📊 CanvasManager calculation:', {
+                rawImageX: imageX,
+                rawImageY: imageY,
+                clampedX,
+                clampedY
+            });
+        const result = { x: clampedX, y: clampedY };
+        if (debug)
+            console.log('✅ CanvasManager result:', result);
+        return result;
     }
     /**
      * Convert image pixel coordinates to screen coordinates
