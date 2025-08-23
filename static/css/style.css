@@ -168,6 +168,23 @@
 .inpainting-mask-toolbar .brush-size-container .brush-size-drag-handle:active {
   transform: scale(0.95);
 }
+.inpainting-mask-toolbar .zoom-controls-container {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 16px;
+  padding-left: 16px;
+  border-left: 1px solid #404040;
+}
+.inpainting-mask-toolbar .zoom-controls-container .toolbar-btn {
+  padding: 6px 10px;
+  font-size: 16px;
+  min-width: 36px;
+}
+.inpainting-mask-toolbar .zoom-controls-container .toolbar-btn.zoom-reset-btn {
+  font-size: 14px;
+  padding: 6px 8px;
+}
 
 .inpainting-mask-canvas-container {
   flex: 1;
@@ -190,7 +207,6 @@
   position: absolute;
   top: 50%;
   left: 50%;
-  transform: translate(-50%, -50%);
   border: 1px solid #404040;
   border-radius: 4px;
   image-rendering: -moz-crisp-edges;

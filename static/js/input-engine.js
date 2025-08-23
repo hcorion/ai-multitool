@@ -9,6 +9,7 @@ export class InputEngine {
     eventHandler = null;
     isEnabled = false;
     cursorElement = null;
+    coordinateTransformer = null;
     constructor(canvas, settings = {}) {
         console.log('InputEngine constructor called with canvas:', canvas);
         this.canvas = canvas;
@@ -210,10 +211,32 @@ export class InputEngine {
      * Update cursor preview position
      */
     updateCursorPreview(screenX, screenY) {
-        if (this.cursorElement) {
-            this.cursorElement.style.left = `${screenX}px`;
-            this.cursorElement.style.top = `${screenY}px`;
+        if (!this.cursorElement)
+            return;
+        let cursorX = screenX;
+        let cursorY = screenY;
+        // If we have a coordinate transformer, we need to account for canvas transforms
+        if (this.coordinateTransformer) {
+            // First, convert screen coordinates to image coordinates
+            const imageCoords = this.coordinateTransformer(screenX, screenY);
+            if (!imageCoords) {
+                // Cursor is outside valid drawing area, hide it
+                this.cursorElement.style.display = 'none';
+                return;
+            }
+            // Now convert the image coordinates back to screen coordinates
+            // This accounts for all canvas transforms (zoom, pan, centering)
+            if ('imageToScreen' in this.coordinateTransformer) {
+                const transformedScreen = this.coordinateTransformer.imageToScreen(imageCoords.x, imageCoords.y);
+                cursorX = transformedScreen.x;
+                cursorY = transformedScreen.y;
+            }
         }
+        // Position cursor at the transformed screen coordinates
+        this.cursorElement.style.left = `${cursorX}px`;
+        this.cursorElement.style.top = `${cursorY}px`;
+        // Make sure cursor is visible when updating position
+        this.cursorElement.style.display = 'block';
     }
     /**
      * Show cursor preview
@@ -259,8 +282,14 @@ export class InputEngine {
      */
     updateCursorSize(size) {
         if (this.cursorElement) {
-            this.cursorElement.style.width = `${size}px`;
-            this.cursorElement.style.height = `${size}px`;
+            // If we have a coordinate transformer with scale info, scale the cursor size
+            let displaySize = size;
+            if (this.coordinateTransformer && this.coordinateTransformer.getTransform) {
+                const transform = this.coordinateTransformer.getTransform();
+                displaySize = size * transform.scale;
+            }
+            this.cursorElement.style.width = `${displaySize}px`;
+            this.cursorElement.style.height = `${displaySize}px`;
         }
     }
     /**
@@ -285,6 +314,12 @@ export class InputEngine {
         this.eventHandler = handler;
     }
     /**
+     * Set coordinate transformer for cursor preview positioning
+     */
+    setCoordinateTransformer(transformer) {
+        this.coordinateTransformer = transformer;
+    }
+    /**
      * Enable input handling
      */
     enable() {
@@ -299,7 +334,7 @@ export class InputEngine {
         this.canvas.style.cursor = 'default'; // Restore default cursor
         this.hideCursorPreview();
         // Cancel any active pointers
-        for (const [pointerId, pointerState] of this.activePointers) {
+        for (const [pointerId, pointerState] of Array.from(this.activePointers.entries())) {
             if (this.settings.capturePointer && this.canvas.hasPointerCapture(pointerId)) {
                 this.canvas.releasePointerCapture(pointerId);
             }
@@ -354,7 +389,7 @@ export class InputEngine {
      * Force cancel all active pointers (useful for cleanup)
      */
     cancelAllPointers() {
-        for (const [pointerId, pointerState] of this.activePointers) {
+        for (const [pointerId, pointerState] of Array.from(this.activePointers.entries())) {
             if (this.settings.capturePointer && this.canvas.hasPointerCapture(pointerId)) {
                 this.canvas.releasePointerCapture(pointerId);
             }

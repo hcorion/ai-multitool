@@ -157,8 +157,11 @@ export class CanvasManager {
         canvases.forEach(canvas => {
             canvas.style.width = `${this.state.displayWidth}px`;
             canvas.style.height = `${this.state.displayHeight}px`;
-            // Don't set left/top - let CSS centering handle positioning
-            // The CSS uses transform: translate(-50%, -50%) to center the canvas
+            // Apply initial centering transform (will be overridden by zoom/pan if active)
+            if (!canvas.style.transform || canvas.style.transform === '') {
+                canvas.style.transform = 'translate(-50%, -50%)';
+                canvas.style.transformOrigin = '50% 50%';
+            }
         });
     }
     /**
@@ -536,9 +539,35 @@ export class CanvasManager {
         this.state.isDirty = true;
     }
     /**
+     * Apply zoom/pan transform to canvases
+     */
+    applyTransform(transform) {
+        if (!this.state)
+            return;
+        const canvases = [this.imageCanvas, this.overlayCanvas];
+        canvases.forEach(canvas => {
+            // Combine the centering transform (-50%, -50%) with zoom/pan transform
+            // The order is important: first center, then apply zoom/pan
+            canvas.style.transform = `translate(-50%, -50%) translate(${transform.translateX}px, ${transform.translateY}px) scale(${transform.scale})`;
+            canvas.style.transformOrigin = '50% 50%'; // Set origin to center for proper scaling
+        });
+    }
+    /**
+     * Reset canvas transforms
+     */
+    resetTransform() {
+        const canvases = [this.imageCanvas, this.overlayCanvas];
+        canvases.forEach(canvas => {
+            // Reset to just the centering transform
+            canvas.style.transform = 'translate(-50%, -50%)';
+            canvas.style.transformOrigin = '50% 50%';
+        });
+    }
+    /**
      * Cleanup resources
      */
     cleanup() {
+        this.resetTransform();
         this.state = null;
         this.loadedImage = null;
     }

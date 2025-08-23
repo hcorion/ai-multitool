@@ -194,6 +194,26 @@
             }
         }
     }
+    
+    .zoom-controls-container {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        margin-left: 16px;
+        padding-left: 16px;
+        border-left: 1px solid #404040;
+        
+        .toolbar-btn {
+            padding: 6px 10px;
+            font-size: 16px;
+            min-width: 36px;
+            
+            &.zoom-reset-btn {
+                font-size: 14px;
+                padding: 6px 8px;
+            }
+        }
+    }
 }
 
 .inpainting-mask-canvas-container {
@@ -219,7 +239,7 @@
     position: absolute;
     top: 50%;
     left: 50%;
-    transform: translate(-50%, -50%);
+    // transform: translate(-50%, -50%); // Removed - handled by JavaScript
     border: 1px solid #404040;
     border-radius: 4px;
     

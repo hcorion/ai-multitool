@@ -28,6 +28,12 @@ export type InputEventHandler = (event: {
     pressure?: number;
 }) => void;
 
+export interface CoordinateTransformer {
+    (screenX: number, screenY: number): { x: number; y: number } | null;
+    getTransform?: () => { scale: number; translateX: number; translateY: number };
+    imageToScreen?: (imageX: number, imageY: number) => { x: number; y: number };
+}
+
 export class InputEngine {
     private canvas: HTMLCanvasElement;
     private settings: InputSettings;
@@ -35,6 +41,7 @@ export class InputEngine {
     private eventHandler: InputEventHandler | null = null;
     private isEnabled: boolean = false;
     private cursorElement: HTMLElement | null = null;
+    private coordinateTransformer: CoordinateTransformer | null = null;
 
     constructor(canvas: HTMLCanvasElement, settings: Partial<InputSettings> = {}) {
         console.log('InputEngine constructor called with canvas:', canvas);
@@ -264,10 +271,37 @@ export class InputEngine {
      * Update cursor preview position
      */
     private updateCursorPreview(screenX: number, screenY: number): void {
-        if (this.cursorElement) {
-            this.cursorElement.style.left = `${screenX}px`;
-            this.cursorElement.style.top = `${screenY}px`;
+        if (!this.cursorElement) return;
+
+        let cursorX = screenX;
+        let cursorY = screenY;
+
+        // If we have a coordinate transformer, we need to account for canvas transforms
+        if (this.coordinateTransformer) {
+            // First, convert screen coordinates to image coordinates
+            const imageCoords = this.coordinateTransformer(screenX, screenY);
+            
+            if (!imageCoords) {
+                // Cursor is outside valid drawing area, hide it
+                this.cursorElement.style.display = 'none';
+                return;
+            }
+
+            // Now convert the image coordinates back to screen coordinates
+            // This accounts for all canvas transforms (zoom, pan, centering)
+            if ('imageToScreen' in this.coordinateTransformer) {
+                const transformedScreen = (this.coordinateTransformer as any).imageToScreen(imageCoords.x, imageCoords.y);
+                cursorX = transformedScreen.x;
+                cursorY = transformedScreen.y;
+            }
         }
+
+        // Position cursor at the transformed screen coordinates
+        this.cursorElement.style.left = `${cursorX}px`;
+        this.cursorElement.style.top = `${cursorY}px`;
+        
+        // Make sure cursor is visible when updating position
+        this.cursorElement.style.display = 'block';
     }
 
     /**
@@ -319,8 +353,15 @@ export class InputEngine {
      */
     public updateCursorSize(size: number): void {
         if (this.cursorElement) {
-            this.cursorElement.style.width = `${size}px`;
-            this.cursorElement.style.height = `${size}px`;
+            // If we have a coordinate transformer with scale info, scale the cursor size
+            let displaySize = size;
+            if (this.coordinateTransformer && this.coordinateTransformer.getTransform) {
+                const transform = this.coordinateTransformer.getTransform();
+                displaySize = size * transform.scale;
+            }
+            
+            this.cursorElement.style.width = `${displaySize}px`;
+            this.cursorElement.style.height = `${displaySize}px`;
         }
     }
 
@@ -347,6 +388,13 @@ export class InputEngine {
     }
 
     /**
+     * Set coordinate transformer for cursor preview positioning
+     */
+    public setCoordinateTransformer(transformer: CoordinateTransformer | null): void {
+        this.coordinateTransformer = transformer;
+    }
+
+    /**
      * Enable input handling
      */
     public enable(): void {
@@ -363,7 +411,7 @@ export class InputEngine {
         this.hideCursorPreview();
         
         // Cancel any active pointers
-        for (const [pointerId, pointerState] of this.activePointers) {
+        for (const [pointerId, pointerState] of Array.from(this.activePointers.entries())) {
             if (this.settings.capturePointer && this.canvas.hasPointerCapture(pointerId)) {
                 this.canvas.releasePointerCapture(pointerId);
             }
@@ -427,7 +475,7 @@ export class InputEngine {
      * Force cancel all active pointers (useful for cleanup)
      */
     public cancelAllPointers(): void {
-        for (const [pointerId, pointerState] of this.activePointers) {
+        for (const [pointerId, pointerState] of Array.from(this.activePointers.entries())) {
             if (this.settings.capturePointer && this.canvas.hasPointerCapture(pointerId)) {
                 this.canvas.releasePointerCapture(pointerId);
             }

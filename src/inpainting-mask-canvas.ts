@@ -5,6 +5,7 @@
 
 import { CanvasManager, CanvasState } from './canvas-manager.js';
 import { InputEngine, InputEventHandler } from './input-engine.js';
+import { ZoomPanController, Transform2D, ZoomPanEventHandler } from './zoom-pan-controller.js';
 
 interface InpaintingMaskCanvasConfig {
     imageUrl: string;
@@ -21,8 +22,10 @@ export class InpaintingMaskCanvas {
     private maskAlphaCanvas: OffscreenCanvas | HTMLCanvasElement | null = null;
     private canvasManager: CanvasManager | null = null;
     private inputEngine: InputEngine | null = null;
+    private zoomPanController: ZoomPanController | null = null;
     private isVisible: boolean = false;
     private currentBrushSize: number = 20;
+    private isZoomPanActive: boolean = false;
 
     constructor(config: InpaintingMaskCanvasConfig) {
         this.config = config;
@@ -154,10 +157,34 @@ export class InpaintingMaskCanvas {
         cancelButton.innerHTML = '✕ Cancel';
         cancelButton.title = 'Cancel mask editing';
 
+        // Create zoom controls
+        const zoomContainer = document.createElement('div');
+        zoomContainer.className = 'zoom-controls-container';
+
+        const zoomInButton = document.createElement('button');
+        zoomInButton.className = 'toolbar-btn zoom-in-btn';
+        zoomInButton.innerHTML = '🔍+';
+        zoomInButton.title = 'Zoom in';
+
+        const zoomOutButton = document.createElement('button');
+        zoomOutButton.className = 'toolbar-btn zoom-out-btn';
+        zoomOutButton.innerHTML = '🔍-';
+        zoomOutButton.title = 'Zoom out';
+
+        const zoomResetButton = document.createElement('button');
+        zoomResetButton.className = 'toolbar-btn zoom-reset-btn';
+        zoomResetButton.innerHTML = '🔍⌂';
+        zoomResetButton.title = 'Reset zoom (Ctrl+wheel to zoom)';
+
+        zoomContainer.appendChild(zoomInButton);
+        zoomContainer.appendChild(zoomOutButton);
+        zoomContainer.appendChild(zoomResetButton);
+
         // Add all buttons to toolbar
         toolbar.appendChild(paintButton);
         toolbar.appendChild(eraseButton);
         toolbar.appendChild(brushSizeContainer);
+        toolbar.appendChild(zoomContainer);
         toolbar.appendChild(undoButton);
         toolbar.appendChild(redoButton);
         toolbar.appendChild(completeButton);
@@ -221,6 +248,51 @@ export class InpaintingMaskCanvas {
         this.inputEngine.setEventHandler(this.handleInputEvent.bind(this));
         console.log('Input event handler set');
 
+        // Set up coordinate transformer for cursor preview
+        const coordinateTransformer = (screenX: number, screenY: number) => {
+            if (this.zoomPanController) {
+                return this.zoomPanController.screenToImage(screenX, screenY);
+            } else if (this.canvasManager) {
+                return this.canvasManager.screenToImage(screenX, screenY);
+            }
+            return null;
+        };
+
+        // Add getTransform method to access zoom scale
+        coordinateTransformer.getTransform = () => {
+            if (this.zoomPanController) {
+                return this.zoomPanController.getTransform();
+            }
+            return { scale: 1, translateX: 0, translateY: 0 };
+        };
+
+        // Add imageToScreen method to convert image coordinates back to screen coordinates
+        coordinateTransformer.imageToScreen = (imageX: number, imageY: number) => {
+            if (this.zoomPanController) {
+                return this.zoomPanController.imageToScreen(imageX, imageY);
+            }
+            // Fallback if no zoom/pan controller
+            return { x: imageX, y: imageY };
+        };
+
+        this.inputEngine.setCoordinateTransformer(coordinateTransformer);
+
+        // Create zoom/pan controller for the overlay canvas
+        this.zoomPanController = new ZoomPanController(this.overlayCanvas, {
+            minZoom: 0.1,
+            maxZoom: 10.0,
+            zoomSensitivity: 0.002,
+            panSensitivity: 1.0,
+            enablePinchZoom: true,
+            enableWheelZoom: true,
+            enablePan: true,
+            wheelZoomModifier: 'ctrl'
+        });
+
+        // Set up zoom/pan event handler
+        this.zoomPanController.setEventHandler(this.handleZoomPanEvent);
+        console.log('Zoom/pan controller created');
+
         // Set up resize handler
         window.addEventListener('resize', this.handleResize.bind(this));
     }
@@ -237,6 +309,9 @@ export class InpaintingMaskCanvas {
         const redoBtn = this.popupElement.querySelector('.redo-btn') as HTMLButtonElement;
         const completeBtn = this.popupElement.querySelector('.complete-btn') as HTMLButtonElement;
         const cancelBtn = this.popupElement.querySelector('.cancel-btn') as HTMLButtonElement;
+        const zoomInBtn = this.popupElement.querySelector('.zoom-in-btn') as HTMLButtonElement;
+        const zoomOutBtn = this.popupElement.querySelector('.zoom-out-btn') as HTMLButtonElement;
+        const zoomResetBtn = this.popupElement.querySelector('.zoom-reset-btn') as HTMLButtonElement;
 
         // Tool selection
         paintBtn?.addEventListener('click', () => this.setTool('paint'));
@@ -259,6 +334,11 @@ export class InpaintingMaskCanvas {
         undoBtn?.addEventListener('click', () => this.undo());
         redoBtn?.addEventListener('click', () => this.redo());
 
+        // Zoom controls
+        zoomInBtn?.addEventListener('click', () => this.zoomIn());
+        zoomOutBtn?.addEventListener('click', () => this.zoomOut());
+        zoomResetBtn?.addEventListener('click', () => this.zoomReset());
+
         // Action buttons
         completeBtn?.addEventListener('click', () => this.completeMask());
         cancelBtn?.addEventListener('click', () => this.cancelMask());
@@ -278,6 +358,27 @@ export class InpaintingMaskCanvas {
         try {
             await this.canvasManager.loadImage(imageUrl);
             this.hideError();
+
+            // Set up zoom/pan controller bounds
+            if (this.zoomPanController && this.canvasManager) {
+                const state = this.canvasManager.getState();
+                if (state) {
+                    this.zoomPanController.setImageBounds(state.imageWidth, state.imageHeight);
+
+                    // Use the actual canvas container size, not the display size
+                    const canvasContainer = this.overlayCanvas?.parentElement;
+                    if (canvasContainer) {
+                        const containerRect = canvasContainer.getBoundingClientRect();
+                        this.zoomPanController.setCanvasBounds(containerRect.width, containerRect.height);
+                    } else {
+                        // Fallback to display size if container not found
+                        this.zoomPanController.setCanvasBounds(state.displayWidth, state.displayHeight);
+                    }
+
+                    this.zoomPanController.enable();
+                    console.log('Zoom/pan controller configured and enabled');
+                }
+            }
 
             // Enable input handling after image is loaded
             if (this.inputEngine) {
@@ -447,6 +548,28 @@ export class InpaintingMaskCanvas {
         console.log('Redo requested');
     }
 
+    private zoomIn(): void {
+        if (this.zoomPanController) {
+            const currentTransform = this.zoomPanController.getTransform();
+            const newScale = Math.min(10.0, currentTransform.scale * 1.5);
+            this.zoomPanController.setTransform({ scale: newScale });
+        }
+    }
+
+    private zoomOut(): void {
+        if (this.zoomPanController) {
+            const currentTransform = this.zoomPanController.getTransform();
+            const newScale = Math.max(0.1, currentTransform.scale / 1.5);
+            this.zoomPanController.setTransform({ scale: newScale });
+        }
+    }
+
+    private zoomReset(): void {
+        if (this.zoomPanController) {
+            this.zoomPanController.resetTransform();
+        }
+    }
+
     private completeMask(): void {
         try {
             const maskDataUrl = this.exportMask();
@@ -501,12 +624,50 @@ export class InpaintingMaskCanvas {
                 this.adjustBrushSize(5);
                 event.preventDefault();
                 break;
+            case '=':
+            case '+':
+                // Zoom in
+                if (event.ctrlKey || event.metaKey) {
+                    this.zoomIn();
+                    event.preventDefault();
+                }
+                break;
+            case '-':
+            case '_':
+                // Zoom out
+                if (event.ctrlKey || event.metaKey) {
+                    this.zoomOut();
+                    event.preventDefault();
+                }
+                break;
+            case '0':
+                // Reset zoom
+                if (event.ctrlKey || event.metaKey) {
+                    this.zoomReset();
+                    event.preventDefault();
+                }
+                break;
         }
     }
 
     private handleResize(): void {
         if (this.canvasManager) {
             this.canvasManager.handleResize();
+
+            // Update zoom/pan controller bounds after resize
+            if (this.zoomPanController) {
+                const canvasContainer = this.overlayCanvas?.parentElement;
+                if (canvasContainer) {
+                    const containerRect = canvasContainer.getBoundingClientRect();
+                    this.zoomPanController.setCanvasBounds(containerRect.width, containerRect.height);
+                } else {
+                    // Fallback to display size
+                    const state = this.canvasManager.getState();
+                    if (state) {
+                        this.zoomPanController.setCanvasBounds(state.displayWidth, state.displayHeight);
+                    }
+                }
+            }
         }
     }
 
@@ -521,8 +682,20 @@ export class InpaintingMaskCanvas {
             return;
         }
 
+        // Don't process drawing events if zoom/pan is active
+        if (this.isZoomPanActive) {
+            console.log('Zoom/pan active, ignoring drawing input');
+            return;
+        }
+
         // Convert screen coordinates to image coordinates
-        const imageCoords = this.canvasManager.screenToImage(event.screenX, event.screenY);
+        // FIXED: Always use CanvasManager for coordinate conversion as it gives correct results
+        // The ZoomPanController's coordinate transformation has issues with the current canvas setup
+        let imageCoords: { x: number; y: number } | null = null;
+
+        imageCoords = this.canvasManager.screenToImage(event.screenX, event.screenY);
+        console.log('Using CanvasManager for coordinate conversion (FIXED)');
+
         if (!imageCoords) {
             console.log('Outside canvas bounds');
             return; // Outside canvas bounds
@@ -564,6 +737,45 @@ export class InpaintingMaskCanvas {
                 // Cancel the brush stroke
                 this.canvasManager.endBrushStroke();
                 break;
+        }
+    };
+
+    /**
+     * Handle zoom/pan events from the ZoomPanController
+     */
+    private handleZoomPanEvent: ZoomPanEventHandler = {
+        onTransformStart: () => {
+            console.log('Zoom/pan gesture started - disabling drawing');
+            this.isZoomPanActive = true;
+
+            // Disable drawing in input engine
+            if (this.inputEngine) {
+                this.inputEngine.updateSettings({ enableDrawing: false });
+            }
+        },
+
+        onTransformUpdate: (transform: Transform2D) => {
+            console.log('Zoom/pan transform updated:', transform);
+
+            // Apply transform to canvases
+            if (this.canvasManager) {
+                this.canvasManager.applyTransform(transform);
+            }
+
+            // Update cursor size to account for zoom level
+            if (this.inputEngine) {
+                this.inputEngine.updateCursorSize(this.currentBrushSize);
+            }
+        },
+
+        onTransformEnd: () => {
+            console.log('Zoom/pan gesture ended - re-enabling drawing');
+            this.isZoomPanActive = false;
+
+            // Re-enable drawing in input engine
+            if (this.inputEngine) {
+                this.inputEngine.updateSettings({ enableDrawing: true });
+            }
         }
     };
 
@@ -624,8 +836,15 @@ export class InpaintingMaskCanvas {
 
         // Cleanup input engine
         if (this.inputEngine) {
+            this.inputEngine.setCoordinateTransformer(null);
             this.inputEngine.cleanup();
             this.inputEngine = null;
+        }
+
+        // Cleanup zoom/pan controller
+        if (this.zoomPanController) {
+            this.zoomPanController.cleanup();
+            this.zoomPanController = null;
         }
 
         if (this.popupElement) {
