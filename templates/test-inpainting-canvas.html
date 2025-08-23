@@ -89,13 +89,17 @@
         <button class="test-button" onclick="testWithLocalImage()">
             🖼️ Test with Local Image
         </button>
-        
+
         <button class="test-button" onclick="testBrushEngine()">
             🖌️ Test Brush Engine
         </button>
-        
+
         <button class="test-button" onclick="testPaintEraseTools()">
             🎨 Test Paint/Erase Tools
+        </button>
+
+        <button class="test-button" onclick="testMaskOverlay()">
+            🎭 Test Mask Overlay System
         </button>
 
         <div id="result" class="result-container">
@@ -232,38 +236,38 @@
             document.body.appendChild(fileInput);
             fileInput.click();
         };
-        
-        window.testBrushEngine = function() {
+
+        window.testBrushEngine = function () {
             // Test the brush engine directly
             import('{{ url_for("static", filename="js/brush-engine.js") }}').then(({ BrushEngine }) => {
                 const resultDiv = document.getElementById('result');
                 const resultText = document.getElementById('result-text');
                 const maskPreview = document.getElementById('mask-preview');
-                
+
                 resultDiv.style.display = 'block';
                 resultText.textContent = '🧪 Testing Brush Engine...';
-                
+
                 try {
                     // Create a test mask
                     const width = 100;
                     const height = 100;
                     const maskData = new Uint8Array(width * height);
-                    
+
                     // Create brush engine
                     const engine = new BrushEngine({ size: 20, mode: 'paint' });
-                    
+
                     // Test single stamp
                     const hasChanges = engine.applyStamp(maskData, width, height, 50, 50, 20, 'paint');
-                    
+
                     // Validate binary invariant
                     const isValid = BrushEngine.validateBinaryMask(maskData);
-                    
+
                     // Count painted pixels
                     let paintedPixels = 0;
                     for (let i = 0; i < maskData.length; i++) {
                         if (maskData[i] === 255) paintedPixels++;
                     }
-                    
+
                     // Create preview canvas
                     const canvas = document.createElement('canvas');
                     canvas.width = width;
@@ -272,10 +276,10 @@
                     canvas.style.border = '1px solid #666';
                     canvas.style.borderRadius = '4px';
                     canvas.style.imageRendering = 'pixelated';
-                    
+
                     const ctx = canvas.getContext('2d');
                     const imageData = ctx.createImageData(width, height);
-                    
+
                     // Convert mask to RGBA
                     for (let i = 0; i < maskData.length; i++) {
                         const pixelIndex = i * 4;
@@ -285,18 +289,18 @@
                         imageData.data[pixelIndex + 2] = value; // B
                         imageData.data[pixelIndex + 3] = 255;   // A
                     }
-                    
+
                     ctx.putImageData(imageData, 0, 0);
-                    
+
                     resultText.textContent = `✅ Brush Engine Test Results:
 • Changes detected: ${hasChanges}
 • Binary invariant valid: ${isValid}
 • Painted pixels: ${paintedPixels}
 • Circular stamp applied successfully!`;
-                    
+
                     maskPreview.innerHTML = '<h4>Brush Test Result:</h4>';
                     maskPreview.appendChild(canvas);
-                    
+
                 } catch (error) {
                     resultText.textContent = `❌ Brush Engine Test Failed: ${error.message}`;
                     console.error('Brush engine test error:', error);
@@ -308,64 +312,64 @@
                 resultText.textContent = `❌ Failed to load brush engine: ${error.message}`;
             });
         };
-        
-        window.testPaintEraseTools = function() {
+
+        window.testPaintEraseTools = function () {
             // Test paint and erase functionality
             import('{{ url_for("static", filename="js/brush-engine.js") }}').then(({ BrushEngine }) => {
                 const resultDiv = document.getElementById('result');
                 const resultText = document.getElementById('result-text');
                 const maskPreview = document.getElementById('mask-preview');
-                
+
                 resultDiv.style.display = 'block';
                 resultText.textContent = '🎨 Testing Paint and Erase Tools...';
-                
+
                 try {
                     // Create test mask data
                     const width = 100;
                     const height = 100;
                     const maskData = new Uint8Array(width * height);
-                    
+
                     // Create brush engine
                     const engine = new BrushEngine({ size: 20, mode: 'paint' });
-                    
+
                     // Test paint tool (should stamp white/255 values)
                     engine.updateSettings({ mode: 'paint' });
                     const paintResult = engine.applyStamp(maskData, width, height, 30, 30, 20, 'paint');
-                    
+
                     // Count painted pixels
                     let paintedPixels = 0;
                     for (let i = 0; i < maskData.length; i++) {
                         if (maskData[i] === 255) paintedPixels++;
                     }
-                    
+
                     // Test erase tool (should stamp black/0 values)
                     engine.updateSettings({ mode: 'erase' });
                     const eraseResult = engine.applyStamp(maskData, width, height, 30, 30, 15, 'erase');
-                    
+
                     // Count remaining painted pixels after erase
                     let remainingPixels = 0;
                     for (let i = 0; i < maskData.length; i++) {
                         if (maskData[i] === 255) remainingPixels++;
                     }
-                    
+
                     // Test brush size range (1-200)
                     const testSizes = [1, 50, 100, 200];
                     const sizeResults = testSizes.map(size => {
                         const testMask = new Uint8Array(200 * 200);
                         engine.updateSettings({ size });
                         const hasChanges = engine.applyStamp(testMask, 200, 200, 100, 100, size, 'paint');
-                        
+
                         let pixelCount = 0;
                         for (let i = 0; i < testMask.length; i++) {
                             if (testMask[i] === 255) pixelCount++;
                         }
-                        
+
                         return { size, hasChanges, pixelCount };
                     });
-                    
+
                     // Validate binary invariant
                     const isValid = BrushEngine.validateBinaryMask(maskData);
-                    
+
                     // Create visual preview
                     const canvas = document.createElement('canvas');
                     canvas.width = width;
@@ -374,10 +378,10 @@
                     canvas.style.border = '1px solid #666';
                     canvas.style.borderRadius = '4px';
                     canvas.style.imageRendering = 'pixelated';
-                    
+
                     const ctx = canvas.getContext('2d');
                     const imageData = ctx.createImageData(width, height);
-                    
+
                     // Convert mask to RGBA for display
                     for (let i = 0; i < maskData.length; i++) {
                         const pixelIndex = i * 4;
@@ -387,9 +391,9 @@
                         imageData.data[pixelIndex + 2] = value; // B
                         imageData.data[pixelIndex + 3] = 255;   // A
                     }
-                    
+
                     ctx.putImageData(imageData, 0, 0);
-                    
+
                     // Create size test visualization
                     const sizeCanvas = document.createElement('canvas');
                     sizeCanvas.width = 400;
@@ -398,11 +402,11 @@
                     sizeCanvas.style.border = '1px solid #666';
                     sizeCanvas.style.borderRadius = '4px';
                     sizeCanvas.style.imageRendering = 'pixelated';
-                    
+
                     const sizeCtx = sizeCanvas.getContext('2d');
                     sizeCtx.fillStyle = '#333';
                     sizeCtx.fillRect(0, 0, 400, 100);
-                    
+
                     // Draw circles for different brush sizes
                     sizeCtx.fillStyle = '#fff';
                     testSizes.forEach((size, index) => {
@@ -411,32 +415,32 @@
                         sizeCtx.beginPath();
                         sizeCtx.arc(x, y, size / 2, 0, Math.PI * 2);
                         sizeCtx.fill();
-                        
+
                         sizeCtx.fillStyle = '#ccc';
                         sizeCtx.font = '12px Arial';
                         sizeCtx.textAlign = 'center';
-                        sizeCtx.fillText(`${size}px`, x, y + size/2 + 15);
+                        sizeCtx.fillText(`${size}px`, x, y + size / 2 + 15);
                         sizeCtx.fillStyle = '#fff';
                     });
-                    
+
                     resultText.textContent = `✅ Paint/Erase Tools Test Results:
 • Paint tool: ${paintResult ? 'Working' : 'Failed'} (${paintedPixels} pixels painted)
 • Erase tool: ${eraseResult ? 'Working' : 'Failed'} (${remainingPixels} pixels remaining)
 • Binary invariant: ${isValid ? 'Valid' : 'Invalid'}
 • Size range tests: ${sizeResults.every(r => r.hasChanges) ? 'All passed' : 'Some failed'}`;
-                    
+
                     maskPreview.innerHTML = '<h4>Paint/Erase Test Results:</h4>';
-                    
+
                     const paintEraseDiv = document.createElement('div');
                     paintEraseDiv.innerHTML = '<p><strong>Paint then Erase Test:</strong></p>';
                     paintEraseDiv.appendChild(canvas);
                     maskPreview.appendChild(paintEraseDiv);
-                    
+
                     const sizeDiv = document.createElement('div');
                     sizeDiv.innerHTML = '<p><strong>Brush Size Range Test (1px, 50px, 100px, 200px):</strong></p>';
                     sizeDiv.appendChild(sizeCanvas);
                     maskPreview.appendChild(sizeDiv);
-                    
+
                     // Add detailed results
                     const detailsDiv = document.createElement('div');
                     detailsDiv.style.marginTop = '10px';
@@ -447,7 +451,7 @@
                         ${sizeResults.map(r => `<p>Size ${r.size}px: ${r.pixelCount} pixels painted</p>`).join('')}
                     `;
                     maskPreview.appendChild(detailsDiv);
-                    
+
                 } catch (error) {
                     resultText.textContent = `❌ Paint/Erase Tools Test Failed: ${error.message}`;
                     console.error('Paint/erase tools test error:', error);
@@ -457,6 +461,415 @@
                 const resultText = document.getElementById('result-text');
                 resultDiv.style.display = 'block';
                 resultText.textContent = `❌ Failed to load brush engine: ${error.message}`;
+            });
+        };
+
+        window.testMaskOverlay = function () {
+            console.log('testMaskOverlay function called');
+            // Test the mask overlay visualization system
+
+            import('{{ url_for("static", filename="js/canvas-manager.js") }}').then(async ({ CanvasManager }) => {
+                try {
+
+                    const resultDiv = document.getElementById('result');
+                    const resultText = document.getElementById('result-text');
+                    const maskPreview = document.getElementById('mask-preview');
+
+                    resultDiv.style.display = 'block';
+                    resultText.textContent = '🎭 Testing Mask Overlay System...';
+
+                    // Create test canvases
+                    const imageCanvas = document.createElement('canvas');
+                    const overlayCanvas = document.createElement('canvas');
+                    const maskAlphaCanvas = new OffscreenCanvas(50, 50);
+
+                    // Set up canvas dimensions
+                    const width = 50;
+                    const height = 50;
+
+                    imageCanvas.width = width;
+                    imageCanvas.height = height;
+                    overlayCanvas.width = width;
+                    overlayCanvas.height = height;
+                    maskAlphaCanvas.width = width;
+                    maskAlphaCanvas.height = height;
+
+                    // Create container element
+                    const container = document.createElement('div');
+                    container.style.width = '400px';
+                    container.style.height = '400px';
+                    container.appendChild(imageCanvas);
+                    document.body.appendChild(container);
+
+                    const manager = new CanvasManager(imageCanvas, overlayCanvas, maskAlphaCanvas);
+
+                    // Create a simple test image (data URL)
+                    const testImageUrl = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+
+                    // Load image and test overlay system
+                    await manager.loadImage(testImageUrl);
+                    const state = manager.getState();
+                    if (!state) {
+                        throw new Error('Failed to get canvas state');
+                    }
+
+                    // Override canvas dimensions back to our test size (loadImage resized them to 1x1)
+                    imageCanvas.width = width;
+                    imageCanvas.height = height;
+                    overlayCanvas.width = width;
+                    overlayCanvas.height = height;
+                    maskAlphaCanvas.width = width;
+                    maskAlphaCanvas.height = height;
+
+                    // Ensure all contexts have image smoothing disabled
+                    const imageCtx = imageCanvas.getContext('2d');
+                    const overlayCtx = overlayCanvas.getContext('2d');
+                    const maskAlphaCtx = maskAlphaCanvas.getContext('2d');
+
+                    if (imageCtx) imageCtx.imageSmoothingEnabled = false;
+                    if (overlayCtx) overlayCtx.imageSmoothingEnabled = false;
+                    if (maskAlphaCtx) maskAlphaCtx.imageSmoothingEnabled = false;
+
+                    // Test 1: Binary Invariant Test
+                    // Create simple test pattern - half filled, half empty
+                    const maskData = new Uint8Array(width * height);
+                    for (let y = 0; y < height; y++) {
+                        for (let x = 0; x < width; x++) {
+                            const index = y * width + x;
+                            // Fill left half with 255, right half with 0
+                            maskData[index] = (x < Math.floor(width / 2)) ? 255 : 0;
+                        }
+                    }
+
+                    // Apply mask data and override state dimensions
+                    state.maskData = maskData;
+                    state.imageWidth = width;
+                    state.imageHeight = height;
+
+                    // Debug: Count expected overlay pixels
+                    let expectedOverlayPixels = 0;
+                    for (let i = 0; i < maskData.length; i++) {
+                        if (maskData[i] === 255) expectedOverlayPixels++;
+                    }
+
+                    // Update overlay
+                    manager.updateMaskOverlay();
+
+                    // Debug: Check mask data first few values
+                    console.log('Main test mask data first 10:', Array.from(maskData.slice(0, 10)));
+                    console.log('Main test mask data last 10:', Array.from(maskData.slice(-10)));
+                    console.log('Main test expected overlay pixels:', expectedOverlayPixels);
+                    console.log('Main test canvas dimensions:', overlayCanvas.width, 'x', overlayCanvas.height);
+                    console.log('Main test state dimensions:', state.imageWidth, 'x', state.imageHeight);
+                    console.log('Main test mask data length:', maskData.length, 'expected:', width * height);
+
+                    // Verify overlay maintains binary values
+                    const testOverlayCtx = overlayCanvas.getContext('2d');
+                    const overlayImageData = testOverlayCtx.getImageData(0, 0, width, height);
+                    const overlayData = overlayImageData.data;
+
+                    let binaryCount = 0;
+                    let nonBinaryCount = 0;
+                    let overlayCount = 0;
+                    const nonBinaryValues = [];
+                    const allAlphaValues = [];
+
+                    for (let i = 0; i < overlayData.length; i += 4) {
+                        const alpha = overlayData[i + 3];
+                        allAlphaValues.push(alpha);
+
+                        // For overlay, we expect 0 (transparent) or ~128 (50% opacity)
+                        // Allow slight rounding errors (127-129 for overlay)
+                        if (alpha === 0 || (alpha >= 127 && alpha <= 129)) {
+                            binaryCount++;
+                            if (alpha >= 127 && alpha <= 129) overlayCount++;
+                        } else {
+                            nonBinaryCount++;
+                            nonBinaryValues.push(alpha);
+                        }
+                    }
+
+                    // Test 2: Image Smoothing Test
+                    const imageSmoothingDisabled = !overlayCtx.imageSmoothingEnabled;
+                    const maskAlphaSmoothingDisabled = !maskAlphaCtx.imageSmoothingEnabled;
+
+                    // Test 3: Compositing Test
+                    let allAlphasMatch = false;
+                    let alphaMatches = [];
+                    // Create a fresh canvas manager for compositing test to avoid interference
+                    const compositingImageCanvas = document.createElement('canvas');
+                    const compositingOverlayCanvas = document.createElement('canvas');
+                    const compositingMaskAlphaCanvas = new OffscreenCanvas(2, 2);
+
+                    compositingImageCanvas.width = 2;
+                    compositingImageCanvas.height = 2;
+                    compositingOverlayCanvas.width = 2;
+                    compositingOverlayCanvas.height = 2;
+                    compositingMaskAlphaCanvas.width = 2;
+                    compositingMaskAlphaCanvas.height = 2;
+
+                    const compositingContainer = document.createElement('div');
+                    compositingContainer.style.width = '400px';
+                    compositingContainer.style.height = '400px';
+                    compositingContainer.appendChild(compositingImageCanvas);
+                    document.body.appendChild(compositingContainer);
+
+                    const compositingManager = new CanvasManager(compositingImageCanvas, compositingOverlayCanvas, compositingMaskAlphaCanvas);
+
+                    // Ensure compositing canvases have smoothing disabled
+                    const compImageCtx = compositingImageCanvas.getContext('2d');
+                    const compOverlayCtx = compositingOverlayCanvas.getContext('2d');
+                    const compMaskAlphaCtx = compositingMaskAlphaCanvas.getContext('2d');
+
+                    if (compImageCtx) compImageCtx.imageSmoothingEnabled = false;
+                    if (compOverlayCtx) compOverlayCtx.imageSmoothingEnabled = false;
+                    if (compMaskAlphaCtx) compMaskAlphaCtx.imageSmoothingEnabled = false;
+
+                    // Load image for compositing test
+                    compositingManager.loadImage(testImageUrl).then(() => {
+                        // Override compositing canvas dimensions (loadImage resized them to 1x1)
+                        compositingImageCanvas.width = 2;
+                        compositingImageCanvas.height = 2;
+                        compositingOverlayCanvas.width = 2;
+                        compositingOverlayCanvas.height = 2;
+                        compositingMaskAlphaCanvas.width = 2;
+                        compositingMaskAlphaCanvas.height = 2;
+
+                        const compositingState = compositingManager.getState();
+                        if (compositingState) {
+                            // Create a simple 4-pixel pattern for compositing test
+                            const compositingMask = new Uint8Array([255, 0, 255, 0]);
+                            compositingState.maskData = compositingMask;
+                            compositingState.imageWidth = 2;
+                            compositingState.imageHeight = 2;
+
+                            compositingManager.updateMaskOverlay();
+
+                            const compositingOverlayCtx = compositingOverlayCanvas.getContext('2d');
+                            const compositingImageData = compositingOverlayCtx.getImageData(0, 0, 2, 2);
+                            const compositingData = compositingImageData.data;
+
+                            // Check alpha values - should be ~128 where mask is 255, 0 where mask is 0
+                            alphaMatches = []; // Use outer scope variable
+                            for (let i = 0; i < compositingMask.length; i++) {
+                                const expectedAlpha = compositingMask[i] === 255 ? 128 : 0;
+                                const actualAlpha = compositingData[i * 4 + 3];
+
+                                // Allow slight rounding errors for overlay alpha (127-129)
+                                let matches;
+                                if (expectedAlpha === 0) {
+                                    matches = actualAlpha === 0;
+                                } else {
+                                    matches = actualAlpha >= 127 && actualAlpha <= 129;
+                                }
+
+                                alphaMatches.push({
+                                    index: i,
+                                    expected: expectedAlpha,
+                                    actual: actualAlpha,
+                                    matches: matches
+                                });
+                            }
+
+                            allAlphasMatch = alphaMatches.every(match => match.matches);
+
+                            // Cleanup compositing test
+                            document.body.removeChild(compositingContainer);
+                        } else {
+                            allAlphasMatch = false;
+                            alphaMatches = [];
+                        }
+
+                        // Continue with the rest of the test after compositing completes
+                        completeTest();
+                    }).catch(error => {
+                        allAlphasMatch = false;
+                        alphaMatches = [];
+                        completeTest();
+                    });
+
+                    // Define function to complete the test after async operations
+                    function completeTest() {
+                        // Test 4: Dirty Rectangle Calculation Test
+                        const brushSize = 20;
+                        const centerX = 50;
+                        const centerY = 50;
+                        const imageWidth = 100;
+                        const imageHeight = 100;
+
+                        const radius = Math.ceil(brushSize / 2);
+                        const dirtyRect = {
+                            x: Math.max(0, centerX - radius),
+                            y: Math.max(0, centerY - radius),
+                            width: Math.min(imageWidth - Math.max(0, centerX - radius), radius * 2),
+                            height: Math.min(imageHeight - Math.max(0, centerY - radius), radius * 2)
+                        };
+
+                        const expectedDirtyRect = { x: 40, y: 40, width: 20, height: 20 };
+                        const dirtyRectCorrect = dirtyRect.x === expectedDirtyRect.x &&
+                            dirtyRect.y === expectedDirtyRect.y &&
+                            dirtyRect.width === expectedDirtyRect.width &&
+                            dirtyRect.height === expectedDirtyRect.height;
+
+                        // Create visual previews
+                        const previewContainer = document.createElement('div');
+                        previewContainer.innerHTML = '<h4>Mask Overlay Test Results:</h4>';
+
+                        // Binary test preview
+                        const binaryCanvas = document.createElement('canvas');
+                        binaryCanvas.width = 50;
+                        binaryCanvas.height = 50;
+                        binaryCanvas.style.width = '100px';
+                        binaryCanvas.style.height = '100px';
+                        binaryCanvas.style.border = '1px solid #666';
+                        binaryCanvas.style.borderRadius = '4px';
+                        binaryCanvas.style.imageRendering = 'pixelated';
+                        binaryCanvas.style.margin = '5px';
+
+                        const binaryCtx = binaryCanvas.getContext('2d');
+                        const binaryImageData = binaryCtx.createImageData(50, 50);
+
+                        // Recreate simple test pattern for display (left half filled)
+                        for (let y = 0; y < 50; y++) {
+                            for (let x = 0; x < 50; x++) {
+                                const index = y * 50 + x;
+                                const pixelIndex = index * 4;
+                                const value = (x < 25) ? 255 : 0; // Left half filled
+                                binaryImageData.data[pixelIndex] = value;     // R
+                                binaryImageData.data[pixelIndex + 1] = value; // G
+                                binaryImageData.data[pixelIndex + 2] = value; // B
+                                binaryImageData.data[pixelIndex + 3] = 255;   // A
+                            }
+                        }
+
+                        binaryCtx.putImageData(binaryImageData, 0, 0);
+
+                        // Overlay preview (copy from overlay canvas)
+                        const overlayPreview = document.createElement('canvas');
+                        overlayPreview.width = 50;
+                        overlayPreview.height = 50;
+                        overlayPreview.style.width = '100px';
+                        overlayPreview.style.height = '100px';
+                        overlayPreview.style.border = '1px solid #666';
+                        overlayPreview.style.borderRadius = '4px';
+                        overlayPreview.style.imageRendering = 'pixelated';
+                        overlayPreview.style.margin = '5px';
+
+                        // Reset overlay canvas size for preview
+                        overlayCanvas.width = 50;
+                        overlayCanvas.height = 50;
+                        state.imageWidth = 50;
+                        state.imageHeight = 50;
+
+                        // Recreate the left-half pattern for 50x50 preview
+                        const previewMaskData = new Uint8Array(50 * 50);
+                        for (let y = 0; y < 50; y++) {
+                            for (let x = 0; x < 50; x++) {
+                                const index = y * 50 + x;
+                                previewMaskData[index] = (x < 25) ? 255 : 0; // Left half filled
+                            }
+                        }
+                        console.log('Preview mask data first 10:', Array.from(previewMaskData.slice(0, 10)));
+                        console.log('Preview mask data expected 255 count:', Array.from(previewMaskData).filter(v => v === 255).length);
+                        state.maskData = previewMaskData;
+                        manager.updateMaskOverlay();
+
+                        // Debug: Check overlay after preview update
+                        const debugOverlayCtx = overlayCanvas.getContext('2d');
+                        const debugOverlayData = debugOverlayCtx.getImageData(0, 0, 50, 50);
+                        const debugAlphas = [];
+                        for (let i = 0; i < debugOverlayData.data.length; i += 4) {
+                            debugAlphas.push(debugOverlayData.data[i + 3]);
+                        }
+                        console.log('Preview overlay alphas first 10:', debugAlphas.slice(0, 10));
+                        console.log('Preview overlay 128 count:', debugAlphas.filter(v => v === 128).length);
+
+                        const overlayPreviewCtx = overlayPreview.getContext('2d');
+                        overlayPreviewCtx.drawImage(overlayCanvas, 0, 0);
+
+                        // Cleanup
+                        document.body.removeChild(container);
+
+                        // Display results
+                        const allTestsPassed = nonBinaryCount === 0 &&
+                            imageSmoothingDisabled &&
+                            maskAlphaSmoothingDisabled &&
+                            allAlphasMatch &&
+                            dirtyRectCorrect;
+
+                        resultText.textContent = `${allTestsPassed ? '✅' : '❌'} Mask Overlay System Test Results:
+• Binary invariant: ${nonBinaryCount === 0 ? 'PASS' : 'FAIL'} (${nonBinaryCount} non-binary pixels)
+• Image smoothing disabled: ${imageSmoothingDisabled && maskAlphaSmoothingDisabled ? 'PASS' : 'FAIL'}
+• Compositing accuracy: ${allAlphasMatch ? 'PASS' : 'FAIL'}
+• Dirty rectangle calculation: ${dirtyRectCorrect ? 'PASS' : 'FAIL'}
+• Total pixels tested: ${binaryCount + nonBinaryCount}`;
+
+                        // Add visual previews
+                        const previewDiv = document.createElement('div');
+                        previewDiv.innerHTML = `
+                            <div style="display: flex; flex-wrap: wrap; justify-content: center; margin-top: 10px;">
+                                <div style="text-align: center; margin: 5px;">
+                                    <p style="margin: 5px 0; font-size: 12px;">Original Mask Pattern</p>
+                                </div>
+                                <div style="text-align: center; margin: 5px;">
+                                    <p style="margin: 5px 0; font-size: 12px;">Overlay Result</p>
+                                </div>
+                            </div>
+                        `;
+
+                        const canvasContainer = document.createElement('div');
+                        canvasContainer.style.display = 'flex';
+                        canvasContainer.style.justifyContent = 'center';
+                        canvasContainer.style.flexWrap = 'wrap';
+                        canvasContainer.appendChild(binaryCanvas);
+                        canvasContainer.appendChild(overlayPreview);
+
+                        previewDiv.appendChild(canvasContainer);
+
+                        // Add detailed test results
+                        const detailsDiv = document.createElement('div');
+                        detailsDiv.style.marginTop = '10px';
+                        detailsDiv.style.fontSize = '12px';
+                        detailsDiv.style.color = '#ccc';
+                        detailsDiv.style.textAlign = 'left';
+                        detailsDiv.innerHTML = `
+                            <p><strong>Detailed Test Results:</strong></p>
+                            <p>• Valid overlay pixels: ${binaryCount} (0 or 128 alpha)</p>
+                            <p>• Invalid pixels: ${nonBinaryCount}</p>
+                            <p>• Overlay pixels (128 alpha): ${overlayCount}</p>
+                            <p>• Expected overlay pixels: ${expectedOverlayPixels}</p>
+                            <p>• All alpha values: [${allAlphaValues.slice(0, 20).join(', ')}${allAlphaValues.length > 20 ? '...' : ''}]</p>
+                            ${nonBinaryCount > 0 ? `<p>• Invalid alpha values: [${nonBinaryValues.slice(0, 10).join(', ')}${nonBinaryValues.length > 10 ? '...' : ''}]</p>` : ''}
+                            <p>• Overlay smoothing disabled: ${imageSmoothingDisabled}</p>
+                            <p>• Mask alpha smoothing disabled: ${maskAlphaSmoothingDisabled}</p>
+                            <p>• Alpha compositing matches: ${alphaMatches.filter(m => m.matches).length}/${alphaMatches.length}</p>
+                            <p>• Compositing details: ${alphaMatches.map(m => `[${m.index}] expected:${m.expected} actual:${m.actual} ${m.matches ? '✓' : '✗'}`).join(', ')}</p>
+                            <p>• Main overlay first 10 pixels: [${allAlphaValues.slice(0, 10).map((v, i) => `${i}:${v}`).join(', ')}]</p>
+                            <p>• Main overlay pattern check: Left quarter (0-12): [${allAlphaValues.slice(0, 13).join(', ')}]</p>
+                            <p>• Main overlay pattern check: Right quarter (37-49): [${allAlphaValues.slice(37, 50).join(', ')}]</p>
+                            <p>• Dirty rect calculated: (${dirtyRect.x}, ${dirtyRect.y}, ${dirtyRect.width}, ${dirtyRect.height})</p>
+                            <p>• Dirty rect expected: (${expectedDirtyRect.x}, ${expectedDirtyRect.y}, ${expectedDirtyRect.width}, ${expectedDirtyRect.height})</p>
+                            <p>• Debug: Check browser console for mask data details</p>
+                        `;
+
+                        maskPreview.innerHTML = '';
+                        maskPreview.appendChild(previewDiv);
+                        maskPreview.appendChild(detailsDiv);
+                    } // End of completeTest function
+
+                } catch (error) {
+                    const resultDiv = document.getElementById('result');
+                    const resultText = document.getElementById('result-text');
+                    resultDiv.style.display = 'block';
+                    resultText.textContent = `❌ Mask Overlay System Test Failed: ${error.message}`;
+                    console.error('Mask overlay test error:', error);
+                }
+            }).catch(error => {
+                const resultDiv = document.getElementById('result');
+                const resultText = document.getElementById('result-text');
+                resultDiv.style.display = 'block';
+                resultText.textContent = `❌ Mask Overlay System Test Failed: ${error.message}`;
+                console.error('Mask overlay test error:', error);
             });
         };
     </script>

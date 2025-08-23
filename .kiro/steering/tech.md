@@ -219,3 +219,74 @@ pytest --cov=app --cov-report=html
 # View coverage report
 # Open htmlcov/index.html in browser
 ```
+
+### JavaScript Testing with Selenium
+
+This project uses Selenium WebDriver to test JavaScript functionality in a real browser environment. This approach allows testing of complex frontend interactions, canvas operations, and DOM manipulation.
+
+#### JavaScript Test Pattern
+```python
+import pytest
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+
+class TestJavaScriptFeature:
+    @pytest.fixture
+    def driver(self):
+        """Set up Chrome driver for testing"""
+        options = webdriver.ChromeOptions()
+        options.add_argument('--headless')
+        options.add_argument('--no-sandbox')
+        options.add_argument('--disable-dev-shm-usage')
+        driver = webdriver.Chrome(options=options)
+        driver.implicitly_wait(10)
+        yield driver
+        driver.quit()
+    
+    def test_javascript_functionality(self, driver):
+        """Test JavaScript functionality in browser"""
+        driver.get("http://localhost:5000/test-page")
+        
+        # Wait for page to load
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.CLASS_NAME, "test-element"))
+        )
+        
+        # Execute JavaScript test code
+        result = driver.execute_script("""
+            return new Promise((resolve) => {
+                import('/static/js/module.js').then(({ ClassName }) => {
+                    try {
+                        // Test JavaScript functionality
+                        const instance = new ClassName();
+                        const testResult = instance.testMethod();
+                        
+                        resolve({
+                            success: true,
+                            result: testResult
+                        });
+                    } catch (error) {
+                        resolve({ success: false, error: error.message });
+                    }
+                });
+            });
+        """)
+        
+        assert result['success'], f"Test failed: {result.get('error', 'Unknown error')}"
+```
+
+#### Key Testing Principles
+- **Real Browser Environment**: Tests run in actual Chrome browser for authentic behavior
+- **ES Module Imports**: Use dynamic imports to load TypeScript-compiled modules
+- **Promise-based Testing**: JavaScript tests return promises for async operations
+- **Canvas and DOM Testing**: Full access to Canvas API, DOM manipulation, and browser APIs
+- **Error Handling**: Comprehensive error catching and reporting from JavaScript
+- **Headless Execution**: Tests run in headless mode for CI/CD compatibility
+
+#### Test File Organization
+- Python test files generate and execute JavaScript test code
+- Tests verify complex interactions like canvas rendering, input handling, and state management
+- Each test focuses on specific functionality (binary mask enforcement, coordinate mapping, etc.)
+- Results are validated in Python with detailed assertion messages

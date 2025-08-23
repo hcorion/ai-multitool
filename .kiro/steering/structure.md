@@ -35,6 +35,14 @@
 - `conftest.py` - Shared fixtures and test configuration
 - Test files organized by module: `test_app.py`, `test_novelai_client.py`, `test_image_models.py`
 
+### JavaScript Testing Pattern
+- **Selenium-based Testing**: JavaScript functionality tested using Selenium WebDriver in real Chrome browser
+- **Python Test Generators**: Python test files generate and execute JavaScript test code dynamically
+- **Canvas and DOM Testing**: Full browser environment for testing complex frontend interactions
+- **Module Import Testing**: Tests use ES module dynamic imports to load compiled TypeScript modules
+- **Promise-based Execution**: JavaScript tests return promises for async validation in Python
+- **Examples**: `test_brush_engine.py`, `test_canvas_manager.py`, `test_input_engine.py`, `test_mask_overlay.py`
+
 ## Configuration Files
 - `tsconfig.json` - TypeScript compiler configuration
 - `package.json` - Frontend dependencies
