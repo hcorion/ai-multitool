@@ -46,7 +46,7 @@ from flask import (
 )
 from PIL import Image as PILImage
 from PIL.PngImagePlugin import PngInfo
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from wand.image import Image as WandImage
 
 import utils
@@ -184,6 +184,40 @@ class ConversationData(BaseModel):
     object: str = "conversation"
 
 
+def validate_reasoning_data(
+    reasoning_data: Dict[str, Any] | None,
+) -> Dict[str, Any] | None:
+    """Validate reasoning data structure and ensure it contains expected fields."""
+    if reasoning_data is None:
+        return None
+
+    if not isinstance(reasoning_data, dict):
+        raise ValueError("Reasoning data must be a dictionary")
+
+    # Validate required fields exist and are of correct types
+    expected_fields = {
+        "summary_parts": list,
+        "complete_summary": str,
+        "timestamp": (int, float),
+        "response_id": str,
+    }
+
+    for field, expected_type in expected_fields.items():
+        if field in reasoning_data:
+            if not isinstance(reasoning_data[field], expected_type):
+                raise ValueError(
+                    f"Reasoning data field '{field}' must be of type {expected_type}"
+                )
+
+    # Ensure summary_parts contains only strings if present
+    if "summary_parts" in reasoning_data:
+        for part in reasoning_data["summary_parts"]:
+            if not isinstance(part, str):
+                raise ValueError("All items in summary_parts must be strings")
+
+    return reasoning_data
+
+
 class ChatMessage(BaseModel):
     """Pydantic model for individual chat messages."""
 
@@ -193,6 +227,17 @@ class ChatMessage(BaseModel):
     response_id: str | None = Field(
         None, description="OpenAI response ID for assistant messages"
     )
+    reasoning_data: Dict[str, Any] | None = Field(
+        None, description="Reasoning summary data for assistant messages"
+    )
+
+    @field_validator("reasoning_data")
+    @classmethod
+    def validate_reasoning_data_field(
+        cls, v: Dict[str, Any] | None
+    ) -> Dict[str, Any] | None:
+        """Validate reasoning data structure."""
+        return validate_reasoning_data(v)
 
 
 class Conversation(BaseModel):
@@ -209,11 +254,19 @@ class Conversation(BaseModel):
     )
 
     def add_message(
-        self, role: str, content: str, response_id: str | None = None
+        self,
+        role: str,
+        content: str,
+        response_id: str | None = None,
+        reasoning_data: Dict[str, Any] | None = None,
     ) -> None:
         """Add a message to the conversation."""
         message = ChatMessage(
-            role=role, text=content, timestamp=int(time.time()), response_id=response_id
+            role=role,
+            text=content,
+            timestamp=int(time.time()),
+            response_id=response_id,
+            reasoning_data=reasoning_data,
         )
         self.messages.append(message)
         self.last_update = int(time.time())
@@ -484,6 +537,7 @@ class ConversationManager:
         role: str,
         content: str,
         response_id: str | None = None,
+        reasoning_data: Dict[str, Any] | None = None,
     ) -> None:
         """Add a message to a conversation."""
         user_conversations = self._load_user_conversations(username)
@@ -495,7 +549,7 @@ class ConversationManager:
             )
 
         # Use the Pydantic model's add_message method
-        conversation.add_message(role, content, response_id)
+        conversation.add_message(role, content, response_id, reasoning_data)
 
         self._save_user_conversations(username, user_conversations)
 
@@ -679,7 +733,7 @@ code
             if error.code == "model_not_found" or error.code == "model_unavailable":
                 return {
                     "error": "model_unavailable",
-                    "message": "The o4-mini model is currently unavailable. Please try again in a few minutes.",
+                    "message": "The gpt5 model is currently unavailable. Please try again in a few minutes.",
                     "user_action": "Try again later or contact support if the issue persists.",
                 }
             elif error.code == "insufficient_quota":
