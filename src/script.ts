@@ -92,12 +92,33 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Chat buttons
     addEventListenerToElement("send-chat", "click", sendChatMessage);
+    
+    // Reasoning modal buttons
+    addEventListenerToElement("reasoning-modal-close", "click", hideReasoningModalFromScript);
 
     // Grid Modal Buttons
     addEventListenerToElement("grid-image-close", "click", closeGridModal);
     addEventListenerToElement("grid-prev", "click", previousGridImage);
     addEventListenerToElement("grid-next", "click", nextGridImage);
     addEventListenerToElement("advanced-toggle", "click", toggleShowAdvanced);
+    
+    // Add keyboard and click-outside handlers for reasoning modal
+    document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") {
+            const modal = document.getElementById("reasoning-modal");
+            if (modal && modal.style.display === "block") {
+                hideReasoningModalFromScript();
+            }
+        }
+    });
+    
+    // Click outside modal to close
+    document.addEventListener("click", (e) => {
+        const modal = document.getElementById("reasoning-modal");
+        if (modal && modal.style.display === "block" && e.target === modal) {
+            hideReasoningModalFromScript();
+        }
+    });
     addEventListenerToElement("advanced-generate-grid", "change", toggleAdvancedInput);
 
     addEventListener("keydown", keyDownEvent);
@@ -1192,12 +1213,114 @@ function updateMostRecentChatMessage(messages: chat.ChatMessage[]): void {
         const div = document.createElement("div") as HTMLDivElement;
         div.className = "ai-message";
         div.innerHTML = utils.unescapeHTML(html);
+        
+        // Add reasoning button for assistant messages
+        if (message.role === "assistant") {
+            addReasoningButtonToMessage(div, messages.length - 1);
+        }
+        
         chatHistory.appendChild(div);
     } else {
         var lastChildDiv = chatHistory.lastChild as HTMLDivElement;
         lastChildDiv.innerHTML = utils.unescapeHTML(html);
+        
+        // Re-add reasoning button if it's an assistant message and doesn't already have one
+        if (message.role === "assistant" && !lastChildDiv.querySelector('.reasoning-button')) {
+            addReasoningButtonToMessage(lastChildDiv, messages.length - 1);
+        }
     }
     chatHistory.scrollTop = chatHistory.scrollHeight; // Scroll to bottom
+}
+
+function addReasoningButtonToMessage(messageElement: HTMLElement, messageIndex: number): void {
+    const reasoningButton = document.createElement("button");
+    reasoningButton.className = "reasoning-button";
+    reasoningButton.innerHTML = "i";
+    reasoningButton.title = "View reasoning";
+    reasoningButton.setAttribute("data-message-index", messageIndex.toString());
+    
+    reasoningButton.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        showReasoningModalFromScript(messageIndex);
+    });
+    
+    messageElement.appendChild(reasoningButton);
+}
+
+function showReasoningModalFromScript(messageIndex: number): void {
+    // Get current conversation ID
+    const conversationId = currentThreadId;
+    if (!conversationId) {
+        showReasoningErrorFromScript("No conversation selected");
+        return;
+    }
+    
+    // Show modal with loading state
+    const modal = document.getElementById("reasoning-modal");
+    const content = document.getElementById("reasoning-content");
+    const loading = document.getElementById("reasoning-loading");
+    const error = document.getElementById("reasoning-error");
+    
+    if (!modal || !content || !loading || !error) {
+        console.error("Reasoning modal elements not found");
+        return;
+    }
+    
+    // Reset modal state
+    content.style.display = "none";
+    error.style.display = "none";
+    loading.style.display = "block";
+    modal.style.display = "block";
+    
+    // Fetch reasoning data
+    fetch(`/chat/reasoning/${conversationId}/${messageIndex}`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            loading.style.display = "none";
+            if (data.reasoning && data.reasoning.complete_summary) {
+                displayReasoningDataFromScript(data.reasoning);
+                content.style.display = "block";
+            } else {
+                showReasoningErrorFromScript("No reasoning data available for this message");
+            }
+        })
+        .catch(err => {
+            loading.style.display = "none";
+            showReasoningErrorFromScript(`Failed to load reasoning data: ${err.message}`);
+        });
+}
+
+function displayReasoningDataFromScript(reasoningData: any): void {
+    const content = document.getElementById("reasoning-content");
+    if (!content) return;
+    
+    content.innerHTML = `
+        <div class="reasoning-summary">
+            <h3>AI Reasoning Process</h3>
+            <div class="reasoning-text">${reasoningData.complete_summary.replace(/\n/g, '<br>')}</div>
+        </div>
+    `;
+}
+
+function showReasoningErrorFromScript(message: string): void {
+    const error = document.getElementById("reasoning-error");
+    if (!error) return;
+    
+    error.textContent = message;
+    error.style.display = "block";
+}
+
+function hideReasoningModalFromScript(): void {
+    const modal = document.getElementById("reasoning-modal");
+    if (modal) {
+        modal.style.display = "none";
+    }
 }
 
 //////////////////////

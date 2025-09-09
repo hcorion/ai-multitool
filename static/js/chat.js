@@ -46,7 +46,7 @@ export function refreshChatMessages(messages) {
     const chatHistory = document.getElementById("chat-history");
     chatHistory.innerHTML = "";
     // Display AI response in chat history
-    messages.forEach((message) => {
+    messages.forEach((message, index) => {
         var converter = new showdown.Converter({
             strikethrough: true,
             smoothLivePreview: true,
@@ -54,7 +54,95 @@ export function refreshChatMessages(messages) {
             tables: true,
             extensions: ["highlight"],
         }), text = message.text, html = converter.makeHtml(text);
-        chatHistory.innerHTML += `<div class="ai-message">${utils.unescapeHTML(html)}</div>`;
+        const messageDiv = document.createElement("div");
+        messageDiv.className = "ai-message";
+        messageDiv.innerHTML = utils.unescapeHTML(html);
+        // Add reasoning button for assistant messages
+        if (message.role === "assistant") {
+            addReasoningButton(messageDiv, index);
+        }
+        chatHistory.appendChild(messageDiv);
     });
     chatHistory.scrollTop = chatHistory.scrollHeight; // Scroll to bottom
+}
+function addReasoningButton(messageElement, messageIndex) {
+    const reasoningButton = document.createElement("button");
+    reasoningButton.className = "reasoning-button";
+    reasoningButton.innerHTML = "i";
+    reasoningButton.title = "View reasoning";
+    reasoningButton.setAttribute("data-message-index", messageIndex.toString());
+    reasoningButton.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        showReasoningModal(messageIndex);
+    });
+    messageElement.appendChild(reasoningButton);
+}
+function showReasoningModal(messageIndex) {
+    // Get current conversation ID - this should be available globally
+    const conversationId = window.currentThreadId;
+    if (!conversationId) {
+        showReasoningError("No conversation selected");
+        return;
+    }
+    // Show modal with loading state
+    const modal = document.getElementById("reasoning-modal");
+    const content = document.getElementById("reasoning-content");
+    const loading = document.getElementById("reasoning-loading");
+    const error = document.getElementById("reasoning-error");
+    if (!modal || !content || !loading || !error) {
+        console.error("Reasoning modal elements not found");
+        return;
+    }
+    // Reset modal state
+    content.style.display = "none";
+    error.style.display = "none";
+    loading.style.display = "block";
+    modal.style.display = "block";
+    // Fetch reasoning data
+    fetch(`/chat/reasoning/${conversationId}/${messageIndex}`)
+        .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        return response.json();
+    })
+        .then(data => {
+        loading.style.display = "none";
+        if (data.reasoning && data.reasoning.complete_summary) {
+            displayReasoningData(data.reasoning);
+            content.style.display = "block";
+        }
+        else {
+            showReasoningError("No reasoning data available for this message");
+        }
+    })
+        .catch(err => {
+        loading.style.display = "none";
+        showReasoningError(`Failed to load reasoning data: ${err.message}`);
+    });
+}
+function displayReasoningData(reasoningData) {
+    const content = document.getElementById("reasoning-content");
+    if (!content)
+        return;
+    content.innerHTML = `
+        <div class="reasoning-summary">
+            <h3>AI Reasoning Process</h3>
+            <div class="reasoning-text">${reasoningData.complete_summary.replace(/\n/g, '<br>')}</div>
+        </div>
+    `;
+}
+function showReasoningError(message) {
+    const error = document.getElementById("reasoning-error");
+    if (!error)
+        return;
+    error.textContent = message;
+    error.style.display = "block";
+}
+export function hideReasoningModal() {
+    const modal = document.getElementById("reasoning-modal");
+    if (modal) {
+        modal.style.display = "none";
+    }
 }
