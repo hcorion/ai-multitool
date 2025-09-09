@@ -12,7 +12,13 @@
   - Add validation for reasoning data structure
   - _Requirements: 2.3, 5.2_
 
-- [ ] 2. Implement reasoning data capture and stream processing
+- [x] 2. Implement reasoning data capture and stream processing
+
+
+
+
+
+
   - Add reasoning configuration with "summary": "detailed" to API requests
   - Create reasoning event processing methods to handle stream events
   - Implement reasoning data extraction from response.reasoning_summary_* events

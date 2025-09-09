@@ -676,7 +676,7 @@ class ResponsesAPIClient:
                 "input": input_text,
                 "stream": stream,
                 "store": True,  # Store responses for conversation continuity
-                "reasoning": {"effort": "high"},
+                "reasoning": {"effort": "high", "summary": "detailed"},
                 "tools": [{"type": "web_search_preview"}],
                 "instructions": f"""You are CodeGPT, a large language model trained by OpenAI, based on the GPT-5 architecture. Knowledge cutoff: 2024-09-30. Current date: {datetime.today().strftime("%Y-%m-%d")}.
 You are trained to act and respond like a professional software engineer would, with vast knowledge of every programming language and excellent reasoning skills. You write industry-standard clean, elegant, idomatic code. You output code in Markdown format like so:
@@ -2322,19 +2322,21 @@ def converse():
                 # Process the stream
                 event_processor.process_stream(stream)
 
-                # Get the response ID and final text for storage
+                # Get the response ID, final text, and reasoning data for storage
                 response_id = event_processor.get_response_id()
                 final_text = event_processor.accumulated_text
+                reasoning_data = event_processor.get_reasoning_data()
 
                 if final_text and response_id:
                     try:
-                        # Store assistant response in conversation
+                        # Store assistant response in conversation with reasoning data
                         conversation_manager.add_message(
                             username,
                             conversation_id,
                             "assistant",
                             final_text,
                             response_id,
+                            reasoning_data,
                         )
                     except ConversationStorageError as e:
                         import logging
@@ -2458,6 +2460,12 @@ class StreamEventProcessor:
         self.event_queue = event_queue
         self.current_response_id: str | None = None
         self.accumulated_text = ""
+        self.reasoning_data: Dict[str, Any] = {
+            "summary_parts": [],
+            "complete_summary": "",
+            "timestamp": 0,
+            "response_id": "",
+        }
 
     def process_stream(self, stream: Any) -> None:
         """Process the entire stream of ResponseStreamEvent objects with comprehensive error handling."""
@@ -2547,6 +2555,14 @@ class StreamEventProcessor:
             self._handle_output_item_done(event)
         elif event_type == "response.completed":
             self._handle_response_completed(event)
+        elif event_type == "response.reasoning_summary_part.added":
+            self._handle_reasoning_summary_part_added(event)
+        elif event_type == "response.reasoning_summary_text.delta":
+            self._handle_reasoning_summary_text_delta(event)
+        elif event_type == "response.reasoning_summary_text.done":
+            self._handle_reasoning_summary_text_done(event)
+        elif event_type == "response.reasoning_summary_part.done":
+            self._handle_reasoning_summary_part_done(event)
         else:
             # Handle other event types if needed
             print(f"Unhandled event type: {event_type}")
@@ -2554,6 +2570,14 @@ class StreamEventProcessor:
     def _handle_response_created(self, event: Any) -> None:
         """Handle response.created event - response has been created."""
         self.accumulated_text = ""
+        # Reset reasoning data for new response
+        self.reasoning_data = {
+            "summary_parts": [],
+            "complete_summary": "",
+            "timestamp": 0,
+            "response_id": "",
+        }
+        
         # Extract response ID if available
         if hasattr(event, "response") and hasattr(event.response, "id"):
             self.current_response_id = event.response.id
@@ -2649,6 +2673,95 @@ class StreamEventProcessor:
     def get_response_id(self) -> str | None:
         """Get the response ID from the processed stream for conversation continuity."""
         return self.current_response_id
+
+    def _handle_reasoning_summary_part_added(self, event: Any) -> None:
+        """Handle response.reasoning_summary_part.added event - new reasoning part added."""
+        try:
+            # Extract reasoning part from the event
+            part_text = ""
+            if hasattr(event, "part") and event.part is not None:
+                if isinstance(event.part, str):
+                    part_text = event.part
+                elif hasattr(event.part, "text") and event.part.text is not None:
+                    part_text = str(event.part.text)
+                elif event.part is not None:
+                    part_text = str(event.part)
+            elif hasattr(event, "text") and event.text is not None:
+                part_text = str(event.text)
+
+            if part_text and part_text != "None":
+                self.reasoning_data["summary_parts"].append(part_text)
+                
+        except Exception as e:
+            import logging
+            logging.warning(f"Error processing reasoning summary part added: {e}")
+
+    def _handle_reasoning_summary_text_delta(self, event: Any) -> None:
+        """Handle response.reasoning_summary_text.delta event - reasoning text delta."""
+        try:
+            # Extract delta text from the event
+            delta_text = ""
+            if hasattr(event, "delta") and event.delta is not None:
+                if isinstance(event.delta, str):
+                    delta_text = event.delta
+                elif hasattr(event.delta, "text") and event.delta.text is not None:
+                    delta_text = str(event.delta.text)
+                elif event.delta is not None:
+                    delta_text = str(event.delta)
+            elif hasattr(event, "text") and event.text is not None:
+                delta_text = str(event.text)
+
+            if delta_text and delta_text != "None":
+                self.reasoning_data["complete_summary"] += delta_text
+                
+        except Exception as e:
+            import logging
+            logging.warning(f"Error processing reasoning summary text delta: {e}")
+
+    def _handle_reasoning_summary_text_done(self, event: Any) -> None:
+        """Handle response.reasoning_summary_text.done event - reasoning text complete."""
+        try:
+            # Extract final reasoning text from event if available
+            if hasattr(event, "text") and event.text is not None:
+                final_text = str(event.text)
+                # Use the final text from the event if it's more complete or if we have no accumulated text
+                if (len(final_text) > len(self.reasoning_data["complete_summary"]) or 
+                    not self.reasoning_data["complete_summary"]):
+                    self.reasoning_data["complete_summary"] = final_text
+            
+            # Set timestamp and response ID
+            self.reasoning_data["timestamp"] = int(time.time())
+            if self.current_response_id:
+                self.reasoning_data["response_id"] = self.current_response_id
+                
+        except Exception as e:
+            import logging
+            logging.warning(f"Error processing reasoning summary text done: {e}")
+
+    def _handle_reasoning_summary_part_done(self, event: Any) -> None:
+        """Handle response.reasoning_summary_part.done event - reasoning part complete."""
+        try:
+            # This event indicates a reasoning part is complete
+            # We can use this for validation or cleanup if needed
+            pass
+        except Exception as e:
+            import logging
+            logging.warning(f"Error processing reasoning summary part done: {e}")
+
+    def get_reasoning_data(self) -> Dict[str, Any] | None:
+        """Get the reasoning data from the processed stream."""
+        try:
+            # Only return reasoning data if we have meaningful content
+            if (self.reasoning_data["complete_summary"] or 
+                self.reasoning_data["summary_parts"]):
+                
+                # Validate the reasoning data before returning
+                return validate_reasoning_data(self.reasoning_data.copy())
+            return None
+        except Exception as e:
+            import logging
+            logging.warning(f"Error getting reasoning data: {e}")
+            return None
 
 
 # StreamingEventHandler removed - now using StreamEventProcessor for Responses API
