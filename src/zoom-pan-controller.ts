@@ -41,9 +41,22 @@ export class ZoomPanController {
     private lastPanPosition: { x: number; y: number } = { x: 0, y: 0 };
     private gestureStartTransform: Transform2D | null = null;
 
-    // Image bounds for constraint calculations
+    // Image/canvas bounds
     private imageBounds: { width: number; height: number } | null = null;
     private canvasBounds: { width: number; height: number } | null = null;
+
+    // Wheel gesture debounce so transform end fires
+    private wheelGestureTimer: number | null = null;
+
+    // Store bound handlers so cleanup actually removes them
+    private bound = {
+        pointerDown: (e: PointerEvent) => this.handlePointerDown(e),
+        pointerMove: (e: PointerEvent) => this.handlePointerMove(e),
+        pointerUp: (e: PointerEvent) => this.handlePointerUp(e),
+        pointerCancel: (e: PointerEvent) => this.handlePointerCancel(e),
+        wheel: (e: WheelEvent) => this.handleWheel(e),
+        contextMenu: (e: Event) => this.handleContextMenu(e),
+    };
 
     constructor(canvas: HTMLCanvasElement, settings: Partial<ZoomPanSettings> = {}) {
         this.canvas = canvas;
@@ -68,21 +81,14 @@ export class ZoomPanController {
         this.setupEventListeners();
     }
 
-    /**
-     * Set up event listeners for zoom and pan gestures
-     */
     private setupEventListeners(): void {
-        // Pointer events for touch gestures
-        this.canvas.addEventListener('pointerdown', this.handlePointerDown.bind(this));
-        this.canvas.addEventListener('pointermove', this.handlePointerMove.bind(this));
-        this.canvas.addEventListener('pointerup', this.handlePointerUp.bind(this));
-        this.canvas.addEventListener('pointercancel', this.handlePointerCancel.bind(this));
+        this.canvas.addEventListener('pointerdown', this.bound.pointerDown);
+        this.canvas.addEventListener('pointermove', this.bound.pointerMove);
+        this.canvas.addEventListener('pointerup', this.bound.pointerUp);
+        this.canvas.addEventListener('pointercancel', this.bound.pointerCancel);
 
-        // Wheel events for mouse zoom
-        this.canvas.addEventListener('wheel', this.handleWheel.bind(this), { passive: false });
-
-        // Prevent context menu during gestures
-        this.canvas.addEventListener('contextmenu', this.handleContextMenu.bind(this));
+        this.canvas.addEventListener('wheel', this.bound.wheel, { passive: false });
+        this.canvas.addEventListener('contextmenu', this.bound.contextMenu);
     }
 
     /**
@@ -159,7 +165,6 @@ export class ZoomPanController {
     private handleWheel(event: WheelEvent): void {
         if (!this.isEnabled || !this.settings.enableWheelZoom) return;
 
-        // Check for required modifier key
         const hasModifier = this.checkWheelModifier(event);
         if (!hasModifier && this.settings.wheelZoomModifier !== 'none') {
             return;
@@ -167,14 +172,13 @@ export class ZoomPanController {
 
         event.preventDefault();
 
-        // Calculate zoom delta
+        // Treat wheel as a short gesture that ends after a brief pause
+        if (!this.isActive) this.startGesture();
+
         const delta = -event.deltaY * this.settings.zoomSensitivity;
         const newScale = this.clampZoom(this.transform.scale * (1 + delta));
 
         if (newScale !== this.transform.scale) {
-            this.startGesture();
-
-            // Zoom towards mouse position
             const rect = this.canvas.getBoundingClientRect();
             const centerX = event.clientX - rect.left;
             const centerY = event.clientY - rect.top;
@@ -182,6 +186,19 @@ export class ZoomPanController {
             this.zoomToPoint(newScale, centerX, centerY);
             this.notifyTransformUpdate();
         }
+
+        // Debounce gesture end so rapid wheel events act as one gesture
+        if (this.wheelGestureTimer) {
+            window.clearTimeout(this.wheelGestureTimer);
+        }
+        this.wheelGestureTimer = window.setTimeout(() => {
+            this.wheelGestureTimer = null;
+            this.endGesture();
+        }, 120);
+    }
+
+    private clampZoom(scale: number): number {
+        return Math.max(this.settings.minZoom, Math.min(this.settings.maxZoom, scale));
     }
 
     /**
@@ -352,42 +369,43 @@ export class ZoomPanController {
         this.constrainTransform();
     }
 
-    /**
-     * Clamp zoom level to valid range
-     */
-    private clampZoom(scale: number): number {
-        return Math.max(this.settings.minZoom, Math.min(this.settings.maxZoom, scale));
-    }
 
     /**
      * Constrain transform to keep image visible
      */
     private constrainTransform(): void {
-        if (!this.imageBounds || !this.canvasBounds) return;
-
-        // Get current canvas display size
+        if (!this.imageBounds) return;
+    
         const rect = this.canvas.getBoundingClientRect();
-        const canvasWidth = rect.width;
-        const canvasHeight = rect.height;
-
-        // Calculate the scaled image size
-        const scaledWidth = this.imageBounds.width * this.transform.scale;
-        const scaledHeight = this.imageBounds.height * this.transform.scale;
-
-        // Calculate maximum translation to keep image visible
-        // If image is larger than canvas, allow panning within bounds
-        // If image is smaller than canvas, limit movement to keep it mostly visible
-        const maxTranslateX = Math.max(0, (scaledWidth - canvasWidth) / 2);
-        const maxTranslateY = Math.max(0, (scaledHeight - canvasHeight) / 2);
-
-        // Add some padding to allow slight over-panning
+        const S = this.transform.scale;
+    
+        // Pre (unscaled) canvas dims
+        const preW = rect.width / S;
+        const preH = rect.height / S;
+    
+        // Base contain fit in pre space
+        const imgW = this.imageBounds.width;
+        const imgH = this.imageBounds.height;
+        const imageAspect = imgW / imgH;
+        const canvasAspect = preW / preH;
+    
+        const baseScale = imageAspect > canvasAspect
+            ? preW / imgW
+            : preH / imgH;
+    
+        // Displayed image size in pre space, then multiplied by interactive zoom S
+        const displayW = imgW * baseScale * S;
+        const displayH = imgH * baseScale * S;
+    
+        // Visible canvas size in screen space is rect.width/height.
+        // Max pan beyond edges (allow slight over-pan via padding):
         const padding = 50;
-        const limitX = maxTranslateX + padding;
-        const limitY = maxTranslateY + padding;
-
-        // Constrain translation
-        this.transform.translateX = Math.max(-limitX, Math.min(limitX, this.transform.translateX));
-        this.transform.translateY = Math.max(-limitY, Math.min(limitY, this.transform.translateY));
+    
+        const maxTranslateX = Math.max(0, (displayW - rect.width) / 2) + padding;
+        const maxTranslateY = Math.max(0, (displayH - rect.height) / 2) + padding;
+    
+        this.transform.translateX = Math.max(-maxTranslateX, Math.min(maxTranslateX, this.transform.translateX));
+        this.transform.translateY = Math.max(-maxTranslateY, Math.min(maxTranslateY, this.transform.translateY));
     }
 
     /**
@@ -523,281 +541,172 @@ export class ZoomPanController {
         return { ...this.settings };
     }
 
+    
+    private getCanvasBorders() {
+        const cs = getComputedStyle(this.canvas);
+        const toN = (v: string) => (parseFloat(v) || 0);
+        return {
+        left:   toN(cs.borderLeftWidth),
+        right:  toN(cs.borderRightWidth),
+        top:    toN(cs.borderTopWidth),
+        bottom: toN(cs.borderBottomWidth),
+        };
+    }
+  
+
     /**
      * Convert screen coordinates to image coordinates with current transform
      */
-    public screenToImage(screenX: number, screenY: number, debug: boolean = false): { x: number; y: number } | null {
-        if (debug) console.log('🔍 ZoomPanController.screenToImage called:', { screenX, screenY });
-        
-        if (!this.imageBounds || !this.canvasBounds) {
-            if (debug) console.log('❌ ZoomPanController: Missing bounds', { imageBounds: this.imageBounds, canvasBounds: this.canvasBounds });
-            return null;
-        }
-
+    public screenToImage(screenX: number, screenY: number, debug = false): { x: number; y: number } | null {
+        if (!this.imageBounds) return null;
+      
         const rect = this.canvas.getBoundingClientRect();
-        const canvasX = screenX - rect.left;
-        const canvasY = screenY - rect.top;
-
-        if (debug) console.log('📐 ZoomPanController: Canvas rect and relative coords', {
-            rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
-            canvasX,
-            canvasY,
-            transform: this.transform,
-            imageBounds: this.imageBounds
-        });
-
-        // Check if point is within canvas bounds
-        if (canvasX < 0 || canvasY < 0 || canvasX >= rect.width || canvasY >= rect.height) {
-            if (debug) console.log('❌ ZoomPanController: Point outside canvas bounds');
-            return null;
+        const S = this.transform.scale;
+        const T = { x: this.transform.translateX, y: this.transform.translateY };
+        const borders = this.getCanvasBorders();
+      
+        // Element center in SCREEN coords (includes border; matches transform-origin center)
+        const cx = rect.left + rect.width / 2;
+        const cy = rect.top  + rect.height / 2;
+      
+        // 1) screen -> center-relative
+        const srX = screenX - cx;
+        const srY = screenY - cy;
+      
+        // 2) invert view: pre-relative (element border-box space)
+        const prX = (srX - T.x) / S;
+        const prY = (srY - T.y) / S;
+      
+        // 3) pre-relative -> pre (top-left) in border-box coords
+        const preW = rect.width  / S;   // includes border
+        const preH = rect.height / S;   // includes border
+        const preX = prX + preW / 2;
+        const preY = prY + preH / 2;
+      
+        // 4) step into content-box coords (subtract border)
+        const contentX = preX - borders.left;
+        const contentY = preY - borders.top;
+        const contentW = preW - (borders.left + borders.right);
+        const contentH = preH - (borders.top  + borders.bottom);
+      
+        // Outside canvas content area?
+        if (contentX < 0 || contentY < 0 || contentX > contentW || contentY > contentH) {
+          return null;
         }
-
-        // For default transform (no zoom/pan), use the same simple logic as CanvasManager
-        const isDefaultState = Math.abs(this.transform.scale - 1.0) < 0.001 && 
-            Math.abs(this.transform.translateX) < 0.001 && 
-            Math.abs(this.transform.translateY) < 0.001;
-            
-        if (isDefaultState) {
-            if (debug) console.log('✅ ZoomPanController: Using DEFAULT state logic');
-            
-            // The canvas CSS size matches the display size, and canvas internal size matches image size
-            // So we can use the same simple transformation as CanvasManager
-            const scale = rect.width / this.imageBounds.width;
-            
-            // Convert from display coordinates to image coordinates
-            const imagePixelX = canvasX / scale;
-            const imagePixelY = canvasY / scale;
-            
-            if (debug) console.log('📊 ZoomPanController DEFAULT calculation:', {
-                scale,
-                imagePixelX,
-                imagePixelY,
-                flooredX: Math.floor(imagePixelX),
-                flooredY: Math.floor(imagePixelY)
-            });
-            
-            // Check if point is within actual image bounds
-            if (imagePixelX < 0 || imagePixelY < 0 || imagePixelX >= this.imageBounds.width || imagePixelY >= this.imageBounds.height) {
-                if (debug) console.log('❌ ZoomPanController DEFAULT: Point outside image bounds');
-                return null;
-            }
-
-            const result = {
-                x: Math.floor(imagePixelX),
-                y: Math.floor(imagePixelY)
-            };
-            if (debug) console.log('✅ ZoomPanController DEFAULT result:', result);
-            return result;
+      
+        // 5) map content box -> image pixels (contain-fit inside content)
+        const imgW = this.imageBounds.width;
+        const imgH = this.imageBounds.height;
+        const imageAspect   = imgW / imgH;
+        const contentAspect = contentW / contentH;
+      
+        let displayW: number, displayH: number, offX = 0, offY = 0;
+        if (imageAspect > contentAspect) {
+          // fit to width
+          displayW = contentW;
+          displayH = contentW / imageAspect;
+          offY = (contentH - displayH) / 2;
+        } else {
+          // fit to height
+          displayH = contentH;
+          displayW = contentH * imageAspect;
+          offX = (contentW - displayW) / 2;
         }
-
-        if (debug) console.log('🔄 ZoomPanController: Using TRANSFORMED state logic');
-        
-        // For transformed state, we need to reverse the CSS transform to find the original coordinates
-        // The key insight: the browser applies CSS transforms, but we need to work backwards to find
-        // what the coordinates would be in the original (non-transformed) coordinate system
-        
-        // Step 1: Find the center of the transformed canvas
-        const transformedCenterX = rect.left + rect.width / 2;
-        const transformedCenterY = rect.top + rect.height / 2;
-        
-        if (debug) console.log('📍 ZoomPanController TRANSFORMED Step 1 - Centers:', {
-            transformedCenterX,
-            transformedCenterY
-        });
-        
-        // Step 2: Convert screen coordinates to be relative to the transformed center
-        const relativeToTransformedCenterX = screenX - transformedCenterX;
-        const relativeToTransformedCenterY = screenY - transformedCenterY;
-        
-        if (debug) console.log('📍 ZoomPanController TRANSFORMED Step 2 - Relative to transformed center:', {
-            relativeToTransformedCenterX,
-            relativeToTransformedCenterY
-        });
-        
-        // Step 3: Reverse the CSS transform to get original coordinates
-        // The CSS transform is: translate(translateX, translateY) scale(scale)
-        // To reverse: first reverse scale, then reverse translation
-        
-        // Reverse the scale
-        const relativeToOriginalCenterX = relativeToTransformedCenterX / this.transform.scale;
-        const relativeToOriginalCenterY = relativeToTransformedCenterY / this.transform.scale;
-        
-        // Reverse the translation (subtract because CSS transform adds)
-        const originalRelativeX = relativeToOriginalCenterX - this.transform.translateX;
-        const originalRelativeY = relativeToOriginalCenterY - this.transform.translateY;
-        
-        if (debug) console.log('📍 ZoomPanController TRANSFORMED Step 3 - Reverse transform:', {
-            relativeToOriginalCenterX,
-            relativeToOriginalCenterY,
-            originalRelativeX,
-            originalRelativeY
-        });
-        
-        // Step 4: Convert back to canvas coordinates using original canvas size
-        const originalCanvasWidth = rect.width / this.transform.scale;
-        const originalCanvasHeight = rect.height / this.transform.scale;
-        
-        const originalCanvasX = originalRelativeX + originalCanvasWidth / 2;
-        const originalCanvasY = originalRelativeY + originalCanvasHeight / 2;
-        
-        if (debug) console.log('📍 ZoomPanController TRANSFORMED Step 4 - Original canvas coords:', {
-            originalCanvasWidth,
-            originalCanvasHeight,
-            originalCanvasX,
-            originalCanvasY
-        });
-        
-        // Step 5: Convert to image coordinates using the same logic as default state
-        const scale = originalCanvasWidth / this.imageBounds.width;
-        const imagePixelX = originalCanvasX / scale;
-        const imagePixelY = originalCanvasY / scale;
-
-        if (debug) console.log('📊 ZoomPanController TRANSFORMED Step 5 - Final calculation:', {
-            scale,
-            imagePixelX,
-            imagePixelY,
-            flooredX: Math.floor(imagePixelX),
-            flooredY: Math.floor(imagePixelY)
-        });
-
-        // Check if point is within actual image bounds
-        if (imagePixelX < 0 || imagePixelY < 0 || imagePixelX >= this.imageBounds.width || imagePixelY >= this.imageBounds.height) {
-            if (debug) console.log('❌ ZoomPanController TRANSFORMED: Point outside image bounds');
-            return null;
+      
+        const dX = contentX - offX;
+        const dY = contentY - offY;
+      
+        if (dX < 0 || dY < 0 || dX > displayW || dY > displayH) {
+          return null; // in the letterbox margins
         }
-
-        const result = {
-            x: Math.floor(imagePixelX),
-            y: Math.floor(imagePixelY)
-        };
-        if (debug) console.log('✅ ZoomPanController TRANSFORMED result:', result);
-        return result;
-    }
+      
+        const imageX = (dX / displayW) * imgW;
+        const imageY = (dY / displayH) * imgH;
+      
+        return { x: Math.floor(imageX), y: Math.floor(imageY) };
+      }
 
     /**
      * Convert image coordinates to screen coordinates with current transform
      */
+
     public imageToScreen(imageX: number, imageY: number): { x: number; y: number } {
+        if (!this.imageBounds) return { x: 0, y: 0 };
+      
         const rect = this.canvas.getBoundingClientRect();
-        
-        // Account for CSS transforms (same logic as screenToImage)
-        let canvasWidth = rect.width;
-        let canvasHeight = rect.height;
-        let canvasLeft = rect.left;
-        let canvasTop = rect.top;
-        
-        if (Math.abs(this.transform.scale - 1.0) > 0.001 || 
-            Math.abs(this.transform.translateX) > 0.001 || 
-            Math.abs(this.transform.translateY) > 0.001) {
-            
-            // Reverse the CSS transform to get original bounds
-            canvasWidth = rect.width / this.transform.scale;
-            canvasHeight = rect.height / this.transform.scale;
-            
-            const transformedCenterX = rect.left + rect.width / 2;
-            const transformedCenterY = rect.top + rect.height / 2;
-            
-            const originalCenterX = transformedCenterX - this.transform.translateX;
-            const originalCenterY = transformedCenterY - this.transform.translateY;
-            
-            canvasLeft = originalCenterX - canvasWidth / 2;
-            canvasTop = originalCenterY - canvasHeight / 2;
-        }
-
-        // Calculate how the image is displayed within the original canvas
-        const imageAspect = this.imageBounds!.width / this.imageBounds!.height;
-        const canvasAspect = canvasWidth / canvasHeight;
-
-        let displayWidth: number;
-        let displayHeight: number;
-        let baseScale: number;
-
-        if (imageAspect > canvasAspect) {
-            // Image is wider than canvas - fit to width
-            displayWidth = canvasWidth;
-            displayHeight = canvasWidth / imageAspect;
-            baseScale = canvasWidth / this.imageBounds!.width;
+        const S = this.transform.scale;
+        const T = { x: this.transform.translateX, y: this.transform.translateY };
+        const borders = this.getCanvasBorders();
+      
+        // Pre (border-box) sizes (unscaled)
+        const preW = rect.width  / S;
+        const preH = rect.height / S;
+      
+        // Content box sizes (unscaled)
+        const contentW = preW - (borders.left + borders.right);
+        const contentH = preH - (borders.top  + borders.bottom);
+      
+        // Contain-fit image inside content box
+        const imgW = this.imageBounds.width;
+        const imgH = this.imageBounds.height;
+        const imageAspect   = imgW / imgH;
+        const contentAspect = contentW / contentH;
+      
+        let displayW: number, displayH: number, offX = 0, offY = 0, baseScale: number;
+        if (imageAspect > contentAspect) {
+          displayW = contentW;
+          displayH = contentW / imageAspect;
+          baseScale = displayW / imgW;
+          offY = (contentH - displayH) / 2;
         } else {
-            // Image is taller than canvas - fit to height
-            displayWidth = canvasHeight * imageAspect;
-            displayHeight = canvasHeight;
-            baseScale = canvasHeight / this.imageBounds!.height;
+          displayH = contentH;
+          displayW = contentH * imageAspect;
+          baseScale = displayH / imgH;
+          offX = (contentW - displayW) / 2;
         }
-
-        // Calculate image position (centered in original canvas)
-        const imageOffsetX = (canvasWidth - displayWidth) / 2;
-        const imageOffsetY = (canvasHeight - displayHeight) / 2;
-
-        // Convert image pixel coordinates to display coordinates
-        const displayX = imageX * baseScale;
-        const displayY = imageY * baseScale;
-
-        // Convert to center-relative coordinates for transform application
-        const centerX = displayWidth / 2;
-        const centerY = displayHeight / 2;
-        const relativeX = displayX - centerX;
-        const relativeY = displayY - centerY;
-
-        // Apply transform
-        const transformedX = relativeX * this.transform.scale + this.transform.translateX;
-        const transformedY = relativeY * this.transform.scale + this.transform.translateY;
-
-        // Convert back to image-relative coordinates
-        const imageRelativeX = transformedX + centerX;
-        const imageRelativeY = transformedY + centerY;
-
-        // Convert to original canvas coordinates
-        const canvasX = imageRelativeX + imageOffsetX;
-        const canvasY = imageRelativeY + imageOffsetY;
-
-        // Convert to screen coordinates
-        // For transformed state, we need to apply the transform to get the final screen position
-        if (Math.abs(this.transform.scale - 1.0) > 0.001 || 
-            Math.abs(this.transform.translateX) > 0.001 || 
-            Math.abs(this.transform.translateY) > 0.001) {
-            
-            // Apply the CSS transform to get the final screen position
-            const originalScreenX = canvasLeft + canvasX;
-            const originalScreenY = canvasTop + canvasY;
-            
-            // The CSS transform is applied around the center of the original canvas
-            const originalCenterX = canvasLeft + canvasWidth / 2;
-            const originalCenterY = canvasTop + canvasHeight / 2;
-            
-            // Apply scale and translation
-            const scaledX = (originalScreenX - originalCenterX) * this.transform.scale;
-            const scaledY = (originalScreenY - originalCenterY) * this.transform.scale;
-            
-            const finalScreenX = originalCenterX + scaledX + this.transform.translateX;
-            const finalScreenY = originalCenterY + scaledY + this.transform.translateY;
-            
-            return { x: finalScreenX, y: finalScreenY };
-        } else {
-            // No transform, simple conversion
-            const screenX = canvasLeft + canvasX;
-            const screenY = canvasTop + canvasY;
-            return { x: screenX, y: screenY };
-        }
-
-    }
-
+      
+        // Image px -> content box coords
+        const cX = offX + imageX * baseScale;
+        const cY = offY + imageY * baseScale;
+      
+        // Content -> pre (add borders)
+        const preX = cX + borders.left;
+        const preY = cY + borders.top;
+      
+        // Pre -> center-relative
+        const prX = preX - preW / 2;
+        const prY = preY - preH / 2;
+      
+        // Apply view transform
+        const srX = prX * S + T.x;
+        const srY = prY * S + T.y;
+      
+        // Back to absolute screen
+        const cx = rect.left + rect.width / 2;
+        const cy = rect.top  + rect.height / 2;
+      
+        return { x: cx + srX, y: cy + srY };
+      }
     /**
      * Cleanup resources
      */
     public cleanup(): void {
         this.disable();
-
-        // Remove event listeners
-        this.canvas.removeEventListener('pointerdown', this.handlePointerDown.bind(this));
-        this.canvas.removeEventListener('pointermove', this.handlePointerMove.bind(this));
-        this.canvas.removeEventListener('pointerup', this.handlePointerUp.bind(this));
-        this.canvas.removeEventListener('pointercancel', this.handlePointerCancel.bind(this));
-        this.canvas.removeEventListener('wheel', this.handleWheel.bind(this));
-        this.canvas.removeEventListener('contextmenu', this.handleContextMenu.bind(this));
+        this.canvas.removeEventListener('pointerdown', this.bound.pointerDown);
+        this.canvas.removeEventListener('pointermove', this.bound.pointerMove);
+        this.canvas.removeEventListener('pointerup', this.bound.pointerUp);
+        this.canvas.removeEventListener('pointercancel', this.bound.pointerCancel);
+        this.canvas.removeEventListener('wheel', this.bound.wheel);
+        this.canvas.removeEventListener('contextmenu', this.bound.contextMenu);
 
         this.activePointers.clear();
         this.eventHandler = null;
         this.imageBounds = null;
         this.canvasBounds = null;
+
+        if (this.wheelGestureTimer) {
+            window.clearTimeout(this.wheelGestureTimer);
+            this.wheelGestureTimer = null;
+        }
     }
 }

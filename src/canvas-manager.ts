@@ -93,8 +93,8 @@ export class CanvasManager implements CoordinateTransform {
             throw new Error('Canvas container not found');
         }
 
-        const containerWidth = containerRect.width - 40; // Account for padding
-        const containerHeight = containerRect.height - 40;
+        const containerWidth = containerRect.width;
+        const containerHeight = containerRect.height;
         
         const { displayWidth, displayHeight, scale } = this.calculateContainScaling(
             img.naturalWidth,
@@ -128,6 +128,10 @@ export class CanvasManager implements CoordinateTransform {
         // Initialize the mask overlay (empty initially)
         this.updateMaskOverlay();
     }
+
+    public getBaseScale(): number {
+        return this.state?.scale ?? 1; // CSS px per image px when interactive scale=1
+      }
 
     /**
      * Calculate "contain" scaling with letterboxing to maintain aspect ratio
@@ -196,15 +200,10 @@ export class CanvasManager implements CoordinateTransform {
     private renderImage(img: HTMLImageElement): void {
         const ctx = this.imageCanvas.getContext('2d');
         if (!ctx || !this.state) return;
-
-        // Clear canvas
         ctx.clearRect(0, 0, this.state.imageWidth, this.state.imageHeight);
-        
-        // Draw image at full resolution
         ctx.drawImage(img, 0, 0);
-
-        // Update canvas display size and position
         this.updateCanvasDisplay();
+        this.resetTransform(); // ensure we start from centered state
     }
 
     /**
@@ -212,19 +211,15 @@ export class CanvasManager implements CoordinateTransform {
      */
     private updateCanvasDisplay(): void {
         if (!this.state) return;
-
+      
         const canvases = [this.imageCanvas, this.overlayCanvas];
-        
         canvases.forEach(canvas => {
-            canvas.style.width = `${this.state!.displayWidth}px`;
-            canvas.style.height = `${this.state!.displayHeight}px`;
-            // Apply initial centering transform (will be overridden by zoom/pan if active)
-            if (!canvas.style.transform || canvas.style.transform === '') {
-                canvas.style.transform = 'translate(-50%, -50%)';
-                canvas.style.transformOrigin = '50% 50%';
-            }
+          canvas.style.width = `${this.state!.displayWidth}px`;
+          canvas.style.height = `${this.state!.displayHeight}px`;
+          // Do NOT touch canvas.style.transform here.
+          // Centering/zoom/pan is handled solely by resetTransform/applyTransform.
         });
-    }
+      }
 
     /**
      * Update mask overlay visualization with dirty rectangle optimization
@@ -491,8 +486,8 @@ export class CanvasManager implements CoordinateTransform {
         const containerRect = this.imageCanvas.parentElement?.getBoundingClientRect();
         if (!containerRect) return;
 
-        const containerWidth = containerRect.width - 40;
-        const containerHeight = containerRect.height - 40;
+        const containerWidth = containerRect.width;
+        const containerHeight = containerRect.height;
         
         const { displayWidth, displayHeight, scale } = this.calculateContainScaling(
             this.state.imageWidth,
@@ -727,31 +722,33 @@ export class CanvasManager implements CoordinateTransform {
     /**
      * Apply zoom/pan transform to canvases
      */
-    public applyTransform(transform: { scale: number; translateX: number; translateY: number }): void {
+    public applyTransform({ scale, translateX, translateY }: { scale: number; translateX: number; translateY: number }): void {
         if (!this.state) return;
-
+      
+        const value =
+          `translate(-50%, -50%) ` +
+          `translate(${translateX}px, ${translateY}px) ` + // translate in screen px (applies after scale)
+          `scale(${scale})`;
+      
         const canvases = [this.imageCanvas, this.overlayCanvas];
-        
         canvases.forEach(canvas => {
-            // Combine the centering transform (-50%, -50%) with zoom/pan transform
-            // The order is important: first center, then apply zoom/pan
-            canvas.style.transform = `translate(-50%, -50%) translate(${transform.translateX}px, ${transform.translateY}px) scale(${transform.scale})`;
-            canvas.style.transformOrigin = '50% 50%'; // Set origin to center for proper scaling
+          // Force override any CSS that might re-apply centering later
+          canvas.style.setProperty('transform', value, 'important');
+          canvas.style.setProperty('transform-origin', '50% 50%', 'important');
         });
-    }
+      }
 
     /**
      * Reset canvas transforms
      */
     public resetTransform(): void {
+        const value = 'translate(-50%, -50%)';
         const canvases = [this.imageCanvas, this.overlayCanvas];
-        
         canvases.forEach(canvas => {
-            // Reset to just the centering transform
-            canvas.style.transform = 'translate(-50%, -50%)';
-            canvas.style.transformOrigin = '50% 50%';
+          canvas.style.setProperty('transform', value, 'important');
+          canvas.style.setProperty('transform-origin', '50% 50%', 'important');
         });
-    }
+      }
 
     /**
      * Cleanup resources

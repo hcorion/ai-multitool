@@ -20,13 +20,16 @@ export interface InputSettings {
 
 export type InputEventHandler = (event: {
     type: 'start' | 'move' | 'end' | 'cancel';
+    clientX: number;
+    clientY: number;
+    // kept for backward compatibility with existing code
     screenX: number;
     screenY: number;
     pointerId: number;
     pointerType: string;
     isPrimary: boolean;
     pressure?: number;
-}) => void;
+  }) => void;
 
 export interface CoordinateTransformer {
     (screenX: number, screenY: number): { x: number; y: number } | null;
@@ -42,6 +45,17 @@ export class InputEngine {
     private isEnabled: boolean = false;
     private cursorElement: HTMLElement | null = null;
     private coordinateTransformer: CoordinateTransformer | null = null;
+
+    private bound = {
+        pointerDown: (e: PointerEvent) => this.handlePointerDown(e),
+        pointerMove: (e: PointerEvent) => this.handlePointerMove(e),
+        pointerUp: (e: PointerEvent) => this.handlePointerUp(e),
+        pointerCancel: (e: PointerEvent) => this.handlePointerCancel(e),
+        pointerLeave: (e: PointerEvent) => this.handlePointerLeave(e),
+        contextMenu: (e: Event) => this.handleContextMenu(e),
+        mouseEnter: (e: MouseEvent) => this.handleMouseEnter(e),
+        mouseLeave: (e: MouseEvent) => this.handleMouseLeave(e),
+      };
 
     constructor(canvas: HTMLCanvasElement, settings: Partial<InputSettings> = {}) {
         console.log('InputEngine constructor called with canvas:', canvas);
@@ -66,20 +80,14 @@ export class InputEngine {
         console.log('Setting up event listeners on canvas:', this.canvas);
         
         // Pointer Events API handlers
-        this.canvas.addEventListener('pointerdown', this.handlePointerDown.bind(this));
-        this.canvas.addEventListener('pointermove', this.handlePointerMove.bind(this));
-        this.canvas.addEventListener('pointerup', this.handlePointerUp.bind(this));
-        this.canvas.addEventListener('pointercancel', this.handlePointerCancel.bind(this));
-        this.canvas.addEventListener('pointerleave', this.handlePointerLeave.bind(this));
-
-        // Context menu prevention for better drawing experience
-        this.canvas.addEventListener('contextmenu', this.handleContextMenu.bind(this));
-
-        // Mouse cursor tracking for brush preview
-        this.canvas.addEventListener('mouseenter', this.handleMouseEnter.bind(this));
-        this.canvas.addEventListener('mouseleave', this.handleMouseLeave.bind(this));
-        
-        console.log('Event listeners attached');
+        this.canvas.addEventListener('pointerdown', this.bound.pointerDown);
+        this.canvas.addEventListener('pointermove', this.bound.pointerMove);
+        this.canvas.addEventListener('pointerup', this.bound.pointerUp);
+        this.canvas.addEventListener('pointercancel', this.bound.pointerCancel);
+        this.canvas.addEventListener('pointerleave', this.bound.pointerLeave);
+        this.canvas.addEventListener('contextmenu', this.bound.contextMenu);
+        this.canvas.addEventListener('mouseenter', this.bound.mouseEnter);
+        this.canvas.addEventListener('mouseleave', this.bound.mouseLeave);
     }
 
     /**
@@ -95,142 +103,115 @@ export class InputEngine {
      * Handle pointer down events
      */
     private handlePointerDown(event: PointerEvent): void {
-        console.log('Pointer down event received:', event.type, 'enabled:', this.isEnabled, 'enableDrawing:', this.settings.enableDrawing);
         if (!this.isEnabled || !this.settings.enableDrawing) return;
-
-        // Prevent default behavior
         event.preventDefault();
-
-        // Only handle primary pointer for drawing (ignore secondary touches/clicks)
         if (!event.isPrimary) return;
-
-        // Capture the pointer for reliable tracking
-        if (this.settings.capturePointer) {
-            this.canvas.setPointerCapture(event.pointerId);
-        }
-
-        // Create pointer state
-        const pointerState: PointerState = {
-            pointerId: event.pointerId,
-            pointerType: event.pointerType,
-            isPrimary: event.isPrimary,
-            isDrawing: true,
-            lastPosition: { x: event.clientX, y: event.clientY },
-            startTime: Date.now()
-        };
-
-        this.activePointers.set(event.pointerId, pointerState);
-
-        // Notify handler
-        if (this.eventHandler) {
-            this.eventHandler({
-                type: 'start',
-                screenX: event.clientX,
-                screenY: event.clientY,
-                pointerId: event.pointerId,
-                pointerType: event.pointerType,
-                isPrimary: event.isPrimary,
-                pressure: event.pressure
-            });
-        }
-    }
+        if (this.settings.capturePointer) this.canvas.setPointerCapture(event.pointerId);
+    
+        this.activePointers.set(event.pointerId, {
+          pointerId: event.pointerId,
+          pointerType: event.pointerType,
+          isPrimary: event.isPrimary,
+          isDrawing: true,
+          lastPosition: { x: event.clientX, y: event.clientY },
+          startTime: Date.now()
+        });
+    
+        this.eventHandler?.({
+          type: 'start',
+          clientX: event.clientX,
+          clientY: event.clientY,
+          screenX: event.clientX,
+          screenY: event.clientY,
+          pointerId: event.pointerId,
+          pointerType: event.pointerType,
+          isPrimary: event.isPrimary,
+          pressure: event.pressure
+        });
+      }
 
     /**
      * Handle pointer move events
      */
     private handlePointerMove(event: PointerEvent): void {
         if (!this.isEnabled) return;
-
         const pointerState = this.activePointers.get(event.pointerId);
-
-        // Handle drawing movement
+    
         if (pointerState && pointerState.isDrawing && this.settings.enableDrawing) {
-            event.preventDefault();
-
-            // Update pointer state
-            pointerState.lastPosition = { x: event.clientX, y: event.clientY };
-
-            // Notify handler
-            if (this.eventHandler) {
-                this.eventHandler({
-                    type: 'move',
-                    screenX: event.clientX,
-                    screenY: event.clientY,
-                    pointerId: event.pointerId,
-                    pointerType: event.pointerType,
-                    isPrimary: event.isPrimary,
-                    pressure: event.pressure
-                });
-            }
+          event.preventDefault();
+          pointerState.lastPosition = { x: event.clientX, y: event.clientY };
+          this.eventHandler?.({
+            type: 'move',
+            clientX: event.clientX,
+            clientY: event.clientY,
+            screenX: event.clientX,
+            screenY: event.clientY,
+            pointerId: event.pointerId,
+            pointerType: event.pointerType,
+            isPrimary: event.isPrimary,
+            pressure: event.pressure
+          });
         } else if (event.pointerType === 'mouse') {
-            // Handle cursor preview for mouse (non-drawing movement)
-            this.updateCursorPreview(event.clientX, event.clientY);
+          this.updateCursorPreview(event.clientX, event.clientY);
         }
-    }
+      }
 
     /**
      * Handle pointer up events
      */
     private handlePointerUp(event: PointerEvent): void {
         if (!this.isEnabled) return;
-
         const pointerState = this.activePointers.get(event.pointerId);
         if (!pointerState) return;
-
+    
         event.preventDefault();
-
-        // Release pointer capture
         if (this.settings.capturePointer && this.canvas.hasPointerCapture(event.pointerId)) {
-            this.canvas.releasePointerCapture(event.pointerId);
+          this.canvas.releasePointerCapture(event.pointerId);
         }
-
-        // Notify handler if this was a drawing operation
-        if (pointerState.isDrawing && this.eventHandler) {
-            this.eventHandler({
-                type: 'end',
-                screenX: event.clientX,
-                screenY: event.clientY,
-                pointerId: event.pointerId,
-                pointerType: event.pointerType,
-                isPrimary: event.isPrimary,
-                pressure: event.pressure
-            });
+    
+        if (pointerState.isDrawing) {
+          this.eventHandler?.({
+            type: 'end',
+            clientX: event.clientX,
+            clientY: event.clientY,
+            screenX: event.clientX,
+            screenY: event.clientY,
+            pointerId: event.pointerId,
+            pointerType: event.pointerType,
+            isPrimary: event.isPrimary,
+            pressure: event.pressure
+          });
         }
-
-        // Clean up pointer state
         this.activePointers.delete(event.pointerId);
-    }
+      }
 
     /**
      * Handle pointer cancel events (important for robust input handling)
      */
     private handlePointerCancel(event: PointerEvent): void {
         if (!this.isEnabled) return;
-
         const pointerState = this.activePointers.get(event.pointerId);
         if (!pointerState) return;
-
-        // Release pointer capture
+    
         if (this.settings.capturePointer && this.canvas.hasPointerCapture(event.pointerId)) {
-            this.canvas.releasePointerCapture(event.pointerId);
+          this.canvas.releasePointerCapture(event.pointerId);
         }
-
-        // Notify handler of cancellation
-        if (pointerState.isDrawing && this.eventHandler) {
-            this.eventHandler({
-                type: 'cancel',
-                screenX: event.clientX,
-                screenY: event.clientY,
-                pointerId: event.pointerId,
-                pointerType: event.pointerType,
-                isPrimary: event.isPrimary,
-                pressure: event.pressure
-            });
+    
+        if (pointerState.isDrawing) {
+          this.eventHandler?.({
+            type: 'cancel',
+            clientX: event.clientX,
+            clientY: event.clientY,
+            screenX: event.clientX,
+            screenY: event.clientY,
+            pointerId: event.pointerId,
+            pointerType: event.pointerType,
+            isPrimary: event.isPrimary,
+            pressure: event.pressure
+          });
         }
-
-        // Clean up pointer state
         this.activePointers.delete(event.pointerId);
-    }
+      }
 
     /**
      * Handle pointer leave events
@@ -270,44 +251,27 @@ export class InputEngine {
     /**
      * Update cursor preview position
      */
-    private updateCursorPreview(screenX: number, screenY: number): void {
+    private updateCursorPreview(clientX: number, clientY: number): void {
         if (!this.cursorElement) return;
-
-        let cursorX = screenX;
-        let cursorY = screenY;
-
-        // If we have a coordinate transformer, we need to account for canvas transforms
+      
+        let cursorX = clientX;
+        let cursorY = clientY;
+      
         if (this.coordinateTransformer) {
-            // First, convert screen coordinates to image coordinates
-            const imageCoords = this.coordinateTransformer(screenX, screenY);
-            
-            if (!imageCoords) {
-                // Cursor is outside valid drawing area, hide it
-                this.cursorElement.style.display = 'none';
-                return;
-            }
-
-            // TEMPORARY FIX: Don't do round-trip conversion to avoid cursor teleporting
-            // The imageToScreen method is causing the cursor to teleport
-            // Just use the original screen coordinates for now
-            cursorX = screenX;
-            cursorY = screenY;
-            
-            // TODO: Fix imageToScreen method and re-enable this:
-            // if ('imageToScreen' in this.coordinateTransformer) {
-            //     const transformedScreen = (this.coordinateTransformer as any).imageToScreen(imageCoords.x, imageCoords.y);
-            //     cursorX = transformedScreen.x;
-            //     cursorY = transformedScreen.y;
-            // }
+          const img = this.coordinateTransformer(clientX, clientY);
+          if (!img) { this.cursorElement.style.display = 'none'; return; }
+      
+          if (this.coordinateTransformer.imageToScreen) {
+            const p = this.coordinateTransformer.imageToScreen(img.x, img.y);
+            cursorX = p.x;
+            cursorY = p.y;
+          }
         }
-
-        // Position cursor at the transformed screen coordinates
+      
         this.cursorElement.style.left = `${cursorX}px`;
         this.cursorElement.style.top = `${cursorY}px`;
-        
-        // Make sure cursor is visible when updating position
         this.cursorElement.style.display = 'block';
-    }
+      }
 
     /**
      * Show cursor preview
@@ -358,18 +322,16 @@ export class InputEngine {
      */
     public updateCursorSize(size: number): void {
         if (this.cursorElement) {
-            // If we have a coordinate transformer with scale info, scale the cursor size
-            let displaySize = size;
-            if (this.coordinateTransformer && this.coordinateTransformer.getTransform) {
-                const transform = this.coordinateTransformer.getTransform();
-                displaySize = size * transform.scale;
-            }
-            
-            this.cursorElement.style.width = `${displaySize}px`;
-            this.cursorElement.style.height = `${displaySize}px`;
+          let displaySize = size;
+          if (this.coordinateTransformer?.getTransform) {
+            const t = this.coordinateTransformer.getTransform() as any;
+            const baseScale = t.baseScale ?? 1;
+            displaySize = size * baseScale * t.scale; // exact on-screen brush diameter
+          }
+          this.cursorElement.style.width = `${displaySize}px`;
+          this.cursorElement.style.height = `${displaySize}px`;
         }
-    }
-
+      }
     /**
      * Update cursor preview color based on tool mode
      */
@@ -505,27 +467,17 @@ export class InputEngine {
      */
     public cleanup(): void {
         this.disable();
-        
-        // Remove event listeners
-        this.canvas.removeEventListener('pointerdown', this.handlePointerDown.bind(this));
-        this.canvas.removeEventListener('pointermove', this.handlePointerMove.bind(this));
-        this.canvas.removeEventListener('pointerup', this.handlePointerUp.bind(this));
-        this.canvas.removeEventListener('pointercancel', this.handlePointerCancel.bind(this));
-        this.canvas.removeEventListener('pointerleave', this.handlePointerLeave.bind(this));
-        this.canvas.removeEventListener('contextmenu', this.handleContextMenu.bind(this));
-        this.canvas.removeEventListener('mouseenter', this.handleMouseEnter.bind(this));
-        this.canvas.removeEventListener('mouseleave', this.handleMouseLeave.bind(this));
-        
-        // Remove cursor preview
-        if (this.cursorElement) {
-            this.cursorElement.remove();
-            this.cursorElement = null;
-        }
-        
-        // Reset canvas styles
+        this.canvas.removeEventListener('pointerdown', this.bound.pointerDown);
+        this.canvas.removeEventListener('pointermove', this.bound.pointerMove);
+        this.canvas.removeEventListener('pointerup', this.bound.pointerUp);
+        this.canvas.removeEventListener('pointercancel', this.bound.pointerCancel);
+        this.canvas.removeEventListener('pointerleave', this.bound.pointerLeave);
+        this.canvas.removeEventListener('contextmenu', this.bound.contextMenu);
+        this.canvas.removeEventListener('mouseenter', this.bound.mouseEnter);
+        this.canvas.removeEventListener('mouseleave', this.bound.mouseLeave);
+        if (this.cursorElement) { this.cursorElement.remove(); this.cursorElement = null; }
         this.canvas.style.touchAction = '';
         this.canvas.style.cursor = '';
-        
         this.eventHandler = null;
-    }
+      }
 }
