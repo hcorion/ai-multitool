@@ -654,6 +654,110 @@ class ConversationManager:
         # Use the Pydantic model's get_message_list method
         return conversation.get_message_list()
 
+    def get_message_reasoning_data(
+        self, username: str, conversation_id: str, message_index: int
+    ) -> Dict[str, Any] | None:
+        """Get reasoning data for a specific message by index."""
+        try:
+            conversation = self.get_conversation(username, conversation_id)
+            if not conversation:
+                import logging
+
+                logging.warning(
+                    f"Conversation {conversation_id} not found for user {username}"
+                )
+                return None
+
+            # Validate message index
+            if message_index < 0 or message_index >= len(conversation.messages):
+                import logging
+
+                logging.warning(
+                    f"Invalid message index {message_index} for conversation {conversation_id}. "
+                    f"Valid range: 0-{len(conversation.messages) - 1}"
+                )
+                return None
+
+            message = conversation.messages[message_index]
+
+            # Only return reasoning data if it exists and is valid
+            if message.reasoning_data:
+                try:
+                    # Validate the reasoning data before returning
+                    validated_data = validate_reasoning_data(message.reasoning_data)
+                    return validated_data
+                except ValueError as e:
+                    import logging
+
+                    logging.warning(
+                        f"Invalid reasoning data for message {message_index} in conversation {conversation_id}: {e}"
+                    )
+                    return None
+
+            return None
+
+        except Exception as e:
+            import logging
+
+            logging.error(
+                f"Error retrieving reasoning data for message {message_index} in conversation {conversation_id}: {e}",
+                exc_info=True,
+            )
+            return None
+
+    def get_message_by_index(
+        self, username: str, conversation_id: str, message_index: int
+    ) -> ChatMessage | None:
+        """Get a specific message by index."""
+        try:
+            conversation = self.get_conversation(username, conversation_id)
+            if not conversation:
+                return None
+
+            # Validate message index
+            if message_index < 0 or message_index >= len(conversation.messages):
+                return None
+
+            return conversation.messages[message_index]
+
+        except Exception as e:
+            import logging
+
+            logging.error(
+                f"Error retrieving message {message_index} from conversation {conversation_id}: {e}",
+                exc_info=True,
+            )
+            return None
+
+    def has_reasoning_data(
+        self, username: str, conversation_id: str, message_index: int
+    ) -> bool:
+        """Check if a message has reasoning data available."""
+        try:
+            reasoning_data = self.get_message_reasoning_data(
+                username, conversation_id, message_index
+            )
+            return reasoning_data is not None
+        except Exception:
+            return False
+
+    def get_conversation_message_count(
+        self, username: str, conversation_id: str
+    ) -> int:
+        """Get the total number of messages in a conversation."""
+        try:
+            conversation = self.get_conversation(username, conversation_id)
+            if not conversation:
+                return 0
+            return len(conversation.messages)
+        except Exception as e:
+            import logging
+
+            logging.error(
+                f"Error getting message count for conversation {conversation_id}: {e}"
+            )
+            return 0
+
 
 class ResponsesAPIClient:
     """Client wrapper for OpenAI Responses API with o4-mini model."""
@@ -2453,6 +2557,90 @@ def converse():
         )
 
 
+@app.route("/chat/reasoning/<conversation_id>/<int:message_index>", methods=["GET"])
+def get_message_reasoning(conversation_id: str, message_index: int):
+    """API endpoint to retrieve reasoning data for a specific message."""
+    if "username" not in session:
+        return jsonify({"error": "Authentication required"}), 401
+
+    username = session["username"]
+
+    try:
+        # Validate conversation ownership by attempting to retrieve it
+        conversation = conversation_manager.get_conversation(username, conversation_id)
+        if not conversation:
+            return jsonify({
+                "error": "Conversation not found",
+                "message": "The requested conversation does not exist or you don't have access to it."
+            }), 404
+
+        # Validate message index
+        message_count = conversation_manager.get_conversation_message_count(username, conversation_id)
+        if message_index < 0 or message_index >= message_count:
+            return jsonify({
+                "error": "Invalid message index",
+                "message": f"Message index {message_index} is out of range. Valid range: 0-{message_count - 1}."
+            }), 400
+
+        # Get the message to verify it exists and is an assistant message
+        message = conversation_manager.get_message_by_index(username, conversation_id, message_index)
+        if not message:
+            return jsonify({
+                "error": "Message not found",
+                "message": "The requested message could not be retrieved."
+            }), 404
+
+        # Only assistant messages can have reasoning data
+        if message.role != "assistant":
+            return jsonify({
+                "error": "No reasoning available",
+                "message": "Reasoning data is only available for assistant messages."
+            }), 400
+
+        # Retrieve reasoning data
+        reasoning_data = conversation_manager.get_message_reasoning_data(
+            username, conversation_id, message_index
+        )
+
+        if reasoning_data is None:
+            return jsonify({
+                "error": "No reasoning data",
+                "message": "No reasoning data is available for this message."
+            }), 404
+
+        # Return structured reasoning data
+        return jsonify({
+            "success": True,
+            "conversation_id": conversation_id,
+            "message_index": message_index,
+            "message_role": message.role,
+            "message_text": message.text,
+            "response_id": message.response_id,
+            "reasoning": {
+                "summary_parts": reasoning_data.get("summary_parts", []),
+                "complete_summary": reasoning_data.get("complete_summary", ""),
+                "timestamp": reasoning_data.get("timestamp", 0),
+                "response_id": reasoning_data.get("response_id", "")
+            }
+        })
+
+    except ValueError as e:
+        import logging
+        logging.warning(f"Validation error in get_message_reasoning: {e}")
+        return jsonify({
+            "error": "Invalid request",
+            "message": str(e)
+        }), 400
+
+    except Exception as e:
+        import logging
+        logging.error(f"Unexpected error in get_message_reasoning: {e}", exc_info=True)
+        return jsonify({
+            "error": "Internal server error",
+            "message": "An unexpected error occurred while retrieving reasoning data."
+        }), 500
+
+
 class StreamEventProcessor:
     """Process streaming responses from the Responses API to replace AssistantEventHandler."""
 
@@ -2577,7 +2765,7 @@ class StreamEventProcessor:
             "timestamp": 0,
             "response_id": "",
         }
-        
+
         # Extract response ID if available
         if hasattr(event, "response") and hasattr(event.response, "id"):
             self.current_response_id = event.response.id
@@ -2691,9 +2879,10 @@ class StreamEventProcessor:
 
             if part_text and part_text != "None":
                 self.reasoning_data["summary_parts"].append(part_text)
-                
+
         except Exception as e:
             import logging
+
             logging.warning(f"Error processing reasoning summary part added: {e}")
 
     def _handle_reasoning_summary_text_delta(self, event: Any) -> None:
@@ -2713,9 +2902,10 @@ class StreamEventProcessor:
 
             if delta_text and delta_text != "None":
                 self.reasoning_data["complete_summary"] += delta_text
-                
+
         except Exception as e:
             import logging
+
             logging.warning(f"Error processing reasoning summary text delta: {e}")
 
     def _handle_reasoning_summary_text_done(self, event: Any) -> None:
@@ -2725,17 +2915,20 @@ class StreamEventProcessor:
             if hasattr(event, "text") and event.text is not None:
                 final_text = str(event.text)
                 # Use the final text from the event if it's more complete or if we have no accumulated text
-                if (len(final_text) > len(self.reasoning_data["complete_summary"]) or 
-                    not self.reasoning_data["complete_summary"]):
+                if (
+                    len(final_text) > len(self.reasoning_data["complete_summary"])
+                    or not self.reasoning_data["complete_summary"]
+                ):
                     self.reasoning_data["complete_summary"] = final_text
-            
+
             # Set timestamp and response ID
             self.reasoning_data["timestamp"] = int(time.time())
             if self.current_response_id:
                 self.reasoning_data["response_id"] = self.current_response_id
-                
+
         except Exception as e:
             import logging
+
             logging.warning(f"Error processing reasoning summary text done: {e}")
 
     def _handle_reasoning_summary_part_done(self, event: Any) -> None:
@@ -2746,20 +2939,23 @@ class StreamEventProcessor:
             pass
         except Exception as e:
             import logging
+
             logging.warning(f"Error processing reasoning summary part done: {e}")
 
     def get_reasoning_data(self) -> Dict[str, Any] | None:
         """Get the reasoning data from the processed stream."""
         try:
             # Only return reasoning data if we have meaningful content
-            if (self.reasoning_data["complete_summary"] or 
-                self.reasoning_data["summary_parts"]):
-                
+            if (
+                self.reasoning_data["complete_summary"]
+                or self.reasoning_data["summary_parts"]
+            ):
                 # Validate the reasoning data before returning
                 return validate_reasoning_data(self.reasoning_data.copy())
             return None
         except Exception as e:
             import logging
+
             logging.warning(f"Error getting reasoning data: {e}")
             return None
 

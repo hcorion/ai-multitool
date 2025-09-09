@@ -28,14 +28,20 @@
   - Ensure reasoning processing doesn't block normal chat functionality
   - _Requirements: 2.1, 2.2, 4.3, 5.1_
 
-- [ ] 3. Extend ConversationManager for reasoning data storage
+
+
+
+- [x] 3. Extend ConversationManager for reasoning data storage
   - Add method to store messages with reasoning data
   - Implement reasoning data retrieval by message index
+
+
+
   - Update existing add_message method to accept optional reasoning data
   - Ensure backward compatibility with existing conversation files
   - _Requirements: 2.3, 5.2, 5.3_
 
-- [ ] 4. Create reasoning data API endpoint
+- [x] 4. Create reasoning data API endpoint
   - Implement GET /chat/reasoning/<conversation_id>/<message_index> endpoint
   - Add proper authentication and conversation ownership validation
   - Handle cases where reasoning data is missing or unavailable
