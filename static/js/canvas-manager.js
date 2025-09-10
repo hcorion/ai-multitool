@@ -1,8 +1,10 @@
 /**
  * CanvasManager - Handles canvas state, rendering, and coordinate transformations
- * for the inpainting mask canvas system.
+ * for the inpainting mask canvas system with performance optimizations.
  */
 import { BrushEngine } from './brush-engine.js';
+import { RenderScheduler } from './render-scheduler.js';
+import { PerformanceMonitor } from './performance-monitor.js';
 export class CanvasManager {
     imageCanvas;
     overlayCanvas;
@@ -10,11 +12,26 @@ export class CanvasManager {
     state = null;
     loadedImage = null;
     brushEngine;
+    renderScheduler;
+    performanceMonitor;
+    // Performance optimization flags
+    lastOverlayUpdateTime = 0;
+    overlayUpdateThrottle = 16.67; // ~60 FPS
     constructor(imageCanvas, overlayCanvas, maskAlphaCanvas) {
         this.imageCanvas = imageCanvas;
         this.overlayCanvas = overlayCanvas;
         this.maskAlphaCanvas = maskAlphaCanvas;
         this.brushEngine = new BrushEngine();
+        // Initialize performance systems
+        this.renderScheduler = new RenderScheduler();
+        this.performanceMonitor = new PerformanceMonitor({
+            targetFps: 60,
+            sampleSize: 60,
+            enableMemoryTracking: true,
+            warningThreshold: 45
+        });
+        this.setupRenderCallbacks();
+        this.setupPerformanceMonitoring();
     }
     /**
      * Load and display an image with proper scaling and letterboxing
@@ -122,10 +139,14 @@ export class CanvasManager {
         this.overlayCanvas.height = height;
         this.maskAlphaCanvas.width = width;
         this.maskAlphaCanvas.height = height;
-        // Get contexts and configure them
-        const imageCtx = this.imageCanvas.getContext('2d');
-        const overlayCtx = this.overlayCanvas.getContext('2d');
-        const maskAlphaCtx = this.maskAlphaCanvas.getContext('2d');
+        // Get contexts with performance hints
+        const contextOptions = {
+            desynchronized: true, // Allow desynchronized rendering for better performance
+            willReadFrequently: true // Optimize for frequent pixel reads
+        };
+        const imageCtx = this.imageCanvas.getContext('2d', contextOptions);
+        const overlayCtx = this.overlayCanvas.getContext('2d', contextOptions);
+        const maskAlphaCtx = this.maskAlphaCanvas.getContext('2d', contextOptions);
         if (!imageCtx || !overlayCtx || !maskAlphaCtx) {
             throw new Error('Failed to get canvas contexts');
         }
@@ -163,9 +184,52 @@ export class CanvasManager {
         });
     }
     /**
+     * Set up render callbacks for performance optimization
+     */
+    setupRenderCallbacks() {
+        this.renderScheduler.setRenderCallback('overlay', (operations, dirtyRect) => {
+            this.performanceMonitor.startRender();
+            // Only update if enough time has passed (throttling)
+            const currentTime = performance.now();
+            if (currentTime - this.lastOverlayUpdateTime < this.overlayUpdateThrottle) {
+                return;
+            }
+            this.lastOverlayUpdateTime = currentTime;
+            this.performMaskOverlayUpdate(dirtyRect);
+            this.performanceMonitor.endRender();
+        });
+    }
+    /**
+     * Set up performance monitoring
+     */
+    setupPerformanceMonitoring() {
+        this.performanceMonitor.setPerformanceWarningCallback((metrics) => {
+            console.warn('Performance warning:', this.performanceMonitor.getPerformanceSummary());
+            // Automatically adjust throttling if performance is poor
+            if (metrics.fps < 30) {
+                this.overlayUpdateThrottle = Math.min(33.33, this.overlayUpdateThrottle * 1.2); // Reduce to 30 FPS
+                console.log(`Adjusted overlay update throttle to ${this.overlayUpdateThrottle.toFixed(2)}ms`);
+            }
+        });
+        this.performanceMonitor.setMetricsUpdateCallback((metrics) => {
+            // Could emit performance metrics to UI here if needed
+            if (metrics.totalFrames % 60 === 0) { // Log every 60 frames
+                console.debug('Performance:', this.performanceMonitor.getPerformanceSummary());
+            }
+        });
+        this.performanceMonitor.start();
+    }
+    /**
      * Update mask overlay visualization with dirty rectangle optimization
      */
     updateMaskOverlay(dirtyRect) {
+        // Schedule overlay update through render scheduler for batching
+        this.renderScheduler.scheduleOverlayUpdate(dirtyRect);
+    }
+    /**
+     * Perform the actual mask overlay update (called by render scheduler)
+     */
+    performMaskOverlayUpdate(dirtyRect) {
         if (!this.state)
             return;
         const overlayCtx = this.overlayCanvas.getContext('2d');
@@ -442,14 +506,9 @@ export class CanvasManager {
         const hasChanges = this.brushEngine.applyStamp(this.state.maskData, this.state.imageWidth, this.state.imageHeight, imageX, imageY, brushSize, mode);
         if (hasChanges) {
             this.state.isDirty = true;
-            // Calculate dirty rectangle for the brush stamp
-            const radius = Math.ceil(brushSize / 2);
-            const dirtyRect = {
-                x: Math.max(0, imageX - radius),
-                y: Math.max(0, imageY - radius),
-                width: Math.min(this.state.imageWidth - Math.max(0, imageX - radius), radius * 2),
-                height: Math.min(this.state.imageHeight - Math.max(0, imageY - radius), radius * 2)
-            };
+            // Calculate optimized dirty rectangle for the brush stamp
+            const dirtyRect = this.calculateBrushDirtyRect(imageX, imageY, brushSize);
+            this.renderScheduler.addDirtyRect(dirtyRect);
             this.updateMaskOverlay(dirtyRect);
         }
         return stroke;
@@ -489,6 +548,7 @@ export class CanvasManager {
                     width: Math.min(this.state.imageWidth - Math.max(0, minX), maxX - Math.max(0, minX)),
                     height: Math.min(this.state.imageHeight - Math.max(0, minY), maxY - Math.max(0, minY))
                 };
+                this.renderScheduler.addDirtyRect(dirtyRect);
                 this.updateMaskOverlay(dirtyRect);
             }
             return hasChanges;
@@ -592,10 +652,45 @@ export class CanvasManager {
         });
     }
     /**
+     * Calculate dirty rectangle for a brush operation
+     */
+    calculateBrushDirtyRect(centerX, centerY, brushSize) {
+        if (!this.state) {
+            return { x: 0, y: 0, width: 0, height: 0 };
+        }
+        const radius = Math.ceil(brushSize / 2);
+        return {
+            x: Math.max(0, centerX - radius),
+            y: Math.max(0, centerY - radius),
+            width: Math.min(this.state.imageWidth - Math.max(0, centerX - radius), radius * 2),
+            height: Math.min(this.state.imageHeight - Math.max(0, centerY - radius), radius * 2)
+        };
+    }
+    /**
+     * Get render scheduler for external access
+     */
+    getRenderScheduler() {
+        return this.renderScheduler;
+    }
+    /**
+     * Get performance monitor for external access
+     */
+    getPerformanceMonitor() {
+        return this.performanceMonitor;
+    }
+    /**
+     * Force immediate overlay update (bypasses scheduling)
+     */
+    forceOverlayUpdate(dirtyRect) {
+        this.performMaskOverlayUpdate(dirtyRect);
+    }
+    /**
      * Cleanup resources
      */
     cleanup() {
         this.resetTransform();
+        this.performanceMonitor.stop();
+        this.renderScheduler.cleanup();
         this.state = null;
         this.loadedImage = null;
     }

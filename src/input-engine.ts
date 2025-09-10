@@ -1,7 +1,10 @@
 /**
  * InputEngine - Unified pointer input handling using Pointer Events API
  * Handles mouse, pen, and touch input with proper capture and cancellation
+ * Uses requestAnimationFrame batching for 60 FPS performance
  */
+
+import { RenderScheduler } from './render-scheduler.js';
 
 export interface PointerState {
     pointerId: number;
@@ -45,6 +48,14 @@ export class InputEngine {
     private isEnabled: boolean = false;
     private cursorElement: HTMLElement | null = null;
     private coordinateTransformer: CoordinateTransformer | null = null;
+    private renderScheduler: RenderScheduler;
+    
+    // Batched pointer events for performance
+    private pendingPointerEvents: Array<{
+        type: 'start' | 'move' | 'end' | 'cancel';
+        event: PointerEvent;
+        timestamp: number;
+    }> = [];
 
     private bound = {
         pointerDown: (e: PointerEvent) => this.handlePointerDown(e),
@@ -67,6 +78,10 @@ export class InputEngine {
             ...settings
         };
         console.log('InputEngine settings:', this.settings);
+
+        // Initialize render scheduler for batched processing
+        this.renderScheduler = new RenderScheduler();
+        this.setupRenderCallbacks();
 
         this.setupEventListeners();
         this.setupTouchAction();
@@ -117,7 +132,8 @@ export class InputEngine {
             startTime: Date.now()
         });
 
-        this.eventHandler?.({
+        // Batch pointer start events for performance
+        this.renderScheduler.schedulePointerUpdate({
             type: 'start',
             clientX: event.clientX,
             clientY: event.clientY,
@@ -140,7 +156,9 @@ export class InputEngine {
         if (pointerState && pointerState.isDrawing && this.settings.enableDrawing) {
             event.preventDefault();
             pointerState.lastPosition = { x: event.clientX, y: event.clientY };
-            this.eventHandler?.({
+            
+            // Batch pointer move events for performance
+            this.renderScheduler.schedulePointerUpdate({
                 type: 'move',
                 clientX: event.clientX,
                 clientY: event.clientY,
@@ -152,7 +170,11 @@ export class InputEngine {
                 pressure: event.pressure
             });
         } else if (event.pointerType === 'mouse') {
-            this.updateCursorPreview(event.clientX, event.clientY);
+            // Batch cursor updates for smooth performance
+            this.renderScheduler.scheduleCursorUpdate({
+                clientX: event.clientX,
+                clientY: event.clientY
+            });
         }
     }
 
@@ -170,7 +192,8 @@ export class InputEngine {
         }
 
         if (pointerState.isDrawing) {
-            this.eventHandler?.({
+            // Batch pointer end events for performance
+            this.renderScheduler.schedulePointerUpdate({
                 type: 'end',
                 clientX: event.clientX,
                 clientY: event.clientY,
@@ -198,7 +221,8 @@ export class InputEngine {
         }
 
         if (pointerState.isDrawing) {
-            this.eventHandler?.({
+            // Batch pointer cancel events for performance
+            this.renderScheduler.schedulePointerUpdate({
                 type: 'cancel',
                 clientX: event.clientX,
                 clientY: event.clientY,
@@ -246,6 +270,30 @@ export class InputEngine {
      */
     private handleMouseLeave(_event: MouseEvent): void {
         this.hideCursorPreview();
+    }
+
+    /**
+     * Set up render callbacks for batched processing
+     */
+    private setupRenderCallbacks(): void {
+        // Handle batched pointer events
+        this.renderScheduler.setRenderCallback('pointer', (operations) => {
+            // Process all pointer operations in this frame
+            for (const operation of operations) {
+                if (this.eventHandler) {
+                    this.eventHandler(operation.data);
+                }
+            }
+        });
+
+        // Handle batched cursor updates
+        this.renderScheduler.setRenderCallback('cursor', (operations) => {
+            // Only process the latest cursor position for smooth performance
+            if (operations.length > 0) {
+                const latestOperation = operations[operations.length - 1];
+                this.updateCursorPreview(latestOperation.data.clientX, latestOperation.data.clientY);
+            }
+        });
     }
 
     /**
@@ -467,6 +515,13 @@ export class InputEngine {
     }
 
     /**
+     * Get render scheduler for external access
+     */
+    public getRenderScheduler(): RenderScheduler {
+        return this.renderScheduler;
+    }
+
+    /**
      * Cleanup resources
      */
     public cleanup(): void {
@@ -483,5 +538,6 @@ export class InputEngine {
         this.canvas.style.touchAction = '';
         this.canvas.style.cursor = '';
         this.eventHandler = null;
+        this.renderScheduler.cleanup();
     }
 }

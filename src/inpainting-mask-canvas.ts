@@ -287,12 +287,18 @@ export class InpaintingMaskCanvas {
 
         // Set up zoom/pan event handler
         this.zoomPanController.setEventHandler(this.handleZoomPanEvent);
-        // in inpainting-mask-canvas.ts
+        
+        // Set up performance monitoring integration
+        this.setupPerformanceIntegration();
+        
+        // Debug access (development only)
         (window as any).inpaint = {
             z: this.zoomPanController,
             cm: this.canvasManager,
             overlay: this.overlayCanvas,
-            image: this.imageCanvas
+            image: this.imageCanvas,
+            perf: this.canvasManager.getPerformanceMonitor(),
+            scheduler: this.canvasManager.getRenderScheduler()
         };
         console.log('Zoom/pan controller created');
 
@@ -816,6 +822,37 @@ export class InpaintingMaskCanvas {
           this.currentStroke = null;
         }
       };
+
+    /**
+     * Set up performance monitoring integration
+     */
+    private setupPerformanceIntegration(): void {
+        if (!this.canvasManager) return;
+
+        const performanceMonitor = this.canvasManager.getPerformanceMonitor();
+        
+        // Set up performance warning handler
+        performanceMonitor.setPerformanceWarningCallback((metrics) => {
+            console.warn('Inpainting canvas performance warning:', {
+                fps: metrics.fps.toFixed(1),
+                averageFps: metrics.averageFps.toFixed(1),
+                droppedFrames: metrics.droppedFrames,
+                renderTime: metrics.renderTime.toFixed(2) + 'ms'
+            });
+
+            // Could show a performance warning to the user here
+            // this.showPerformanceWarning(metrics);
+        });
+
+        // Set up periodic performance logging (debug mode)
+        if (console.debug) {
+            performanceMonitor.setMetricsUpdateCallback((metrics) => {
+                if (metrics.totalFrames % 300 === 0) { // Every 5 seconds at 60 FPS
+                    console.debug('Canvas performance:', performanceMonitor.getPerformanceSummary());
+                }
+            });
+        }
+    }
 
     /**
      * Handle zoom/pan events from the ZoomPanController

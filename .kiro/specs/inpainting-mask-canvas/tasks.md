@@ -123,7 +123,13 @@
   - Write tests to verify deterministic replay produces identical mask bytes
   - _Requirements: 3.4, 3.5_
 
-- [ ] 10. Implement performance optimizations for 60 FPS rendering
+- [x] 10. Implement performance optimizations for 60 FPS rendering
+
+
+
+
+
+
   - Add requestAnimationFrame batching for pointer event processing
   - Implement dirty rectangle tracking to minimize redraws
   - Use canvas context hints (desynchronized: true, willReadFrequently: true)
@@ -131,7 +137,9 @@
   - Optimize overlay canvas updates to only occur when mask changes or cursor moves
   - _Requirements: 7.1, 7.2, 7.3, 7.5_
 
-- [ ] 11. Add WebWorker support with main thread fallback
+- [-] 11. Add WebWorker support with main thread fallback
+
+
   - Create WebWorker for heavy mask processing operations
   - Implement OffscreenCanvas support for worker-based rendering
   - Add message passing system for stroke processing and checkpoint creation

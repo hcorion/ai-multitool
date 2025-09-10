@@ -1,7 +1,6 @@
 import * as utils from "./utils.js";
 import * as chat from "./chat.js";
 import { InpaintingMaskCanvas } from "./inpainting-mask-canvas.js";
-import showdown from "showdown";
 
 // TypeScript interfaces for the new image API
 interface ImageOperationResponse {
@@ -819,10 +818,10 @@ function updateGridModalImage(): void {
             // Get the current image URL from the modal
             const modalImage = document.getElementById("grid-modal-image") as HTMLImageElement;
             const imageUrl = modalImage.src;
-            
+
             // Close the grid modal
             closeGridModal();
-            
+
             // Open the inpainting mask canvas with the current image
             openInpaintingMaskCanvas(imageUrl);
         };
