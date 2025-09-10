@@ -29,7 +29,7 @@ export type InputEventHandler = (event: {
     pointerType: string;
     isPrimary: boolean;
     pressure?: number;
-  }) => void;
+}) => void;
 
 export interface CoordinateTransformer {
     (screenX: number, screenY: number): { x: number; y: number } | null;
@@ -55,7 +55,7 @@ export class InputEngine {
         contextMenu: (e: Event) => this.handleContextMenu(e),
         mouseEnter: (e: MouseEvent) => this.handleMouseEnter(e),
         mouseLeave: (e: MouseEvent) => this.handleMouseLeave(e),
-      };
+    };
 
     constructor(canvas: HTMLCanvasElement, settings: Partial<InputSettings> = {}) {
         console.log('InputEngine constructor called with canvas:', canvas);
@@ -78,7 +78,7 @@ export class InputEngine {
      */
     private setupEventListeners(): void {
         console.log('Setting up event listeners on canvas:', this.canvas);
-        
+
         // Pointer Events API handlers
         this.canvas.addEventListener('pointerdown', this.bound.pointerDown);
         this.canvas.addEventListener('pointermove', this.bound.pointerMove);
@@ -107,41 +107,18 @@ export class InputEngine {
         event.preventDefault();
         if (!event.isPrimary) return;
         if (this.settings.capturePointer) this.canvas.setPointerCapture(event.pointerId);
-    
-        this.activePointers.set(event.pointerId, {
-          pointerId: event.pointerId,
-          pointerType: event.pointerType,
-          isPrimary: event.isPrimary,
-          isDrawing: true,
-          lastPosition: { x: event.clientX, y: event.clientY },
-          startTime: Date.now()
-        });
-    
-        this.eventHandler?.({
-          type: 'start',
-          clientX: event.clientX,
-          clientY: event.clientY,
-          screenX: event.clientX,
-          screenY: event.clientY,
-          pointerId: event.pointerId,
-          pointerType: event.pointerType,
-          isPrimary: event.isPrimary,
-          pressure: event.pressure
-        });
-      }
 
-    /**
-     * Handle pointer move events
-     */
-    private handlePointerMove(event: PointerEvent): void {
-        if (!this.isEnabled) return;
-        const pointerState = this.activePointers.get(event.pointerId);
-    
-        if (pointerState && pointerState.isDrawing && this.settings.enableDrawing) {
-          event.preventDefault();
-          pointerState.lastPosition = { x: event.clientX, y: event.clientY };
-          this.eventHandler?.({
-            type: 'move',
+        this.activePointers.set(event.pointerId, {
+            pointerId: event.pointerId,
+            pointerType: event.pointerType,
+            isPrimary: event.isPrimary,
+            isDrawing: true,
+            lastPosition: { x: event.clientX, y: event.clientY },
+            startTime: Date.now()
+        });
+
+        this.eventHandler?.({
+            type: 'start',
             clientX: event.clientX,
             clientY: event.clientY,
             screenX: event.clientX,
@@ -150,11 +127,34 @@ export class InputEngine {
             pointerType: event.pointerType,
             isPrimary: event.isPrimary,
             pressure: event.pressure
-          });
+        });
+    }
+
+    /**
+     * Handle pointer move events
+     */
+    private handlePointerMove(event: PointerEvent): void {
+        if (!this.isEnabled) return;
+        const pointerState = this.activePointers.get(event.pointerId);
+
+        if (pointerState && pointerState.isDrawing && this.settings.enableDrawing) {
+            event.preventDefault();
+            pointerState.lastPosition = { x: event.clientX, y: event.clientY };
+            this.eventHandler?.({
+                type: 'move',
+                clientX: event.clientX,
+                clientY: event.clientY,
+                screenX: event.clientX,
+                screenY: event.clientY,
+                pointerId: event.pointerId,
+                pointerType: event.pointerType,
+                isPrimary: event.isPrimary,
+                pressure: event.pressure
+            });
         } else if (event.pointerType === 'mouse') {
-          this.updateCursorPreview(event.clientX, event.clientY);
+            this.updateCursorPreview(event.clientX, event.clientY);
         }
-      }
+    }
 
     /**
      * Handle pointer up events
@@ -163,27 +163,27 @@ export class InputEngine {
         if (!this.isEnabled) return;
         const pointerState = this.activePointers.get(event.pointerId);
         if (!pointerState) return;
-    
+
         event.preventDefault();
         if (this.settings.capturePointer && this.canvas.hasPointerCapture(event.pointerId)) {
-          this.canvas.releasePointerCapture(event.pointerId);
+            this.canvas.releasePointerCapture(event.pointerId);
         }
-    
+
         if (pointerState.isDrawing) {
-          this.eventHandler?.({
-            type: 'end',
-            clientX: event.clientX,
-            clientY: event.clientY,
-            screenX: event.clientX,
-            screenY: event.clientY,
-            pointerId: event.pointerId,
-            pointerType: event.pointerType,
-            isPrimary: event.isPrimary,
-            pressure: event.pressure
-          });
+            this.eventHandler?.({
+                type: 'end',
+                clientX: event.clientX,
+                clientY: event.clientY,
+                screenX: event.clientX,
+                screenY: event.clientY,
+                pointerId: event.pointerId,
+                pointerType: event.pointerType,
+                isPrimary: event.isPrimary,
+                pressure: event.pressure
+            });
         }
         this.activePointers.delete(event.pointerId);
-      }
+    }
 
     /**
      * Handle pointer cancel events (important for robust input handling)
@@ -192,26 +192,26 @@ export class InputEngine {
         if (!this.isEnabled) return;
         const pointerState = this.activePointers.get(event.pointerId);
         if (!pointerState) return;
-    
+
         if (this.settings.capturePointer && this.canvas.hasPointerCapture(event.pointerId)) {
-          this.canvas.releasePointerCapture(event.pointerId);
+            this.canvas.releasePointerCapture(event.pointerId);
         }
-    
+
         if (pointerState.isDrawing) {
-          this.eventHandler?.({
-            type: 'cancel',
-            clientX: event.clientX,
-            clientY: event.clientY,
-            screenX: event.clientX,
-            screenY: event.clientY,
-            pointerId: event.pointerId,
-            pointerType: event.pointerType,
-            isPrimary: event.isPrimary,
-            pressure: event.pressure
-          });
+            this.eventHandler?.({
+                type: 'cancel',
+                clientX: event.clientX,
+                clientY: event.clientY,
+                screenX: event.clientX,
+                screenY: event.clientY,
+                pointerId: event.pointerId,
+                pointerType: event.pointerType,
+                isPrimary: event.isPrimary,
+                pressure: event.pressure
+            });
         }
         this.activePointers.delete(event.pointerId);
-      }
+    }
 
     /**
      * Handle pointer leave events
@@ -244,7 +244,7 @@ export class InputEngine {
     /**
      * Handle mouse leave events
      */
-    private handleMouseLeave(event: MouseEvent): void {
+    private handleMouseLeave(_event: MouseEvent): void {
         this.hideCursorPreview();
     }
 
@@ -253,25 +253,25 @@ export class InputEngine {
      */
     private updateCursorPreview(clientX: number, clientY: number): void {
         if (!this.cursorElement) return;
-      
+
         let cursorX = clientX;
         let cursorY = clientY;
-      
+
         if (this.coordinateTransformer) {
-          const img = this.coordinateTransformer(clientX, clientY);
-          if (!img) { this.cursorElement.style.display = 'none'; return; }
-      
-          if (this.coordinateTransformer.imageToScreen) {
-            const p = this.coordinateTransformer.imageToScreen(img.x, img.y);
-            cursorX = p.x;
-            cursorY = p.y;
-          }
+            const img = this.coordinateTransformer(clientX, clientY);
+            if (!img) { this.cursorElement.style.display = 'none'; return; }
+
+            if (this.coordinateTransformer.imageToScreen) {
+                const p = this.coordinateTransformer.imageToScreen(img.x, img.y);
+                cursorX = p.x;
+                cursorY = p.y;
+            }
         }
-      
+
         this.cursorElement.style.left = `${cursorX}px`;
         this.cursorElement.style.top = `${cursorY}px`;
         this.cursorElement.style.display = 'block';
-      }
+    }
 
     /**
      * Show cursor preview
@@ -280,7 +280,7 @@ export class InputEngine {
         if (!this.cursorElement) {
             this.createCursorPreview();
         }
-        
+
         if (this.cursorElement) {
             this.cursorElement.style.display = 'block';
             this.updateCursorPreview(screenX, screenY);
@@ -312,7 +312,7 @@ export class InputEngine {
             display: none;
             box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
         `;
-        
+
         document.body.appendChild(this.cursorElement);
         this.updateCursorSize(20); // Default size
     }
@@ -322,16 +322,16 @@ export class InputEngine {
      */
     public updateCursorSize(size: number): void {
         if (this.cursorElement) {
-          let displaySize = size;
-          if (this.coordinateTransformer?.getTransform) {
-            const t = this.coordinateTransformer.getTransform() as any;
-            const baseScale = t.baseScale ?? 1;
-            displaySize = size * baseScale * t.scale; // exact on-screen brush diameter
-          }
-          this.cursorElement.style.width = `${displaySize}px`;
-          this.cursorElement.style.height = `${displaySize}px`;
+            let displaySize = size;
+            if (this.coordinateTransformer?.getTransform) {
+                const t = this.coordinateTransformer.getTransform() as any;
+                const baseScale = t.baseScale ?? 1;
+                displaySize = size * baseScale * t.scale; // exact on-screen brush diameter
+            }
+            this.cursorElement.style.width = `${displaySize}px`;
+            this.cursorElement.style.height = `${displaySize}px`;
         }
-      }
+    }
     /**
      * Update cursor preview color based on tool mode
      */
@@ -376,16 +376,18 @@ export class InputEngine {
         this.isEnabled = false;
         this.canvas.style.cursor = 'default'; // Restore default cursor
         this.hideCursorPreview();
-        
+
         // Cancel any active pointers
         for (const [pointerId, pointerState] of Array.from(this.activePointers.entries())) {
             if (this.settings.capturePointer && this.canvas.hasPointerCapture(pointerId)) {
                 this.canvas.releasePointerCapture(pointerId);
             }
-            
+
             if (pointerState.isDrawing && this.eventHandler) {
                 this.eventHandler({
                     type: 'cancel',
+                    clientX: pointerState.lastPosition?.x || 0,
+                    clientY: pointerState.lastPosition?.y || 0,
                     screenX: pointerState.lastPosition?.x || 0,
                     screenY: pointerState.lastPosition?.y || 0,
                     pointerId: pointerId,
@@ -394,7 +396,7 @@ export class InputEngine {
                 });
             }
         }
-        
+
         this.activePointers.clear();
     }
 
@@ -403,7 +405,7 @@ export class InputEngine {
      */
     public updateSettings(newSettings: Partial<InputSettings>): void {
         this.settings = { ...this.settings, ...newSettings };
-        
+
         // Update touch-action if preventScrolling changed
         if ('preventScrolling' in newSettings) {
             this.setupTouchAction();
@@ -446,10 +448,12 @@ export class InputEngine {
             if (this.settings.capturePointer && this.canvas.hasPointerCapture(pointerId)) {
                 this.canvas.releasePointerCapture(pointerId);
             }
-            
+
             if (pointerState.isDrawing && this.eventHandler) {
                 this.eventHandler({
                     type: 'cancel',
+                    clientX: pointerState.lastPosition?.x || 0,
+                    clientY: pointerState.lastPosition?.y || 0,
                     screenX: pointerState.lastPosition?.x || 0,
                     screenY: pointerState.lastPosition?.y || 0,
                     pointerId: pointerId,
@@ -458,7 +462,7 @@ export class InputEngine {
                 });
             }
         }
-        
+
         this.activePointers.clear();
     }
 
@@ -479,5 +483,5 @@ export class InputEngine {
         this.canvas.style.touchAction = '';
         this.canvas.style.cursor = '';
         this.eventHandler = null;
-      }
+    }
 }

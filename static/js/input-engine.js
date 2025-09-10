@@ -197,7 +197,7 @@ export class InputEngine {
     /**
      * Handle mouse leave events
      */
-    handleMouseLeave(event) {
+    handleMouseLeave(_event) {
         this.hideCursorPreview();
     }
     /**
@@ -327,6 +327,8 @@ export class InputEngine {
             if (pointerState.isDrawing && this.eventHandler) {
                 this.eventHandler({
                     type: 'cancel',
+                    clientX: pointerState.lastPosition?.x || 0,
+                    clientY: pointerState.lastPosition?.y || 0,
                     screenX: pointerState.lastPosition?.x || 0,
                     screenY: pointerState.lastPosition?.y || 0,
                     pointerId: pointerId,
@@ -382,6 +384,8 @@ export class InputEngine {
             if (pointerState.isDrawing && this.eventHandler) {
                 this.eventHandler({
                     type: 'cancel',
+                    clientX: pointerState.lastPosition?.x || 0,
+                    clientY: pointerState.lastPosition?.y || 0,
                     screenX: pointerState.lastPosition?.x || 0,
                     screenY: pointerState.lastPosition?.y || 0,
                     pointerId: pointerId,

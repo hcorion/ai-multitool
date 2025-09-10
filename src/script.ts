@@ -1264,6 +1264,7 @@ function showReasoningModalFromScript(messageIndex: number): void {
     
     if (!modal || !content || !loading || !error) {
         console.error("Reasoning modal elements not found");
+        showReasoningErrorFromScript("Modal interface not available");
         return;
     }
     
@@ -1273,26 +1274,80 @@ function showReasoningModalFromScript(messageIndex: number): void {
     loading.style.display = "block";
     modal.style.display = "block";
     
-    // Fetch reasoning data
-    fetch(`/chat/reasoning/${conversationId}/${messageIndex}`)
+    // Set up timeout for the request
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+        controller.abort();
+    }, 10000); // 10 second timeout
+    
+    // Fetch reasoning data with comprehensive error handling
+    fetch(`/chat/reasoning/${conversationId}/${messageIndex}`, {
+        signal: controller.signal,
+        headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+        }
+    })
         .then(response => {
+            clearTimeout(timeoutId);
+            
             if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                // Handle specific HTTP error codes
+                if (response.status === 404) {
+                    throw new Error("Reasoning data not found for this message");
+                } else if (response.status === 400) {
+                    throw new Error("Invalid request - this message may not support reasoning");
+                } else if (response.status === 401) {
+                    throw new Error("Authentication required - please refresh the page");
+                } else if (response.status === 500) {
+                    throw new Error("Server error - please try again later");
+                } else {
+                    throw new Error(`Request failed (${response.status}): ${response.statusText}`);
+                }
             }
             return response.json();
         })
         .then(data => {
             loading.style.display = "none";
+            
+            // Validate response structure
+            if (!data) {
+                throw new Error("Empty response received");
+            }
+            
+            if (data.error) {
+                throw new Error(data.message || data.error);
+            }
+            
             if (data.reasoning && data.reasoning.complete_summary) {
                 displayReasoningDataFromScript(data.reasoning);
+                content.style.display = "block";
+            } else if (data.reasoning && data.reasoning.summary_parts && data.reasoning.summary_parts.length > 0) {
+                // Fallback to summary parts if complete summary is not available
+                const fallbackData = {
+                    ...data.reasoning,
+                    complete_summary: data.reasoning.summary_parts.join('\n\n')
+                };
+                displayReasoningDataFromScript(fallbackData);
                 content.style.display = "block";
             } else {
                 showReasoningErrorFromScript("No reasoning data available for this message");
             }
         })
         .catch(err => {
+            clearTimeout(timeoutId);
             loading.style.display = "none";
-            showReasoningErrorFromScript(`Failed to load reasoning data: ${err.message}`);
+            
+            // Handle different types of errors
+            if (err.name === 'AbortError') {
+                showReasoningErrorFromScript("Request timed out - please try again");
+            } else if (err.name === 'TypeError' && err.message.includes('fetch')) {
+                showReasoningErrorFromScript("Network error - please check your connection");
+            } else {
+                showReasoningErrorFromScript(`Failed to load reasoning data: ${err.message}`);
+            }
+            
+            console.error("Reasoning modal error:", err);
         });
 }
 
@@ -1300,12 +1355,30 @@ function displayReasoningDataFromScript(reasoningData: any): void {
     const content = document.getElementById("reasoning-content");
     if (!content) return;
     
-    content.innerHTML = `
-        <div class="reasoning-summary">
-            <h3>AI Reasoning Process</h3>
-            <div class="reasoning-text">${reasoningData.complete_summary.replace(/\n/g, '<br>')}</div>
-        </div>
-    `;
+    try {
+        // Validate and sanitize the reasoning data
+        const summary = reasoningData.complete_summary || "";
+        if (!summary) {
+            throw new Error("No reasoning summary available");
+        }
+        
+        // Escape HTML to prevent XSS
+        const escapedSummary = escapeHtml(summary);
+        
+        // Format the content with proper line breaks
+        const formattedSummary = escapedSummary.replace(/\n/g, '<br>');
+        
+        content.innerHTML = `
+            <div class="reasoning-summary">
+                <h3>AI Reasoning Process</h3>
+                <div class="reasoning-text">${formattedSummary}</div>
+                ${reasoningData.timestamp ? `<div class="reasoning-timestamp">Generated: ${new Date(reasoningData.timestamp * 1000).toLocaleString()}</div>` : ''}
+            </div>
+        `;
+    } catch (error) {
+        console.error("Error displaying reasoning data:", error);
+        showReasoningErrorFromScript("Failed to display reasoning data");
+    }
 }
 
 function showReasoningErrorFromScript(message: string): void {

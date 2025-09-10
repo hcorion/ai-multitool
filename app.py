@@ -657,21 +657,19 @@ class ConversationManager:
     def get_message_reasoning_data(
         self, username: str, conversation_id: str, message_index: int
     ) -> Dict[str, Any] | None:
-        """Get reasoning data for a specific message by index."""
+        """Get reasoning data for a specific message by index with comprehensive error handling."""
         try:
             conversation = self.get_conversation(username, conversation_id)
             if not conversation:
                 import logging
-
                 logging.warning(
-                    f"Conversation {conversation_id} not found for user {username}"
+                    f"Conversation {conversation_id} not found for user {username} when retrieving reasoning data"
                 )
                 return None
 
             # Validate message index
             if message_index < 0 or message_index >= len(conversation.messages):
                 import logging
-
                 logging.warning(
                     f"Invalid message index {message_index} for conversation {conversation_id}. "
                     f"Valid range: 0-{len(conversation.messages) - 1}"
@@ -680,27 +678,44 @@ class ConversationManager:
 
             message = conversation.messages[message_index]
 
+            # Log message details for debugging
+            import logging
+            logging.debug(
+                f"Retrieving reasoning data for message {message_index} in conversation {conversation_id}: "
+                f"role={message.role}, has_reasoning={message.reasoning_data is not None}"
+            )
+
             # Only return reasoning data if it exists and is valid
             if message.reasoning_data:
                 try:
                     # Validate the reasoning data before returning
                     validated_data = validate_reasoning_data(message.reasoning_data)
+                    if validated_data:
+                        import logging
+                        summary_length = len(validated_data.get("complete_summary", ""))
+                        parts_count = len(validated_data.get("summary_parts", []))
+                        logging.debug(
+                            f"Successfully retrieved reasoning data: {summary_length} chars, {parts_count} parts"
+                        )
                     return validated_data
                 except ValueError as e:
                     import logging
-
                     logging.warning(
                         f"Invalid reasoning data for message {message_index} in conversation {conversation_id}: {e}"
                     )
                     return None
+            else:
+                import logging
+                logging.debug(
+                    f"No reasoning data available for message {message_index} in conversation {conversation_id}"
+                )
 
             return None
 
         except Exception as e:
             import logging
-
             logging.error(
-                f"Error retrieving reasoning data for message {message_index} in conversation {conversation_id}: {e}",
+                f"Unexpected error retrieving reasoning data for message {message_index} in conversation {conversation_id}: {e}",
                 exc_info=True,
             )
             return None
@@ -758,6 +773,47 @@ class ConversationManager:
             )
             return 0
 
+    def get_reasoning_availability_status(
+        self, username: str, conversation_id: str
+    ) -> Dict[str, Any]:
+        """Get reasoning availability status for a conversation to help with graceful degradation."""
+        try:
+            conversation = self.get_conversation(username, conversation_id)
+            if not conversation:
+                return {
+                    "available": False,
+                    "reason": "conversation_not_found",
+                    "message_count": 0,
+                    "reasoning_count": 0
+                }
+
+            total_messages = len(conversation.messages)
+            assistant_messages = [msg for msg in conversation.messages if msg.role == "assistant"]
+            messages_with_reasoning = [msg for msg in assistant_messages if msg.reasoning_data]
+
+            return {
+                "available": len(messages_with_reasoning) > 0,
+                "reason": "available" if len(messages_with_reasoning) > 0 else "no_reasoning_data",
+                "message_count": total_messages,
+                "assistant_message_count": len(assistant_messages),
+                "reasoning_count": len(messages_with_reasoning),
+                "reasoning_percentage": (len(messages_with_reasoning) / len(assistant_messages) * 100) if assistant_messages else 0
+            }
+
+        except Exception as e:
+            import logging
+            logging.error(
+                f"Error getting reasoning availability status for conversation {conversation_id}: {e}",
+                exc_info=True
+            )
+            return {
+                "available": False,
+                "reason": "error",
+                "message_count": 0,
+                "reasoning_count": 0,
+                "error": str(e)
+            }
+
 
 class ResponsesAPIClient:
     """Client wrapper for OpenAI Responses API with o4-mini model."""
@@ -773,14 +829,13 @@ class ResponsesAPIClient:
         stream: bool = True,
         username: str | None = None,
     ) -> Any:
-        """Create a response using the Responses API with o4-mini model."""
+        """Create a response using the Responses API with comprehensive error handling."""
         try:
             params: Dict[str, Any] = {
                 "model": self.model,
                 "input": input_text,
                 "stream": stream,
                 "store": True,  # Store responses for conversation continuity
-                "reasoning": {"effort": "high", "summary": "detailed"},
                 "tools": [{"type": "web_search_preview"}],
                 "instructions": f"""You are CodeGPT, a large language model trained by OpenAI, based on the GPT-5 architecture. Knowledge cutoff: 2024-09-30. Current date: {datetime.today().strftime("%Y-%m-%d")}.
 You are trained to act and respond like a professional software engineer would, with vast knowledge of every programming language and excellent reasoning skills. You write industry-standard clean, elegant, idomatic code. You output code in Markdown format like so:
@@ -788,6 +843,16 @@ You are trained to act and respond like a professional software engineer would, 
 code
 ```""",
             }
+
+            # Add reasoning configuration with error handling
+            try:
+                params["reasoning"] = {"effort": "high", "summary": "detailed"}
+                import logging
+                logging.debug("Added reasoning configuration to API request")
+            except Exception as e:
+                import logging
+                logging.warning(f"Failed to add reasoning configuration: {e}")
+                # Continue without reasoning - chat should still work
 
             # Add previous response ID for conversation continuity
             if previous_response_id:
@@ -2429,11 +2494,25 @@ def converse():
                 # Get the response ID, final text, and reasoning data for storage
                 response_id = event_processor.get_response_id()
                 final_text = event_processor.accumulated_text
-                reasoning_data = event_processor.get_reasoning_data()
+                
+                # Get reasoning data with graceful degradation
+                reasoning_data = None
+                try:
+                    reasoning_data = event_processor.get_reasoning_data()
+                    if reasoning_data:
+                        import logging
+                        logging.debug(f"Successfully retrieved reasoning data for response {response_id}")
+                    else:
+                        import logging
+                        logging.debug(f"No reasoning data available for response {response_id}")
+                except Exception as e:
+                    import logging
+                    logging.warning(f"Failed to retrieve reasoning data for response {response_id}: {e}")
+                    # Continue without reasoning data - chat functionality should not be affected
 
                 if final_text and response_id:
                     try:
-                        # Store assistant response in conversation with reasoning data
+                        # Store assistant response in conversation with reasoning data (if available)
                         conversation_manager.add_message(
                             username,
                             conversation_id,
@@ -2442,9 +2521,17 @@ def converse():
                             response_id,
                             reasoning_data,
                         )
+                        
+                        # Log reasoning data status for debugging
+                        if reasoning_data:
+                            import logging
+                            logging.info(f"Saved assistant response with reasoning data for conversation {conversation_id}")
+                        else:
+                            import logging
+                            logging.info(f"Saved assistant response without reasoning data for conversation {conversation_id}")
+                            
                     except ConversationStorageError as e:
                         import logging
-
                         logging.error(f"Failed to save assistant response: {e}")
                         event_queue.put(
                             json.dumps(
@@ -2453,6 +2540,19 @@ def converse():
                                     "message": "Response received but failed to save. Your conversation may be incomplete.",
                                     "error_code": "storage_error",
                                     "user_action": "Try refreshing the page or contact support if the issue persists.",
+                                }
+                            )
+                        )
+                    except Exception as e:
+                        import logging
+                        logging.error(f"Unexpected error saving assistant response: {e}", exc_info=True)
+                        event_queue.put(
+                            json.dumps(
+                                {
+                                    "type": "error",
+                                    "message": "Failed to save the response. Please try again.",
+                                    "error_code": "save_error",
+                                    "user_action": "Try sending your message again.",
                                 }
                             )
                         )
@@ -2880,10 +2980,18 @@ class StreamEventProcessor:
             if part_text and part_text != "None":
                 self.reasoning_data["summary_parts"].append(part_text)
 
+        except AttributeError as e:
+            import logging
+            logging.debug(f"Reasoning part event missing expected attributes: {e}")
+            # Continue processing - reasoning is optional
+        except (TypeError, ValueError) as e:
+            import logging
+            logging.warning(f"Error parsing reasoning summary part: {e}")
+            # Continue processing - reasoning is optional
         except Exception as e:
             import logging
-
-            logging.warning(f"Error processing reasoning summary part added: {e}")
+            logging.warning(f"Unexpected error processing reasoning summary part: {e}")
+            # Continue processing - reasoning failures should not block chat
 
     def _handle_reasoning_summary_text_delta(self, event: Any) -> None:
         """Handle response.reasoning_summary_text.delta event - reasoning text delta."""
@@ -2903,10 +3011,18 @@ class StreamEventProcessor:
             if delta_text and delta_text != "None":
                 self.reasoning_data["complete_summary"] += delta_text
 
+        except AttributeError as e:
+            import logging
+            logging.debug(f"Reasoning delta event missing expected attributes: {e}")
+            # Continue processing - reasoning is optional
+        except (TypeError, ValueError) as e:
+            import logging
+            logging.warning(f"Error parsing reasoning summary text delta: {e}")
+            # Continue processing - reasoning is optional
         except Exception as e:
             import logging
-
-            logging.warning(f"Error processing reasoning summary text delta: {e}")
+            logging.warning(f"Unexpected error processing reasoning summary text delta: {e}")
+            # Continue processing - reasoning failures should not block chat
 
     def _handle_reasoning_summary_text_done(self, event: Any) -> None:
         """Handle response.reasoning_summary_text.done event - reasoning text complete."""
@@ -2926,10 +3042,18 @@ class StreamEventProcessor:
             if self.current_response_id:
                 self.reasoning_data["response_id"] = self.current_response_id
 
+        except AttributeError as e:
+            import logging
+            logging.debug(f"Reasoning done event missing expected attributes: {e}")
+            # Continue processing - reasoning is optional
+        except (TypeError, ValueError) as e:
+            import logging
+            logging.warning(f"Error parsing reasoning summary text done: {e}")
+            # Continue processing - reasoning is optional
         except Exception as e:
             import logging
-
-            logging.warning(f"Error processing reasoning summary text done: {e}")
+            logging.warning(f"Unexpected error processing reasoning summary text done: {e}")
+            # Continue processing - reasoning failures should not block chat
 
     def _handle_reasoning_summary_part_done(self, event: Any) -> None:
         """Handle response.reasoning_summary_part.done event - reasoning part complete."""
@@ -2937,26 +3061,42 @@ class StreamEventProcessor:
             # This event indicates a reasoning part is complete
             # We can use this for validation or cleanup if needed
             pass
+        except AttributeError as e:
+            import logging
+            logging.debug(f"Reasoning part done event missing expected attributes: {e}")
+            # Continue processing - reasoning is optional
         except Exception as e:
             import logging
-
-            logging.warning(f"Error processing reasoning summary part done: {e}")
+            logging.warning(f"Unexpected error processing reasoning summary part done: {e}")
+            # Continue processing - reasoning failures should not block chat
 
     def get_reasoning_data(self) -> Dict[str, Any] | None:
-        """Get the reasoning data from the processed stream."""
+        """Get the reasoning data from the processed stream with comprehensive error handling."""
         try:
             # Only return reasoning data if we have meaningful content
             if (
-                self.reasoning_data["complete_summary"]
-                or self.reasoning_data["summary_parts"]
+                self.reasoning_data.get("complete_summary")
+                or self.reasoning_data.get("summary_parts")
             ):
                 # Validate the reasoning data before returning
-                return validate_reasoning_data(self.reasoning_data.copy())
+                validated_data = validate_reasoning_data(self.reasoning_data.copy())
+                if validated_data:
+                    import logging
+                    logging.debug(f"Successfully retrieved reasoning data with {len(validated_data.get('complete_summary', ''))} characters")
+                return validated_data
+            else:
+                import logging
+                logging.debug("No reasoning data available - summary and parts are empty")
+            return None
+        except ValueError as e:
+            import logging
+            logging.warning(f"Reasoning data validation failed: {e}")
+            # Return None instead of raising - reasoning is optional
             return None
         except Exception as e:
             import logging
-
-            logging.warning(f"Error getting reasoning data: {e}")
+            logging.warning(f"Unexpected error getting reasoning data: {e}")
+            # Return None instead of raising - reasoning is optional
             return None
 
 

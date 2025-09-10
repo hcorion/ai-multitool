@@ -6,6 +6,8 @@
 import { CanvasManager, CanvasState } from './canvas-manager.js';
 import { InputEngine, InputEventHandler } from './input-engine.js';
 import { ZoomPanController, Transform2D, ZoomPanEventHandler } from './zoom-pan-controller.js';
+import { HistoryManager, StrokeCommand, HistoryState } from './history-manager.js';
+import { BrushStroke } from './brush-engine.js';
 
 interface InpaintingMaskCanvasConfig {
     imageUrl: string;
@@ -23,12 +25,14 @@ export class InpaintingMaskCanvas {
     private canvasManager: CanvasManager | null = null;
     private inputEngine: InputEngine | null = null;
     private zoomPanController: ZoomPanController | null = null;
+    private historyManager: HistoryManager | null = null;
     private isVisible: boolean = false;
     private currentBrushSize: number = 20;
     private isZoomPanActive: boolean = false;
     private coordinateTransformer: ((screenX: number, screenY: number) => { x: number; y: number } | null) | null = null;
     private boundResizeHandler = () => this.handleResize();
     private boundKeydownHandler = (e: KeyboardEvent) => this.handleKeyDown(e);
+    private currentStroke: BrushStroke | null = null;
 
     constructor(config: InpaintingMaskCanvasConfig) {
         this.config = config;
@@ -238,6 +242,9 @@ export class InpaintingMaskCanvas {
             this.maskAlphaCanvas
         );
 
+        // Create history manager
+        this.historyManager = new HistoryManager(250); // 250MB memory limit
+
         // Create input engine for the overlay canvas (drawing surface)
         console.log('Creating input engine for overlay canvas:', this.overlayCanvas);
         this.inputEngine = new InputEngine(this.overlayCanvas, {
@@ -446,6 +453,9 @@ export class InpaintingMaskCanvas {
             } else {
                 console.error('Input engine not found when trying to enable');
             }
+
+            // Initialize history button states
+            this.updateHistoryButtons();
         } catch (error) {
             throw error;
         }
@@ -595,13 +605,35 @@ export class InpaintingMaskCanvas {
     }
 
     private undo(): void {
-        // Undo logic will be implemented in later tasks
-        console.log('Undo requested');
+        if (!this.historyManager || !this.canvasManager) {
+            console.warn('History manager or canvas manager not initialized');
+            return;
+        }
+
+        const undoneStroke = this.historyManager.undo();
+        if (undoneStroke) {
+            console.log('Undoing stroke:', undoneStroke.id);
+            this.replayHistoryToCurrentState();
+            this.updateHistoryButtons();
+        } else {
+            console.log('Nothing to undo');
+        }
     }
 
     private redo(): void {
-        // Redo logic will be implemented in later tasks
-        console.log('Redo requested');
+        if (!this.historyManager || !this.canvasManager) {
+            console.warn('History manager or canvas manager not initialized');
+            return;
+        }
+
+        const redoneStroke = this.historyManager.redo();
+        if (redoneStroke) {
+            console.log('Redoing stroke:', redoneStroke.id);
+            this.replayHistoryToCurrentState();
+            this.updateHistoryButtons();
+        } else {
+            console.log('Nothing to redo');
+        }
     }
 
     private zoomIn(): void {
@@ -754,11 +786,27 @@ export class InpaintingMaskCanvas {
         const settings = brush.getSettings();
       
         if (evt.type === 'start') {
-          this.canvasManager.startBrushStroke(img.x, img.y, this.currentBrushSize, settings.mode);
+          this.currentStroke = this.canvasManager.startBrushStroke(img.x, img.y, this.currentBrushSize, settings.mode);
         } else if (evt.type === 'move') {
           this.canvasManager.continueBrushStroke(img.x, img.y);
-        } else {
-          this.canvasManager.endBrushStroke();
+        } else if (evt.type === 'end') {
+          const completedStroke = this.canvasManager.endBrushStroke();
+          if (completedStroke && this.historyManager) {
+            // Add the completed stroke to history
+            const strokeCommand = this.historyManager.addStroke(completedStroke);
+            console.log('Added stroke to history:', strokeCommand.id);
+            
+            // Update history button states
+            this.updateHistoryButtons();
+            
+            // Create checkpoint periodically for better performance
+            const state = this.canvasManager.getState();
+            if (state && this.historyManager.getState().strokeCount % 10 === 0) {
+              this.historyManager.createCheckpoint(state.maskData);
+              console.log(`Created checkpoint after ${this.historyManager.getState().strokeCount} strokes`);
+            }
+          }
+          this.currentStroke = null;
         }
       };
 
@@ -852,7 +900,81 @@ export class InpaintingMaskCanvas {
         }
     }
 
+    /**
+     * Replay history from the nearest checkpoint to the current state
+     */
+    private replayHistoryToCurrentState(): void {
+        if (!this.historyManager || !this.canvasManager) return;
+
+        const state = this.canvasManager.getState();
+        if (!state) return;
+
+        const currentStrokes = this.historyManager.getCurrentStrokes();
+        const historyState = this.historyManager.getState();
+
+        // Find the nearest checkpoint
+        const nearestCheckpoint = this.historyManager.getNearestCheckpoint(historyState.currentIndex);
+
+        if (nearestCheckpoint) {
+            // Restore from checkpoint
+            console.log(`Restoring from checkpoint at stroke ${nearestCheckpoint.strokeIndex}`);
+            state.maskData.set(nearestCheckpoint.maskData);
+            
+            // Replay strokes from checkpoint to current state
+            const strokesToReplay = this.historyManager.getStrokesFromCheckpoint(nearestCheckpoint, historyState.currentIndex);
+            console.log(`Replaying ${strokesToReplay.length} strokes from checkpoint`);
+            
+            for (const stroke of strokesToReplay) {
+                this.canvasManager.applyBrushStroke(stroke);
+            }
+        } else {
+            // No checkpoint available, replay all strokes from empty mask
+            console.log(`No checkpoint found, replaying all ${currentStrokes.length} strokes from empty mask`);
+            state.maskData.fill(0); // Clear mask
+            
+            for (const stroke of currentStrokes) {
+                this.canvasManager.applyBrushStroke(stroke);
+            }
+        }
+
+        // Update the overlay to reflect the new state
+        this.canvasManager.updateMaskOverlay();
+        
+        // Create a new checkpoint periodically for performance
+        if (currentStrokes.length > 0 && currentStrokes.length % 20 === 0) {
+            this.historyManager.createCheckpoint(state.maskData);
+            console.log(`Created checkpoint at stroke ${historyState.currentIndex}`);
+        }
+    }
+
+    /**
+     * Update the enabled/disabled state of history buttons
+     */
+    private updateHistoryButtons(): void {
+        if (!this.historyManager || !this.popupElement) return;
+
+        const historyState = this.historyManager.getState();
+        const undoBtn = this.popupElement.querySelector('.undo-btn') as HTMLButtonElement;
+        const redoBtn = this.popupElement.querySelector('.redo-btn') as HTMLButtonElement;
+
+        if (undoBtn) {
+            undoBtn.disabled = !historyState.canUndo;
+            undoBtn.title = historyState.canUndo ? 'Undo last stroke' : 'Nothing to undo';
+        }
+
+        if (redoBtn) {
+            redoBtn.disabled = !historyState.canRedo;
+            redoBtn.title = historyState.canRedo ? 'Redo last undone stroke' : 'Nothing to redo';
+        }
+    }
+
     private cleanup(): void {
+
+        // Cleanup history manager
+        if (this.historyManager) {
+            this.historyManager.clear();
+            this.historyManager = null;
+        }
 
         // Cleanup input engine
         if (this.inputEngine) {

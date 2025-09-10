@@ -1,0 +1,63 @@
+{
+  "642f92f4-864f-4134-8593-6f3c4a1af7b8": {
+    "data": {
+      "id": "642f92f4-864f-4134-8593-6f3c4a1af7b8",
+      "created_at": 1757399666,
+      "metadata": {},
+      "object": "conversation"
+    },
+    "chat_name": "Test Chat",
+    "last_update": 1757399666,
+    "messages": [
+      {
+        "role": "user",
+        "text": "Hello",
+        "timestamp": 1757399666,
+        "response_id": null,
+        "reasoning_data": null
+      }
+    ],
+    "last_response_id": null
+  },
+  "23b303f5-3c82-40f7-820f-a62c9e9d4855": {
+    "data": {
+      "id": "23b303f5-3c82-40f7-820f-a62c9e9d4855",
+      "created_at": 1757399666,
+      "metadata": {},
+      "object": "conversation"
+    },
+    "chat_name": "Test Chat",
+    "last_update": 1757399666,
+    "messages": [
+      {
+        "role": "user",
+        "text": "Hello",
+        "timestamp": 1757399666,
+        "response_id": null,
+        "reasoning_data": null
+      },
+      {
+        "role": "assistant",
+        "text": "Hi there",
+        "timestamp": 1757399666,
+        "response_id": null,
+        "reasoning_data": null
+      },
+      {
+        "role": "assistant",
+        "text": "Another response",
+        "timestamp": 1757399666,
+        "response_id": "resp_123",
+        "reasoning_data": {
+          "summary_parts": [
+            "test reasoning"
+          ],
+          "complete_summary": "Complete test reasoning",
+          "timestamp": 1234567890,
+          "response_id": "resp_123"
+        }
+      }
+    ],
+    "last_response_id": "resp_123"
+  }
+}

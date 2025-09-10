@@ -96,7 +96,13 @@
   - Disable drawing while zoom/pan gestures are active
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
 
-- [ ] 8. Build stroke-based history system for undo/redo
+- [x] 8. Build stroke-based history system for undo/redo
+
+
+
+
+
+
   - Create HistoryManager class with stroke command storage
   - Implement StrokeCommand data structure with mode, brushSize, path, timestamp
   - Add undo functionality that reverts last stroke
