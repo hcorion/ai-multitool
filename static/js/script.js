@@ -926,6 +926,8 @@ function onConversationSelected(ev) {
         chatInput.value = ""; // Clear input field
         chat.refreshChatMessages(chatData.messages);
         currentThreadId = chatData.threadId;
+        // Expose currentThreadId to window for reasoning modal access
+        window.currentThreadId = currentThreadId;
     });
 }
 async function fetchWithStreaming(url, data, processChunk) {
@@ -1014,6 +1016,8 @@ function sendChatMessage() {
         if (chatData.type == "message_list") {
             chatStatusText.textContent = "In queue...";
             currentThreadId = chatData.threadId;
+            // Expose currentThreadId to window for reasoning modal access
+            window.currentThreadId = currentThreadId;
             cachedMessageList = chatData.messages;
             chatInput.value = ""; // Clear input field
             chat.refreshChatMessages(cachedMessageList);

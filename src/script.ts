@@ -92,7 +92,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Chat buttons
     addEventListenerToElement("send-chat", "click", sendChatMessage);
-    
+
     // Reasoning modal buttons
     addEventListenerToElement("reasoning-modal-close", "click", hideReasoningModalFromScript);
 
@@ -101,7 +101,7 @@ document.addEventListener("DOMContentLoaded", () => {
     addEventListenerToElement("grid-prev", "click", previousGridImage);
     addEventListenerToElement("grid-next", "click", nextGridImage);
     addEventListenerToElement("advanced-toggle", "click", toggleShowAdvanced);
-    
+
     // Add keyboard and click-outside handlers for reasoning modal
     document.addEventListener("keydown", (e) => {
         if (e.key === "Escape") {
@@ -111,7 +111,7 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         }
     });
-    
+
     // Click outside modal to close
     document.addEventListener("click", (e) => {
         const modal = document.getElementById("reasoning-modal");
@@ -1048,6 +1048,8 @@ function onConversationSelected(this: HTMLDivElement, ev: MouseEvent) {
         chatInput.value = ""; // Clear input field
         chat.refreshChatMessages(chatData.messages);
         currentThreadId = chatData.threadId;
+        // Expose currentThreadId to window for reasoning modal access
+        (window as any).currentThreadId = currentThreadId;
     })
 }
 
@@ -1144,6 +1146,8 @@ function sendChatMessage(): void {
             if (chatData.type == "message_list") {
                 chatStatusText.textContent = "In queue...";
                 currentThreadId = chatData.threadId;
+                // Expose currentThreadId to window for reasoning modal access
+                (window as any).currentThreadId = currentThreadId;
                 cachedMessageList = chatData.messages;
                 chatInput.value = ""; // Clear input field
                 chat.refreshChatMessages(cachedMessageList);
@@ -1213,17 +1217,17 @@ function updateMostRecentChatMessage(messages: chat.ChatMessage[]): void {
         const div = document.createElement("div") as HTMLDivElement;
         div.className = "ai-message";
         div.innerHTML = utils.unescapeHTML(html);
-        
+
         // Add reasoning button for assistant messages
         if (message.role === "assistant") {
             addReasoningButtonToMessage(div, messages.length - 1);
         }
-        
+
         chatHistory.appendChild(div);
     } else {
         var lastChildDiv = chatHistory.lastChild as HTMLDivElement;
         lastChildDiv.innerHTML = utils.unescapeHTML(html);
-        
+
         // Re-add reasoning button if it's an assistant message and doesn't already have one
         if (message.role === "assistant" && !lastChildDiv.querySelector('.reasoning-button')) {
             addReasoningButtonToMessage(lastChildDiv, messages.length - 1);
@@ -1238,13 +1242,13 @@ function addReasoningButtonToMessage(messageElement: HTMLElement, messageIndex: 
     reasoningButton.innerHTML = "i";
     reasoningButton.title = "View reasoning";
     reasoningButton.setAttribute("data-message-index", messageIndex.toString());
-    
+
     reasoningButton.addEventListener("click", (e) => {
         e.preventDefault();
         e.stopPropagation();
         showReasoningModalFromScript(messageIndex);
     });
-    
+
     messageElement.appendChild(reasoningButton);
 }
 
@@ -1255,31 +1259,31 @@ function showReasoningModalFromScript(messageIndex: number): void {
         showReasoningErrorFromScript("No conversation selected");
         return;
     }
-    
+
     // Show modal with loading state
     const modal = document.getElementById("reasoning-modal");
     const content = document.getElementById("reasoning-content");
     const loading = document.getElementById("reasoning-loading");
     const error = document.getElementById("reasoning-error");
-    
+
     if (!modal || !content || !loading || !error) {
         console.error("Reasoning modal elements not found");
         showReasoningErrorFromScript("Modal interface not available");
         return;
     }
-    
+
     // Reset modal state
     content.style.display = "none";
     error.style.display = "none";
     loading.style.display = "block";
     modal.style.display = "block";
-    
+
     // Set up timeout for the request
     const controller = new AbortController();
     const timeoutId = setTimeout(() => {
         controller.abort();
     }, 10000); // 10 second timeout
-    
+
     // Fetch reasoning data with comprehensive error handling
     fetch(`/chat/reasoning/${conversationId}/${messageIndex}`, {
         signal: controller.signal,
@@ -1290,7 +1294,7 @@ function showReasoningModalFromScript(messageIndex: number): void {
     })
         .then(response => {
             clearTimeout(timeoutId);
-            
+
             if (!response.ok) {
                 // Handle specific HTTP error codes
                 if (response.status === 404) {
@@ -1309,16 +1313,16 @@ function showReasoningModalFromScript(messageIndex: number): void {
         })
         .then(data => {
             loading.style.display = "none";
-            
+
             // Validate response structure
             if (!data) {
                 throw new Error("Empty response received");
             }
-            
+
             if (data.error) {
                 throw new Error(data.message || data.error);
             }
-            
+
             if (data.reasoning && data.reasoning.complete_summary) {
                 displayReasoningDataFromScript(data.reasoning);
                 content.style.display = "block";
@@ -1337,7 +1341,7 @@ function showReasoningModalFromScript(messageIndex: number): void {
         .catch(err => {
             clearTimeout(timeoutId);
             loading.style.display = "none";
-            
+
             // Handle different types of errors
             if (err.name === 'AbortError') {
                 showReasoningErrorFromScript("Request timed out - please try again");
@@ -1346,7 +1350,7 @@ function showReasoningModalFromScript(messageIndex: number): void {
             } else {
                 showReasoningErrorFromScript(`Failed to load reasoning data: ${err.message}`);
             }
-            
+
             console.error("Reasoning modal error:", err);
         });
 }
@@ -1354,20 +1358,20 @@ function showReasoningModalFromScript(messageIndex: number): void {
 function displayReasoningDataFromScript(reasoningData: any): void {
     const content = document.getElementById("reasoning-content");
     if (!content) return;
-    
+
     try {
         // Validate and sanitize the reasoning data
         const summary = reasoningData.complete_summary || "";
         if (!summary) {
             throw new Error("No reasoning summary available");
         }
-        
+
         // Escape HTML to prevent XSS
         const escapedSummary = escapeHtml(summary);
-        
+
         // Format the content with proper line breaks
         const formattedSummary = escapedSummary.replace(/\n/g, '<br>');
-        
+
         content.innerHTML = `
             <div class="reasoning-summary">
                 <h3>AI Reasoning Process</h3>
@@ -1384,7 +1388,7 @@ function displayReasoningDataFromScript(reasoningData: any): void {
 function showReasoningErrorFromScript(message: string): void {
     const error = document.getElementById("reasoning-error");
     if (!error) return;
-    
+
     error.textContent = message;
     error.style.display = "block";
 }
