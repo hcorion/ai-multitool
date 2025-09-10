@@ -868,15 +868,33 @@ button#send-chat:hover {
 #copy-prompt-btn {
   background-color: #0a84ff;
   color: #fff;
+}
+#copy-prompt-btn:hover {
+  background-color: #006edc;
+}
+
+.modal-button-container {
+  display: flex;
+  gap: 10px;
+  margin-top: 15px;
+  flex-wrap: wrap;
+}
+
+#copy-prompt-btn, #inpaint-btn {
   border: none;
   padding: 10px 20px;
   font-size: 1rem;
   cursor: pointer;
   border-radius: 4px;
-  margin-top: 10px;
+  margin: 0;
 }
-#copy-prompt-btn:hover {
-  background-color: #006edc;
+
+#inpaint-btn {
+  background-color: #4CAF50;
+  color: #fff;
+}
+#inpaint-btn:hover {
+  background-color: #45a049;
 }
 
 .reasoning-button {

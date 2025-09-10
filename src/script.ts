@@ -1,6 +1,7 @@
 import * as utils from "./utils.js";
 import * as chat from "./chat.js";
 import { InpaintingMaskCanvas } from "./inpainting-mask-canvas.js";
+import showdown from "showdown";
 
 // TypeScript interfaces for the new image API
 interface ImageOperationResponse {
@@ -742,13 +743,32 @@ function updateGridModalImage(): void {
             metadataDiv.appendChild(infoValue);
         }
 
+        // Create button container for better layout
+        let buttonContainer = document.getElementById("modal-button-container") as HTMLDivElement;
+        if (!buttonContainer) {
+            buttonContainer = document.createElement("div");
+            buttonContainer.id = "modal-button-container";
+            buttonContainer.className = "modal-button-container";
+            metadataDiv.appendChild(buttonContainer);
+        }
+
         // Create (or update) the "Copy Prompt" button.
         let copyPromptButton = document.getElementById("copy-prompt-btn") as HTMLButtonElement;
         if (!copyPromptButton) {
             copyPromptButton = document.createElement("button");
             copyPromptButton.id = "copy-prompt-btn";
             copyPromptButton.textContent = "Copy Prompt";
-            metadataDiv.appendChild(copyPromptButton);
+            buttonContainer.appendChild(copyPromptButton);
+        }
+
+        // Create (or update) the "Inpaint" button.
+        let inpaintButton = document.getElementById("inpaint-btn") as HTMLButtonElement;
+        if (!inpaintButton) {
+            inpaintButton = document.createElement("button");
+            inpaintButton.id = "inpaint-btn";
+            inpaintButton.textContent = "Inpaint";
+            inpaintButton.className = "inpaint-button";
+            buttonContainer.appendChild(inpaintButton);
         }
 
         // Add listener (or rebind) for the copy action.
@@ -792,6 +812,19 @@ function updateGridModalImage(): void {
 
             // Switch to the Generation tab.
             document.getElementById("generationTab")?.click();
+        };
+
+        // Add listener for the inpaint action.
+        inpaintButton.onclick = () => {
+            // Get the current image URL from the modal
+            const modalImage = document.getElementById("grid-modal-image") as HTMLImageElement;
+            const imageUrl = modalImage.src;
+            
+            // Close the grid modal
+            closeGridModal();
+            
+            // Open the inpainting mask canvas with the current image
+            openInpaintingMaskCanvas(imageUrl);
         };
     });
 }

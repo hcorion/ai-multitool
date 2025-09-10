@@ -638,15 +638,34 @@ button#send-chat {
 #copy-prompt-btn {
     background-color: $submit-btn-color;
     color: $text-color;
+
+    &:hover {
+        background-color: $submit-btn-hover-color;
+    }
+}
+
+.modal-button-container {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+    flex-wrap: wrap;
+}
+
+#copy-prompt-btn, #inpaint-btn {
     border: none;
     padding: 10px 20px;
     font-size: 1rem;
     cursor: pointer;
     border-radius: 4px;
-    margin-top: 10px;
+    margin: 0; // Remove individual margins since we use gap in container
+}
+
+#inpaint-btn {
+    background-color: #4CAF50; // Green color for inpainting action
+    color: $text-color;
 
     &:hover {
-        background-color: $submit-btn-hover-color;
+        background-color: #45a049; // Darker green on hover
     }
 }
 
