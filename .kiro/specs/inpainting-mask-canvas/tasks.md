@@ -110,7 +110,12 @@
   - Clear redo history when new strokes are added
   - _Requirements: 3.1, 3.2, 3.3_
 
-- [ ] 9. Add checkpoint system for deterministic replay
+- [x] 9. Add checkpoint system for deterministic replay
+
+
+
+
+
   - Implement tile-based checkpoint creation at 256×256 tile resolution
   - Create replay system that restores from nearest checkpoint then applies subsequent strokes
   - Add periodic checkpoint creation during drawing sessions

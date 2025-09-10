@@ -9,6 +9,11 @@ export class HistoryManager {
     maxMemoryMB = 250; // Default memory limit
     nextStrokeId = 1;
     nextCheckpointId = 1;
+    imageWidth = 0;
+    imageHeight = 0;
+    tileSize = 256; // 256x256 tiles
+    strokesSinceLastCheckpoint = 0;
+    checkpointInterval = 20; // Create checkpoint every 20 strokes
     constructor(maxMemoryMB = 250) {
         this.maxMemoryMB = maxMemoryMB;
     }
@@ -16,7 +21,7 @@ export class HistoryManager {
      * Add a new stroke to the history
      * Clears redo history when new strokes are added
      */
-    addStroke(stroke) {
+    addStroke(stroke, maskData) {
         // Create stroke command with unique ID
         const strokeCommand = {
             ...stroke,
@@ -27,10 +32,17 @@ export class HistoryManager {
             this.strokes = this.strokes.slice(0, this.currentIndex + 1);
             // Also remove checkpoints that are no longer valid
             this.cleanupInvalidCheckpoints();
+            this.strokesSinceLastCheckpoint = 0; // Reset counter after clearing redo
         }
         // Add the new stroke
         this.strokes.push(strokeCommand);
         this.currentIndex = this.strokes.length - 1;
+        this.strokesSinceLastCheckpoint++;
+        // Create periodic checkpoint if needed and mask data is available
+        if (maskData && this.shouldCreatePeriodicCheckpoint()) {
+            this.createTileBasedCheckpoint(maskData);
+            this.strokesSinceLastCheckpoint = 0;
+        }
         // Check memory usage and cleanup if needed
         this.manageMemory();
         return strokeCommand;
@@ -95,14 +107,58 @@ export class HistoryManager {
         return [...this.strokes];
     }
     /**
-     * Create a checkpoint of the current mask state
+     * Set image dimensions for tile-based checkpoints
+     */
+    setImageDimensions(width, height) {
+        this.imageWidth = width;
+        this.imageHeight = height;
+    }
+    /**
+     * Create a checkpoint of the current mask state (legacy method for compatibility)
      */
     createCheckpoint(maskData) {
+        // For backward compatibility, if image dimensions are not set, create a full checkpoint
+        if (this.imageWidth === 0 || this.imageHeight === 0) {
+            return this.createFullCheckpoint(maskData);
+        }
+        return this.createTileBasedCheckpoint(maskData);
+    }
+    /**
+     * Create a tile-based checkpoint of the current mask state
+     */
+    createTileBasedCheckpoint(maskData) {
+        if (this.imageWidth === 0 || this.imageHeight === 0) {
+            throw new Error('Image dimensions must be set before creating tile-based checkpoints');
+        }
+        const tiles = this.extractTiles(maskData);
+        const checkpoint = {
+            tiles,
+            timestamp: Date.now(),
+            strokeIndex: this.currentIndex,
+            id: `checkpoint_${this.nextCheckpointId++}`,
+            imageWidth: this.imageWidth,
+            imageHeight: this.imageHeight,
+            tileSize: this.tileSize
+        };
+        this.checkpoints.push(checkpoint);
+        // Keep checkpoints sorted by stroke index
+        this.checkpoints.sort((a, b) => a.strokeIndex - b.strokeIndex);
+        // Manage memory after adding checkpoint
+        this.manageMemory();
+        return checkpoint;
+    }
+    /**
+     * Create a full checkpoint (stores complete mask data)
+     */
+    createFullCheckpoint(maskData) {
         const checkpoint = {
             maskData: new Uint8Array(maskData), // Create a copy
             timestamp: Date.now(),
             strokeIndex: this.currentIndex,
-            id: `checkpoint_${this.nextCheckpointId++}`
+            id: `checkpoint_${this.nextCheckpointId++}`,
+            imageWidth: this.imageWidth,
+            imageHeight: this.imageHeight,
+            tileSize: this.tileSize
         };
         this.checkpoints.push(checkpoint);
         // Keep checkpoints sorted by stroke index
@@ -145,6 +201,7 @@ export class HistoryManager {
         this.currentIndex = -1;
         this.nextStrokeId = 1;
         this.nextCheckpointId = 1;
+        this.strokesSinceLastCheckpoint = 0;
     }
     /**
      * Get memory usage estimate in MB
@@ -158,7 +215,18 @@ export class HistoryManager {
         }
         // Calculate checkpoint memory usage
         for (const checkpoint of this.checkpoints) {
-            totalBytes += checkpoint.maskData.length + 64; // 64 bytes for metadata
+            if (checkpoint.maskData) {
+                // Full checkpoint
+                totalBytes += checkpoint.maskData.length + 64; // 64 bytes for metadata
+            }
+            else if (checkpoint.tiles) {
+                // Tile-based checkpoint
+                let tileBytes = 0;
+                for (const tile of checkpoint.tiles) {
+                    tileBytes += tile.data.length + 16; // 16 bytes for tile metadata (x, y)
+                }
+                totalBytes += tileBytes + 64; // 64 bytes for checkpoint metadata
+            }
         }
         return totalBytes / (1024 * 1024);
     }
@@ -212,6 +280,136 @@ export class HistoryManager {
         return this.maxMemoryMB;
     }
     /**
+     * Extract tiles from mask data for efficient storage
+     */
+    extractTiles(maskData) {
+        const tiles = [];
+        const tilesX = Math.ceil(this.imageWidth / this.tileSize);
+        const tilesY = Math.ceil(this.imageHeight / this.tileSize);
+        for (let tileY = 0; tileY < tilesY; tileY++) {
+            for (let tileX = 0; tileX < tilesX; tileX++) {
+                const tileData = this.extractTile(maskData, tileX, tileY);
+                // Only store non-empty tiles (optimization)
+                if (this.isTileNonEmpty(tileData)) {
+                    tiles.push({
+                        x: tileX,
+                        y: tileY,
+                        data: tileData
+                    });
+                }
+            }
+        }
+        return tiles;
+    }
+    /**
+     * Extract a single tile from mask data
+     */
+    extractTile(maskData, tileX, tileY) {
+        const startX = tileX * this.tileSize;
+        const startY = tileY * this.tileSize;
+        const endX = Math.min(startX + this.tileSize, this.imageWidth);
+        const endY = Math.min(startY + this.tileSize, this.imageHeight);
+        const tileWidth = endX - startX;
+        const tileHeight = endY - startY;
+        const tileData = new Uint8Array(tileWidth * tileHeight);
+        for (let y = 0; y < tileHeight; y++) {
+            for (let x = 0; x < tileWidth; x++) {
+                const sourceIndex = (startY + y) * this.imageWidth + (startX + x);
+                const tileIndex = y * tileWidth + x;
+                tileData[tileIndex] = maskData[sourceIndex];
+            }
+        }
+        return tileData;
+    }
+    /**
+     * Check if a tile contains non-zero data
+     */
+    isTileNonEmpty(tileData) {
+        for (let i = 0; i < tileData.length; i++) {
+            if (tileData[i] !== 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+    /**
+     * Reconstruct full mask data from checkpoint tiles
+     */
+    reconstructMaskFromCheckpoint(checkpoint) {
+        if (checkpoint.maskData) {
+            // Legacy checkpoint with full mask data
+            return new Uint8Array(checkpoint.maskData);
+        }
+        if (!checkpoint.tiles) {
+            throw new Error('Checkpoint has no mask data or tiles');
+        }
+        // Reconstruct from tiles
+        const maskData = new Uint8Array(checkpoint.imageWidth * checkpoint.imageHeight);
+        maskData.fill(0); // Initialize with zeros
+        for (const tile of checkpoint.tiles) {
+            this.applyTileToMask(maskData, tile, checkpoint.imageWidth, checkpoint.tileSize);
+        }
+        return maskData;
+    }
+    /**
+     * Apply a tile to the mask data
+     */
+    applyTileToMask(maskData, tile, imageWidth, tileSize) {
+        const startX = tile.x * tileSize;
+        const startY = tile.y * tileSize;
+        const endX = Math.min(startX + tileSize, imageWidth);
+        const endY = Math.min(startY + tileSize, this.imageHeight);
+        const tileWidth = endX - startX;
+        const tileHeight = endY - startY;
+        for (let y = 0; y < tileHeight; y++) {
+            for (let x = 0; x < tileWidth; x++) {
+                const maskIndex = (startY + y) * imageWidth + (startX + x);
+                const tileIndex = y * tileWidth + x;
+                if (tileIndex < tile.data.length) {
+                    maskData[maskIndex] = tile.data[tileIndex];
+                }
+            }
+        }
+    }
+    /**
+     * Check if a periodic checkpoint should be created
+     */
+    shouldCreatePeriodicCheckpoint() {
+        return this.strokesSinceLastCheckpoint >= this.checkpointInterval;
+    }
+    /**
+     * Set the checkpoint interval (number of strokes between automatic checkpoints)
+     */
+    setCheckpointInterval(interval) {
+        this.checkpointInterval = Math.max(1, interval);
+    }
+    /**
+     * Get the current checkpoint interval
+     */
+    getCheckpointInterval() {
+        return this.checkpointInterval;
+    }
+    /**
+     * Get the number of strokes since the last checkpoint
+     */
+    getStrokesSinceLastCheckpoint() {
+        return this.strokesSinceLastCheckpoint;
+    }
+    /**
+     * Replay strokes from a checkpoint to recreate mask state deterministically
+     */
+    replayFromCheckpoint(checkpoint, targetStrokeIndex, replayCallback) {
+        // Start with the checkpoint mask data
+        const maskData = this.reconstructMaskFromCheckpoint(checkpoint);
+        // Get strokes to replay
+        const strokesToReplay = this.getStrokesFromCheckpoint(checkpoint, targetStrokeIndex);
+        // Replay each stroke
+        for (const stroke of strokesToReplay) {
+            replayCallback(stroke);
+        }
+        return maskData;
+    }
+    /**
      * Export history state for debugging
      */
     exportDebugInfo() {
@@ -221,6 +419,11 @@ export class HistoryManager {
             currentIndex: this.currentIndex,
             memoryUsageMB: this.getMemoryUsageMB(),
             maxMemoryMB: this.maxMemoryMB,
+            imageWidth: this.imageWidth,
+            imageHeight: this.imageHeight,
+            tileSize: this.tileSize,
+            checkpointInterval: this.checkpointInterval,
+            strokesSinceLastCheckpoint: this.strokesSinceLastCheckpoint,
             state: this.getState(),
             strokes: this.strokes.map(s => ({
                 id: s.id,
@@ -233,7 +436,11 @@ export class HistoryManager {
                 id: cp.id,
                 strokeIndex: cp.strokeIndex,
                 timestamp: cp.timestamp,
-                maskDataSize: cp.maskData.length
+                imageWidth: cp.imageWidth,
+                imageHeight: cp.imageHeight,
+                tileSize: cp.tileSize,
+                maskDataSize: cp.maskData?.length || 0,
+                tileCount: cp.tiles?.length || 0
             }))
         };
     }

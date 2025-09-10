@@ -339,11 +339,15 @@ export class InpaintingMaskCanvas {
         try {
             await this.canvasManager.loadImage(imageUrl);
             this.hideError();
-            // Set up zoom/pan controller bounds
+            // Set up zoom/pan controller bounds and history manager dimensions
             if (this.zoomPanController && this.canvasManager) {
                 const state = this.canvasManager.getState();
                 if (state) {
                     this.zoomPanController.setImageBounds(state.imageWidth, state.imageHeight);
+                    // Set image dimensions for tile-based checkpoints
+                    if (this.historyManager) {
+                        this.historyManager.setImageDimensions(state.imageWidth, state.imageHeight);
+                    }
                     // Use the actual canvas container size, not the display size
                     const canvasContainer = this.overlayCanvas?.parentElement;
                     if (canvasContainer) {
@@ -669,13 +673,14 @@ export class InpaintingMaskCanvas {
         else if (evt.type === 'end') {
             const completedStroke = this.canvasManager.endBrushStroke();
             if (completedStroke && this.historyManager) {
-                // Add the completed stroke to history
-                const strokeCommand = this.historyManager.addStroke(completedStroke);
+                // Get current mask data for periodic checkpoints
+                const state = this.canvasManager.getState();
+                // Add the completed stroke to history (with mask data for periodic checkpoints)
+                const strokeCommand = this.historyManager.addStroke(completedStroke, state?.maskData);
                 console.log('Added stroke to history:', strokeCommand.id);
                 // Update history button states
                 this.updateHistoryButtons();
-                // Create checkpoint periodically for better performance
-                const state = this.canvasManager.getState();
+                // Create checkpoint periodically for better performance (legacy - now handled automatically)
                 if (state && this.historyManager.getState().strokeCount % 10 === 0) {
                     this.historyManager.createCheckpoint(state.maskData);
                     console.log(`Created checkpoint after ${this.historyManager.getState().strokeCount} strokes`);
@@ -780,7 +785,8 @@ export class InpaintingMaskCanvas {
         if (nearestCheckpoint) {
             // Restore from checkpoint
             console.log(`Restoring from checkpoint at stroke ${nearestCheckpoint.strokeIndex}`);
-            state.maskData.set(nearestCheckpoint.maskData);
+            const reconstructedMask = this.historyManager.reconstructMaskFromCheckpoint(nearestCheckpoint);
+            state.maskData.set(reconstructedMask);
             // Replay strokes from checkpoint to current state
             const strokesToReplay = this.historyManager.getStrokesFromCheckpoint(nearestCheckpoint, historyState.currentIndex);
             console.log(`Replaying ${strokesToReplay.length} strokes from checkpoint`);
