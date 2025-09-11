@@ -8,12 +8,14 @@ import { InputEngine, InputEventHandler } from './input-engine.js';
 import { ZoomPanController, Transform2D, ZoomPanEventHandler } from './zoom-pan-controller.js';
 import { HistoryManager, StrokeCommand, HistoryState } from './history-manager.js';
 import { BrushStroke } from './brush-engine.js';
+import { maskFileManager, MaskFileManager } from './mask-file-manager.js';
 
 interface InpaintingMaskCanvasConfig {
     imageUrl: string;
     containerElement: HTMLElement;
-    onMaskComplete: (maskDataUrl: string) => void;
+    onMaskComplete: (maskDataUrl: string, maskFileId?: string | null) => void;
     onCancel: () => void;
+    enableFileManager?: boolean;
 }
 
 export class InpaintingMaskCanvas {
@@ -33,9 +35,15 @@ export class InpaintingMaskCanvas {
     private boundResizeHandler = () => this.handleResize();
     private boundKeydownHandler = (e: KeyboardEvent) => this.handleKeyDown(e);
     private currentStroke: BrushStroke | null = null;
+    private fileManager: MaskFileManager | null = null;
 
     constructor(config: InpaintingMaskCanvasConfig) {
         this.config = config;
+        
+        // Initialize file manager if enabled
+        if (config.enableFileManager !== false) {
+            this.fileManager = maskFileManager;
+        }
     }
 
     public async show(): Promise<void> {
@@ -72,24 +80,33 @@ export class InpaintingMaskCanvas {
             throw new Error('No image loaded');
         }
 
-        // Create a temporary canvas for export
-        const exportCanvas = document.createElement('canvas');
-        exportCanvas.width = state.imageWidth;
-        exportCanvas.height = state.imageHeight;
-        const ctx = exportCanvas.getContext('2d');
+        // Use the enhanced PNG export method that ensures binary values
+        return this.canvasManager.exportMaskAsPNG();
+    }
 
-        if (!ctx) {
-            throw new Error('Failed to get export canvas context');
+    /**
+     * Export mask with metadata for debugging and validation
+     */
+    public exportMaskWithMetadata(): {
+        dataUrl: string;
+        metadata: {
+            width: number;
+            height: number;
+            totalPixels: number;
+            maskedPixels: number;
+            maskPercentage: number;
+            isBinary: boolean;
+            timestamp: number;
+        };
+    } {
+        if (!this.canvasManager) {
+            throw new Error('Canvas not initialized');
         }
 
-        // Get mask image data from canvas manager
-        const imageData = this.canvasManager.exportMaskImageData();
-        if (!imageData) {
-            throw new Error('Failed to export mask image data');
-        }
+        const dataUrl = this.exportMask();
+        const metadata = this.canvasManager.exportMaskMetadata();
 
-        ctx.putImageData(imageData, 0, 0);
-        return exportCanvas.toDataURL('image/png');
+        return { dataUrl, metadata };
     }
 
     /**
@@ -106,42 +123,87 @@ export class InpaintingMaskCanvas {
         }
 
         try {
-            // Export mask using WebWorker (with fallback)
-            const exportResult = await this.canvasManager.exportMaskAsync();
-            if (!exportResult) {
-                throw new Error('Failed to export mask data');
-            }
-
-            // Create a temporary canvas for export
-            const exportCanvas = document.createElement('canvas');
-            exportCanvas.width = exportResult.imageWidth;
-            exportCanvas.height = exportResult.imageHeight;
-            const ctx = exportCanvas.getContext('2d');
-
-            if (!ctx) {
-                throw new Error('Failed to get export canvas context');
-            }
-
-            // Convert mask data to ImageData
-            const imageData = ctx.createImageData(exportResult.imageWidth, exportResult.imageHeight);
-            
-            // Convert mask data to RGBA
-            for (let i = 0; i < exportResult.maskData.length; i++) {
-                const pixelIndex = i * 4;
-                const maskValue = exportResult.maskData[i];
-                
-                imageData.data[pixelIndex] = maskValue;     // R
-                imageData.data[pixelIndex + 1] = maskValue; // G
-                imageData.data[pixelIndex + 2] = maskValue; // B
-                imageData.data[pixelIndex + 3] = 255;       // A
-            }
-
-            ctx.putImageData(imageData, 0, 0);
-            return exportCanvas.toDataURL('image/png');
+            // Use the enhanced async PNG export method
+            return await this.canvasManager.exportMaskAsPNGAsync();
         } catch (error) {
             console.warn('Async mask export failed, falling back to sync:', error);
             return this.exportMask();
         }
+    }
+
+    /**
+     * Export mask asynchronously with metadata
+     */
+    public async exportMaskWithMetadataAsync(): Promise<{
+        dataUrl: string;
+        metadata: {
+            width: number;
+            height: number;
+            totalPixels: number;
+            maskedPixels: number;
+            maskPercentage: number;
+            isBinary: boolean;
+            timestamp: number;
+        };
+    }> {
+        if (!this.canvasManager) {
+            throw new Error('Canvas not initialized');
+        }
+
+        const dataUrl = await this.exportMaskAsync();
+        const metadata = this.canvasManager.exportMaskMetadata();
+
+        return { dataUrl, metadata };
+    }
+
+    /**
+     * Export mask and store as temporary file for cleanup management
+     */
+    public exportMaskAsTemporaryFile(): { dataUrl: string; fileId: string | null } {
+        const dataUrl = this.exportMask();
+        let fileId: string | null = null;
+
+        if (this.fileManager) {
+            const metadata = this.canvasManager?.exportMaskMetadata();
+            fileId = this.fileManager.storeMaskFile(dataUrl, metadata);
+        }
+
+        return { dataUrl, fileId };
+    }
+
+    /**
+     * Export mask asynchronously and store as temporary file
+     */
+    public async exportMaskAsTemporaryFileAsync(): Promise<{ dataUrl: string; fileId: string | null }> {
+        const dataUrl = await this.exportMaskAsync();
+        let fileId: string | null = null;
+
+        if (this.fileManager) {
+            const metadata = this.canvasManager?.exportMaskMetadata();
+            fileId = this.fileManager.storeMaskFile(dataUrl, metadata);
+        }
+
+        return { dataUrl, fileId };
+    }
+
+    /**
+     * Clean up a specific temporary mask file
+     */
+    public cleanupTemporaryFile(fileId: string): boolean {
+        if (!this.fileManager) {
+            return false;
+        }
+        return this.fileManager.removeMaskFile(fileId);
+    }
+
+    /**
+     * Get temporary file statistics
+     */
+    public getTemporaryFileStatistics() {
+        if (!this.fileManager) {
+            return null;
+        }
+        return this.fileManager.getStatistics();
     }
 
     private createPopupStructure(): void {
@@ -738,18 +800,28 @@ export class InpaintingMaskCanvas {
 
     private async completeMask(): Promise<void> {
         try {
-            const maskDataUrl = await this.exportMaskAsync();
-            this.config.onMaskComplete(maskDataUrl);
+            // Export mask with file management
+            const { dataUrl, fileId } = await this.exportMaskAsTemporaryFileAsync();
+            this.config.onMaskComplete(dataUrl, fileId);
             this.hide();
         } catch (error) {
             console.error('Failed to complete mask:', error);
             // Fallback to sync export
             try {
-                const maskDataUrl = this.exportMask();
-                this.config.onMaskComplete(maskDataUrl);
+                const { dataUrl, fileId } = this.exportMaskAsTemporaryFile();
+                this.config.onMaskComplete(dataUrl, fileId);
                 this.hide();
             } catch (fallbackError) {
                 console.error('Fallback export also failed:', fallbackError);
+                // Last resort - basic export without file management
+                try {
+                    const maskDataUrl = this.exportMask();
+                    this.config.onMaskComplete(maskDataUrl);
+                    this.hide();
+                } catch (finalError) {
+                    console.error('All export methods failed:', finalError);
+                    this.showError('Failed to export mask. Please try again.');
+                }
             }
         }
     }
@@ -1242,6 +1314,10 @@ export class InpaintingMaskCanvas {
             this.canvasManager.cleanup();
             this.canvasManager = null;
         }
+
+        // Note: We don't cleanup the global file manager here as it may be used by other instances
+        // The file manager has its own automatic cleanup system
+        this.fileManager = null;
 
         // Reset references
         this.imageCanvas = null;

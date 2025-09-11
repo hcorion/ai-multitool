@@ -98,6 +98,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Grid Modal Buttons
     addEventListenerToElement("grid-image-close", "click", closeGridModal);
+
+    // Inpainting buttons
+    addEventListenerToElement("clear-inpainting-btn", "click", clearInpaintingMode);
     addEventListenerToElement("grid-prev", "click", previousGridImage);
     addEventListenerToElement("grid-next", "click", nextGridImage);
     addEventListenerToElement("advanced-toggle", "click", toggleShowAdvanced);
@@ -186,7 +189,7 @@ function renderImageResult(response: ImageOperationResponse): void {
                 <p><strong>Image Name:</strong> ${response.image_name}</p>
                 
                 <div class="image-actions" style="margin-top: 15px;">
-                    <button id="editMaskBtn" class="edit-mask-btn" onclick="openInpaintingMaskCanvas('${response.image_path}')">
+                    <button id="editMaskBtn" class="edit-mask-btn">
                         🎨 Edit Mask for Inpainting
                     </button>
                 </div>
@@ -203,6 +206,20 @@ function renderImageResult(response: ImageOperationResponse): void {
     // Add event listeners for the new elements
     addEventListenerToElement("generatedImage", "click", openGenModal);
     addEventListenerToElement("generatedImageClose", "click", closeGenModal);
+
+    // Add event listener for inpaint button with prompt extraction
+    const editMaskBtn = document.getElementById("editMaskBtn");
+    if (editMaskBtn) {
+        editMaskBtn.addEventListener("click", () => {
+            // Extract prompts from the response metadata
+            const { prompt, negativePrompt, characterPrompts } = extractPromptsFromMetadata(response.metadata || {});
+
+            // Open inpainting mask canvas with prompts
+            if (response.image_path) {
+                openInpaintingMaskCanvas(response.image_path, prompt, negativePrompt, characterPrompts);
+            }
+        });
+    }
 }
 
 function renderImageError(errorMessage: string): void {
@@ -819,11 +836,14 @@ function updateGridModalImage(): void {
             const modalImage = document.getElementById("grid-modal-image") as HTMLImageElement;
             const imageUrl = modalImage.src;
 
+            // Extract prompts from the current metadata
+            const { prompt, negativePrompt, characterPrompts } = extractPromptsFromMetadata(metadata);
+
             // Close the grid modal
             closeGridModal();
 
-            // Open the inpainting mask canvas with the current image
-            openInpaintingMaskCanvas(imageUrl);
+            // Open the inpainting mask canvas with the current image and prompts
+            openInpaintingMaskCanvas(imageUrl, prompt, negativePrompt, characterPrompts);
         };
     });
 }
@@ -850,15 +870,20 @@ function closeGenModal(): void {
  * Opens the inpainting mask canvas for the given image
  * @param imageUrl - URL of the image to edit
  */
-async function openInpaintingMaskCanvas(imageUrl: string): Promise<void> {
+async function openInpaintingMaskCanvas(imageUrl: string, originalPrompt?: string | undefined, originalNegativePrompt?: string | undefined, originalCharacterPrompts?: CharacterPromptData[]): Promise<void> {
     const canvas = new InpaintingMaskCanvas({
         imageUrl: imageUrl,
         containerElement: document.body,
-        onMaskComplete: (maskDataUrl: string) => {
+        onMaskComplete: async (maskDataUrl: string, maskFileId?: string | null) => {
             console.log('Mask completed:', maskDataUrl);
-            window.open(maskDataUrl, '_blank');
-            // TODO: Integrate with existing inpainting workflow
-            // This will be implemented in later tasks
+
+            try {
+                // Save the mask to the server and set up inpainting
+                await setupInpaintingMode(imageUrl, maskDataUrl, maskFileId, originalPrompt, originalNegativePrompt, originalCharacterPrompts);
+            } catch (error) {
+                console.error('Failed to setup inpainting mode:', error);
+                alert('Failed to setup inpainting mode. Please try again.');
+            }
         },
         onCancel: () => {
             console.log('Mask editing cancelled');
@@ -872,8 +897,288 @@ async function openInpaintingMaskCanvas(imageUrl: string): Promise<void> {
     }
 }
 
-// Make the function globally available
+/**
+ * Set up inpainting mode with the provided base image and mask
+ */
+async function setupInpaintingMode(baseImageUrl: string, maskDataUrl: string, maskFileId?: string | null, originalPrompt?: string, originalNegativePrompt?: string, originalCharacterPrompts?: CharacterPromptData[]): Promise<void> {
+    try {
+        // Save the mask to the server
+        const maskPath = await saveMaskToServer(maskDataUrl);
+
+        // Extract the base image path from the URL
+        const baseImagePath = extractImagePathFromUrl(baseImageUrl);
+
+        // Show the inpainting section
+        showInpaintingSection(baseImageUrl, maskDataUrl, baseImagePath, maskPath);
+
+        // Copy original prompts to the form if provided
+        if (originalPrompt) {
+            copyPromptToForm(originalPrompt, originalNegativePrompt, originalCharacterPrompts);
+        }
+
+        // Switch to the generation tab if not already there
+        const generationTab = document.getElementById('generationTab') as HTMLElement;
+        if (generationTab) {
+            generationTab.click();
+        }
+
+        // Scroll to the inpainting section
+        const inpaintingSection = document.getElementById('inpainting-section');
+        if (inpaintingSection) {
+            inpaintingSection.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        console.log('Inpainting mode setup complete');
+    } catch (error) {
+        console.error('Error setting up inpainting mode:', error);
+        throw error;
+    }
+}
+
+/**
+ * Save mask data URL to server and return the server path
+ */
+async function saveMaskToServer(maskDataUrl: string): Promise<string> {
+    const formData = new FormData();
+
+    // Convert data URL to blob
+    const response = await fetch(maskDataUrl);
+    const blob = await response.blob();
+
+    formData.append('mask', blob, 'mask.png');
+
+    const saveResponse = await fetch('/save-mask', {
+        method: 'POST',
+        body: formData
+    });
+
+    if (!saveResponse.ok) {
+        throw new Error('Failed to save mask to server');
+    }
+
+    const result = await saveResponse.json();
+    return result.mask_path;
+}
+
+/**
+ * Extract image path from full URL
+ */
+function extractImagePathFromUrl(imageUrl: string): string {
+    // Extract the path part from URLs like /static/images/username/image.png
+    const url = new URL(imageUrl, window.location.origin);
+    return url.pathname;
+}
+
+/**
+ * Show the inpainting section and populate it with image and mask data
+ */
+function showInpaintingSection(baseImageUrl: string, maskDataUrl: string, baseImagePath: string, maskPath: string): void {
+    const inpaintingSection = document.getElementById('inpainting-section') as HTMLElement;
+    const imageNameSpan = document.getElementById('inpainting-image-name') as HTMLElement;
+    const maskStatusSpan = document.getElementById('inpainting-mask-status') as HTMLElement;
+    const basePreview = document.getElementById('inpainting-base-preview') as HTMLImageElement;
+    const maskPreview = document.getElementById('inpainting-mask-preview') as HTMLImageElement;
+    const baseImageInput = document.getElementById('inpainting-base-image') as HTMLInputElement;
+    const maskPathInput = document.getElementById('inpainting-mask-path') as HTMLInputElement;
+    const operationInput = document.getElementById('inpainting-operation') as HTMLInputElement;
+    const submitBtn = document.getElementById('generate-submit-btn') as HTMLInputElement;
+
+    if (inpaintingSection) {
+        inpaintingSection.style.display = 'block';
+    }
+
+    if (imageNameSpan) {
+        const imageName = baseImagePath.split('/').pop() || 'Unknown';
+        imageNameSpan.textContent = imageName;
+    }
+
+    if (maskStatusSpan) {
+        maskStatusSpan.textContent = 'Mask created successfully';
+    }
+
+    if (basePreview) {
+        basePreview.src = baseImageUrl;
+        basePreview.style.display = 'block';
+    }
+
+    if (maskPreview) {
+        maskPreview.src = maskDataUrl;
+        maskPreview.style.display = 'block';
+    }
+
+    if (baseImageInput) {
+        baseImageInput.value = baseImagePath;
+    }
+
+    if (maskPathInput) {
+        maskPathInput.value = maskPath;
+    }
+
+    if (operationInput) {
+        operationInput.value = 'inpaint';
+    }
+
+    if (submitBtn) {
+        submitBtn.value = 'Generate Inpainting';
+        submitBtn.classList.add('inpainting-mode');
+    }
+}
+
+/**
+ * Extract prompts from image metadata for inpainting
+ */
+function extractPromptsFromMetadata(metadata: any): {
+    prompt?: string;
+    negativePrompt?: string;
+    characterPrompts?: CharacterPromptData[]
+} {
+    let prompt: string | undefined;
+    let negativePrompt: string | undefined;
+    const characterPrompts: CharacterPromptData[] = [];
+
+    // Priority order for main prompt extraction:
+    // 1. Original "Prompt" (user's input)
+    // 2. "Revised Prompt" (AI-processed version)
+    if (metadata['Prompt']) {
+        prompt = metadata['Prompt'];
+    } else if (metadata['Revised Prompt']) {
+        prompt = metadata['Revised Prompt'];
+    }
+
+    // Priority order for main negative prompt:
+    // 1. Original "Negative Prompt" (user's input)  
+    // 2. "Revised Negative Prompt" (AI-processed version)
+    if (metadata['Negative Prompt']) {
+        negativePrompt = metadata['Negative Prompt'];
+    } else if (metadata['Revised Negative Prompt']) {
+        negativePrompt = metadata['Revised Negative Prompt'];
+    }
+
+    // Extract character prompts (NovelAI specific)
+    const characterMap: { [key: number]: CharacterPromptData } = {};
+
+    for (const key in metadata) {
+        // Look for character prompts: "Character 1 Prompt", "Character 1 Negative", etc.
+        const characterMatch = key.match(/^Character (\d+) (Prompt|Negative)$/);
+        const processedMatch = key.match(/^Character (\d+) Processed (Prompt|Negative)$/);
+
+        if (characterMatch) {
+            const charNum = parseInt(characterMatch[1]);
+            const promptType = characterMatch[2];
+
+            if (!characterMap[charNum]) {
+                characterMap[charNum] = { positive: '', negative: '' };
+            }
+
+            if (promptType === 'Prompt') {
+                characterMap[charNum].positive = metadata[key] || '';
+            } else if (promptType === 'Negative') {
+                characterMap[charNum].negative = metadata[key] || '';
+            }
+        } else if (processedMatch) {
+            // If no original character prompt exists, use processed version as fallback
+            const charNum = parseInt(processedMatch[1]);
+            const promptType = processedMatch[2];
+            const originalKey = `Character ${charNum} ${promptType}`;
+
+            if (!metadata[originalKey]) {
+                if (!characterMap[charNum]) {
+                    characterMap[charNum] = { positive: '', negative: '' };
+                }
+
+                if (promptType === 'Prompt') {
+                    characterMap[charNum].positive = metadata[key] || '';
+                } else if (promptType === 'Negative') {
+                    characterMap[charNum].negative = metadata[key] || '';
+                }
+            }
+        }
+    }
+
+    // Convert character map to array (sorted by character number)
+    const characterNumbers = Object.keys(characterMap).map(num => parseInt(num)).sort((a, b) => a - b);
+    for (const charNum of characterNumbers) {
+        characterPrompts.push(characterMap[charNum]);
+    }
+
+    console.log('Extracted prompts from metadata:', { prompt, negativePrompt, characterPrompts });
+    return { prompt, negativePrompt, characterPrompts };
+}
+
+/**
+ * Copy prompts to the generation form
+ */
+function copyPromptToForm(prompt: string, negativePrompt?: string, characterPrompts?: CharacterPromptData[]): void {
+    const promptTextarea = document.getElementById('prompt') as HTMLTextAreaElement;
+    const negativePromptTextarea = document.getElementById('negative_prompt') as HTMLTextAreaElement;
+
+    if (promptTextarea && prompt) {
+        promptTextarea.value = prompt;
+        // Trigger input event to update character count
+        promptTextarea.dispatchEvent(new Event('input'));
+    }
+
+    if (negativePromptTextarea && negativePrompt) {
+        negativePromptTextarea.value = negativePrompt;
+        // Trigger input event if there's a character count for negative prompt
+        negativePromptTextarea.dispatchEvent(new Event('input'));
+    }
+
+    // Handle character prompts if provided
+    if (characterPrompts && characterPrompts.length > 0) {
+        // Check if NovelAI is selected (character prompts are NovelAI-specific)
+        const providerSelect = document.getElementById('provider') as HTMLSelectElement;
+        if (providerSelect && providerSelect.value === 'novelai') {
+            // Show character prompt interface if not already visible
+            showCharacterPromptInterface();
+
+            // Populate character prompts
+            populateCharacterPrompts(characterPrompts);
+        } else {
+            // Store character prompts for later use if user switches to NovelAI
+            (window as any).pendingCharacterPrompts = characterPrompts;
+            console.log('Character prompts stored for when NovelAI is selected:', characterPrompts);
+        }
+    }
+
+    console.log('Copied prompts to form:', { prompt, negativePrompt, characterPrompts });
+}
+
+/**
+ * Clear inpainting mode and return to normal generation
+ */
+function clearInpaintingMode(): void {
+    const inpaintingSection = document.getElementById('inpainting-section') as HTMLElement;
+    const baseImageInput = document.getElementById('inpainting-base-image') as HTMLInputElement;
+    const maskPathInput = document.getElementById('inpainting-mask-path') as HTMLInputElement;
+    const operationInput = document.getElementById('inpainting-operation') as HTMLInputElement;
+    const submitBtn = document.getElementById('generate-submit-btn') as HTMLInputElement;
+
+    if (inpaintingSection) {
+        inpaintingSection.style.display = 'none';
+    }
+
+    if (baseImageInput) {
+        baseImageInput.value = '';
+    }
+
+    if (maskPathInput) {
+        maskPathInput.value = '';
+    }
+
+    if (operationInput) {
+        operationInput.value = '';
+    }
+
+    if (submitBtn) {
+        submitBtn.value = 'Generate Image';
+        submitBtn.classList.remove('inpainting-mode');
+    }
+}
+
+// Make the functions globally available
 (window as any).openInpaintingMaskCanvas = openInpaintingMaskCanvas;
+(window as any).clearInpaintingMode = clearInpaintingMode;
 
 function toggleShowAdvanced(event: Event): void {
     console.log("show advanced")

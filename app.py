@@ -102,6 +102,47 @@ def test_inpainting_canvas():
     return render_template("test-inpainting-canvas.html")
 
 
+@app.route("/save-mask", methods=["POST"])
+def save_mask():
+    """Save uploaded mask file for inpainting operations."""
+    if "username" not in session:
+        return jsonify({"error": "Not authenticated"}), 401
+    
+    if "mask" not in request.files:
+        return jsonify({"error": "No mask file provided"}), 400
+    
+    mask_file = request.files["mask"]
+    if mask_file.filename == "":
+        return jsonify({"error": "No mask file selected"}), 400
+    
+    try:
+        username = session["username"]
+        
+        # Create user directory if it doesn't exist
+        user_dir = os.path.join(app.static_folder, "images", username)
+        os.makedirs(user_dir, exist_ok=True)
+        
+        # Generate unique filename for the mask
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        mask_filename = f"mask_{timestamp}.png"
+        mask_path = os.path.join(user_dir, mask_filename)
+        
+        # Save the mask file
+        mask_file.save(mask_path)
+        
+        # Return the relative path for use in inpainting requests
+        relative_path = f"/static/images/{username}/{mask_filename}"
+        
+        return jsonify({
+            "success": True,
+            "mask_path": relative_path,
+            "filename": mask_filename
+        })
+        
+    except Exception as e:
+        return jsonify({"error": f"Failed to save mask: {str(e)}"}), 500
+
+
 @app.route("/logout")
 def logout():
     session.pop("username", None)

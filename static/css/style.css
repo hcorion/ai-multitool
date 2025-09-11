@@ -1472,4 +1472,81 @@ button#send-chat:hover {
   background-color: rgba(102, 102, 102, 0.5);
 }
 
+/* In
+painting Section Styles */
+.inpainting-section {
+  background-color: rgba(0, 123, 255, 0.1);
+  border: 2px solid #007bff;
+  border-radius: 8px;
+  padding: 20px;
+  margin: 20px 0;
+}
+.inpainting-section .inpainting-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+.inpainting-section .inpainting-header h3 {
+  margin: 0;
+  color: #007bff;
+  font-size: 1.2em;
+}
+.inpainting-section .inpainting-info {
+  background-color: rgba(255, 255, 255, 0.05);
+  padding: 15px;
+  border-radius: 6px;
+  margin-bottom: 15px;
+}
+.inpainting-section .inpainting-info div {
+  margin-bottom: 8px;
+}
+.inpainting-section .inpainting-info div:last-child {
+  margin-bottom: 0;
+}
+.inpainting-section .inpainting-info strong {
+  color: #ccc;
+}
+.inpainting-section .inpainting-info span {
+  color: #fff;
+  margin-left: 8px;
+}
+.inpainting-section .inpainting-preview {
+  margin-top: 15px;
+}
+.inpainting-section .inpainting-preview .inpainting-preview-container {
+  display: flex;
+  gap: 15px;
+  justify-content: center;
+}
+.inpainting-section .inpainting-preview .inpainting-preview-container .inpainting-preview-image {
+  max-width: 200px;
+  max-height: 200px;
+  border: 2px solid #666;
+  border-radius: 6px;
+  object-fit: contain;
+}
+
+.secondary-button {
+  background-color: #6c757d;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9em;
+  transition: background-color 0.2s;
+}
+.secondary-button:hover {
+  background-color: #5a6268;
+}
+
+/* Update submit button text when in inpainting mode */
+#generate-submit-btn.inpainting-mode {
+  background-color: #28a745;
+}
+#generate-submit-btn.inpainting-mode:hover {
+  background-color: #218838;
+}
+
 /*# sourceMappingURL=style.css.map */

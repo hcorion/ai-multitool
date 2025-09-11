@@ -150,7 +150,13 @@
   - Post dirty rectangles back to main thread for UI updates
   - _Requirements: 7.4, 7.5_
 
-- [ ] 12. Create mask export functionality
+- [x] 12. Create mask export functionality
+
+
+
+
+
+
   - Implement mask export as PNG grayscale with exact image resolution
   - Ensure exported mask contains only binary values (0 or 255)
   - Add data URL generation for integration with inpainting API

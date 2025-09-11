@@ -504,6 +504,77 @@ export class CanvasManager {
         return imageData;
     }
     /**
+     * Export mask as PNG grayscale with exact image resolution
+     * Ensures exported mask contains only binary values (0 or 255)
+     */
+    exportMaskAsPNG() {
+        if (!this.state) {
+            throw new Error('No image loaded');
+        }
+        // Validate binary invariant before export
+        if (!BrushEngine.validateBinaryMask(this.state.maskData)) {
+            console.warn('Binary mask invariant violated during export, enforcing binary values');
+            BrushEngine.enforceBinaryMask(this.state.maskData);
+        }
+        // Create export canvas with exact image dimensions
+        const exportCanvas = document.createElement('canvas');
+        exportCanvas.width = this.state.imageWidth;
+        exportCanvas.height = this.state.imageHeight;
+        const ctx = exportCanvas.getContext('2d');
+        if (!ctx) {
+            throw new Error('Failed to get export canvas context');
+        }
+        // Disable image smoothing for crisp binary output
+        ctx.imageSmoothingEnabled = false;
+        // Create ImageData for grayscale PNG
+        const imageData = ctx.createImageData(this.state.imageWidth, this.state.imageHeight);
+        const data = imageData.data;
+        // Convert binary mask to grayscale RGBA (0 or 255 for all channels)
+        for (let i = 0; i < this.state.maskData.length; i++) {
+            const pixelIndex = i * 4;
+            const maskValue = this.state.maskData[i];
+            // Ensure binary values only
+            const binaryValue = maskValue > 127 ? 255 : 0;
+            data[pixelIndex] = binaryValue; // R
+            data[pixelIndex + 1] = binaryValue; // G
+            data[pixelIndex + 2] = binaryValue; // B
+            data[pixelIndex + 3] = 255; // A (fully opaque)
+        }
+        // Put image data and export as PNG
+        ctx.putImageData(imageData, 0, 0);
+        return exportCanvas.toDataURL('image/png');
+    }
+    /**
+     * Export mask metadata for debugging and validation
+     */
+    exportMaskMetadata() {
+        if (!this.state) {
+            throw new Error('No image loaded');
+        }
+        const totalPixels = this.state.maskData.length;
+        let maskedPixels = 0;
+        let isBinary = true;
+        // Count masked pixels and validate binary invariant
+        for (let i = 0; i < this.state.maskData.length; i++) {
+            const value = this.state.maskData[i];
+            if (value === 255) {
+                maskedPixels++;
+            }
+            else if (value !== 0) {
+                isBinary = false;
+            }
+        }
+        return {
+            width: this.state.imageWidth,
+            height: this.state.imageHeight,
+            totalPixels,
+            maskedPixels,
+            maskPercentage: (maskedPixels / totalPixels) * 100,
+            isBinary,
+            timestamp: Date.now()
+        };
+    }
+    /**
      * Start a brush stroke at the given image coordinates
      */
     startBrushStroke(imageX, imageY, brushSize, mode) {
@@ -674,16 +745,73 @@ export class CanvasManager {
         if (!this.state)
             return null;
         try {
+            // Validate binary invariant before export
+            const validation = await this.workerManager.validateMask(this.state.maskData);
+            if (!validation.isValid) {
+                console.warn('Binary mask invariant violated during async export, using corrected data');
+                this.state.maskData = validation.maskData;
+            }
             const result = await this.workerManager.exportMask(this.state.maskData, this.state.imageWidth, this.state.imageHeight);
             return result;
         }
         catch (error) {
             console.warn('Async mask export failed, falling back to sync:', error);
+            // Validate binary invariant in fallback
+            if (!BrushEngine.validateBinaryMask(this.state.maskData)) {
+                console.warn('Binary mask invariant violated during sync fallback, enforcing binary values');
+                BrushEngine.enforceBinaryMask(this.state.maskData);
+            }
             return {
                 maskData: new Uint8Array(this.state.maskData),
                 imageWidth: this.state.imageWidth,
                 imageHeight: this.state.imageHeight
             };
+        }
+    }
+    /**
+     * Export mask as PNG using WebWorker (with fallback)
+     */
+    async exportMaskAsPNGAsync() {
+        if (!this.state) {
+            throw new Error('No image loaded');
+        }
+        try {
+            // Export mask data using WebWorker
+            const exportResult = await this.exportMaskAsync();
+            if (!exportResult) {
+                throw new Error('Failed to export mask data');
+            }
+            // Create export canvas with exact image dimensions
+            const exportCanvas = document.createElement('canvas');
+            exportCanvas.width = exportResult.imageWidth;
+            exportCanvas.height = exportResult.imageHeight;
+            const ctx = exportCanvas.getContext('2d');
+            if (!ctx) {
+                throw new Error('Failed to get export canvas context');
+            }
+            // Disable image smoothing for crisp binary output
+            ctx.imageSmoothingEnabled = false;
+            // Create ImageData for grayscale PNG
+            const imageData = ctx.createImageData(exportResult.imageWidth, exportResult.imageHeight);
+            const data = imageData.data;
+            // Convert binary mask to grayscale RGBA (0 or 255 for all channels)
+            for (let i = 0; i < exportResult.maskData.length; i++) {
+                const pixelIndex = i * 4;
+                const maskValue = exportResult.maskData[i];
+                // Ensure binary values only (should already be enforced by worker)
+                const binaryValue = maskValue > 127 ? 255 : 0;
+                data[pixelIndex] = binaryValue; // R
+                data[pixelIndex + 1] = binaryValue; // G
+                data[pixelIndex + 2] = binaryValue; // B
+                data[pixelIndex + 3] = 255; // A (fully opaque)
+            }
+            // Put image data and export as PNG
+            ctx.putImageData(imageData, 0, 0);
+            return exportCanvas.toDataURL('image/png');
+        }
+        catch (error) {
+            console.warn('Async PNG export failed, falling back to sync:', error);
+            return this.exportMaskAsPNG();
         }
     }
     /**
