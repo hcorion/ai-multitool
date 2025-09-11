@@ -278,8 +278,24 @@ export class InputEngine {
     private setupRenderCallbacks(): void {
         // Handle batched pointer events
         this.renderScheduler.setRenderCallback('pointer', (operations) => {
-            // Process all pointer operations in this frame
-            for (const operation of operations) {
+            // Sort operations by timestamp to ensure proper event ordering within the same frame
+            // This prevents race conditions where move events are processed before start events
+            const sortedOperations = operations.sort((a, b) => {
+                // First sort by event type priority (start > move > end/cancel)
+                const typeOrder = { 'start': 0, 'move': 1, 'end': 2, 'cancel': 2 };
+                const aTypeOrder = typeOrder[a.data.type as keyof typeof typeOrder] ?? 3;
+                const bTypeOrder = typeOrder[b.data.type as keyof typeof typeOrder] ?? 3;
+                
+                if (aTypeOrder !== bTypeOrder) {
+                    return aTypeOrder - bTypeOrder;
+                }
+                
+                // Then sort by timestamp for events of the same type
+                return a.timestamp - b.timestamp;
+            });
+            
+            // Process all pointer operations in the correct order
+            for (const operation of sortedOperations) {
                 if (this.eventHandler) {
                     this.eventHandler(operation.data);
                 }

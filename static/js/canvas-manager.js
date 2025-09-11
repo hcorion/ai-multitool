@@ -523,6 +523,11 @@ export class CanvasManager {
     continueBrushStroke(imageX, imageY) {
         if (!this.state)
             return false;
+        // Check if we have an active stroke before continuing
+        if (!this.brushEngine.getCurrentStroke()) {
+            console.warn('Attempted to continue brush stroke without active stroke - ignoring');
+            return false;
+        }
         try {
             // Get stamp positions along the path
             const stampPositions = this.brushEngine.continueStroke(imageX, imageY);

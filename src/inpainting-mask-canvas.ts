@@ -874,7 +874,11 @@ export class InpaintingMaskCanvas {
         if (evt.type === 'start') {
           this.currentStroke = this.canvasManager.startBrushStroke(img.x, img.y, this.currentBrushSize, settings.mode);
         } else if (evt.type === 'move') {
-          this.canvasManager.continueBrushStroke(img.x, img.y);
+          // Only continue stroke if we have an active stroke
+          // This prevents the race condition where move events are processed before start events
+          if (this.currentStroke && brush.getCurrentStroke()) {
+            this.canvasManager.continueBrushStroke(img.x, img.y);
+          }
         } else if (evt.type === 'end') {
           const completedStroke = this.canvasManager.endBrushStroke();
           if (completedStroke && this.historyManager) {
@@ -882,6 +886,12 @@ export class InpaintingMaskCanvas {
             this.processStrokeAsync(completedStroke);
           }
           this.currentStroke = null;
+        } else if (evt.type === 'cancel') {
+          // Handle pointer cancellation (important for robust input handling)
+          if (this.currentStroke) {
+            this.canvasManager.endBrushStroke();
+            this.currentStroke = null;
+          }
         }
       };
 

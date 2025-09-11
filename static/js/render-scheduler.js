@@ -34,9 +34,22 @@ export class RenderScheduler {
      * Schedule a pointer event for batched processing
      */
     schedulePointerUpdate(data) {
+        // For pointer events, we need to maintain proper ordering to prevent race conditions
+        // Start events should always be processed before move/end events for the same pointer
+        let priority = 100; // High priority for responsiveness
+        // Adjust priority based on event type to ensure proper ordering
+        if (data.type === 'start') {
+            priority = 110; // Highest priority for start events
+        }
+        else if (data.type === 'end' || data.type === 'cancel') {
+            priority = 90; // Lower priority for end events
+        }
+        else if (data.type === 'move') {
+            priority = 95; // Medium priority for move events
+        }
         this.scheduleRender({
             type: 'pointer',
-            priority: 100, // High priority for responsiveness
+            priority,
             data,
             timestamp: performance.now()
         });
