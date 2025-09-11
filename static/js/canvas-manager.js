@@ -193,13 +193,20 @@ export class CanvasManager {
     setupRenderCallbacks() {
         this.renderScheduler.setRenderCallback('overlay', (operations, dirtyRect) => {
             this.performanceMonitor.startRender();
-            // Only update if enough time has passed (throttling)
-            const currentTime = performance.now();
-            if (currentTime - this.lastOverlayUpdateTime < this.overlayUpdateThrottle) {
-                return;
+            // Check if this is a brush stroke operation
+            const isBrushStroke = this.brushEngine.getCurrentStroke() !== null;
+            if (isBrushStroke) {
+                // For active brush strokes, always update immediately to ensure smooth rendering
+                this.performMaskOverlayUpdate(dirtyRect);
             }
-            this.lastOverlayUpdateTime = currentTime;
-            this.performMaskOverlayUpdate(dirtyRect);
+            else {
+                // For non-brush operations, use throttling for performance
+                const currentTime = performance.now();
+                if (currentTime - this.lastOverlayUpdateTime >= this.overlayUpdateThrottle) {
+                    this.lastOverlayUpdateTime = currentTime;
+                    this.performMaskOverlayUpdate(dirtyRect);
+                }
+            }
             this.performanceMonitor.endRender();
         });
     }

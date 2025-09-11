@@ -35,7 +35,7 @@ export class CanvasManager implements CoordinateTransform {
     private renderScheduler: RenderScheduler;
     private performanceMonitor: PerformanceMonitor;
     private workerManager: WorkerManager;
-    
+
     // Performance optimization flags
     private lastOverlayUpdateTime: number = 0;
     private overlayUpdateThrottle: number = 16.67; // ~60 FPS
@@ -49,7 +49,7 @@ export class CanvasManager implements CoordinateTransform {
         this.overlayCanvas = overlayCanvas;
         this.maskAlphaCanvas = maskAlphaCanvas;
         this.brushEngine = new BrushEngine();
-        
+
         // Initialize performance systems
         this.renderScheduler = new RenderScheduler();
         this.performanceMonitor = new PerformanceMonitor({
@@ -58,10 +58,10 @@ export class CanvasManager implements CoordinateTransform {
             enableMemoryTracking: true,
             warningThreshold: 45
         });
-        
+
         // Initialize worker manager for heavy operations
         this.workerManager = new WorkerManager();
-        
+
         this.setupRenderCallbacks();
         this.setupPerformanceMonitoring();
     }
@@ -72,12 +72,12 @@ export class CanvasManager implements CoordinateTransform {
     public async loadImage(imageUrl: string): Promise<void> {
         return new Promise((resolve, reject) => {
             const img = new Image();
-            
+
             // Set up error handling
             img.onerror = () => {
                 reject(new Error(`Failed to load image: ${imageUrl}`));
             };
-            
+
             // Set up success handling
             img.onload = () => {
                 try {
@@ -88,7 +88,7 @@ export class CanvasManager implements CoordinateTransform {
                     reject(error);
                 }
             };
-            
+
             // Handle CORS for cross-origin images
             img.crossOrigin = 'anonymous';
             img.src = imageUrl;
@@ -120,7 +120,7 @@ export class CanvasManager implements CoordinateTransform {
 
         const containerWidth = containerRect.width;
         const containerHeight = containerRect.height;
-        
+
         const { displayWidth, displayHeight, scale } = this.calculateContainScaling(
             img.naturalWidth,
             img.naturalHeight,
@@ -149,14 +149,14 @@ export class CanvasManager implements CoordinateTransform {
 
         // Render the image
         this.renderImage(img);
-        
+
         // Initialize the mask overlay (empty initially)
         this.updateMaskOverlay();
     }
 
     public getBaseScale(): number {
         return this.state?.scale ?? 1; // CSS px per image px when interactive scale=1
-      }
+    }
 
     /**
      * Calculate "contain" scaling with letterboxing to maintain aspect ratio
@@ -241,15 +241,15 @@ export class CanvasManager implements CoordinateTransform {
      */
     private updateCanvasDisplay(): void {
         if (!this.state) return;
-      
+
         const canvases = [this.imageCanvas, this.overlayCanvas];
         canvases.forEach(canvas => {
-          canvas.style.width = `${this.state!.displayWidth}px`;
-          canvas.style.height = `${this.state!.displayHeight}px`;
-          // Do NOT touch canvas.style.transform here.
-          // Centering/zoom/pan is handled solely by resetTransform/applyTransform.
+            canvas.style.width = `${this.state!.displayWidth}px`;
+            canvas.style.height = `${this.state!.displayHeight}px`;
+            // Do NOT touch canvas.style.transform here.
+            // Centering/zoom/pan is handled solely by resetTransform/applyTransform.
         });
-      }
+    }
 
     /**
      * Set up render callbacks for performance optimization
@@ -257,16 +257,22 @@ export class CanvasManager implements CoordinateTransform {
     private setupRenderCallbacks(): void {
         this.renderScheduler.setRenderCallback('overlay', (operations, dirtyRect) => {
             this.performanceMonitor.startRender();
-            
-            // Only update if enough time has passed (throttling)
-            const currentTime = performance.now();
-            if (currentTime - this.lastOverlayUpdateTime < this.overlayUpdateThrottle) {
-                return;
+
+            // Check if this is a brush stroke operation
+            const isBrushStroke = this.brushEngine.getCurrentStroke() !== null;
+
+            if (isBrushStroke) {
+                // For active brush strokes, always update immediately to ensure smooth rendering
+                this.performMaskOverlayUpdate(dirtyRect);
+            } else {
+                // For non-brush operations, use throttling for performance
+                const currentTime = performance.now();
+                if (currentTime - this.lastOverlayUpdateTime >= this.overlayUpdateThrottle) {
+                    this.lastOverlayUpdateTime = currentTime;
+                    this.performMaskOverlayUpdate(dirtyRect);
+                }
             }
-            
-            this.lastOverlayUpdateTime = currentTime;
-            this.performMaskOverlayUpdate(dirtyRect);
-            
+
             this.performanceMonitor.endRender();
         });
     }
@@ -277,7 +283,7 @@ export class CanvasManager implements CoordinateTransform {
     private setupPerformanceMonitoring(): void {
         this.performanceMonitor.setPerformanceWarningCallback((metrics) => {
             console.warn('Performance warning:', this.performanceMonitor.getPerformanceSummary());
-            
+
             // Automatically adjust throttling if performance is poor
             if (metrics.fps < 30) {
                 this.overlayUpdateThrottle = Math.min(33.33, this.overlayUpdateThrottle * 1.2); // Reduce to 30 FPS
@@ -355,12 +361,12 @@ export class CanvasManager implements CoordinateTransform {
                 const maskY = rect.y + y;
 
                 // Check bounds
-                if (maskX >= 0 && maskX < this.state.imageWidth && 
+                if (maskX >= 0 && maskX < this.state.imageWidth &&
                     maskY >= 0 && maskY < this.state.imageHeight) {
-                    
+
                     const maskIndex = maskY * this.state.imageWidth + maskX;
                     const maskValue = this.state.maskData[maskIndex];
-                    
+
                     // Convert to RGBA - only show overlay where mask is 255
                     const pixelIndex = (y * rect.width + x) * 4;
                     if (maskValue === 255) {
@@ -394,14 +400,14 @@ export class CanvasManager implements CoordinateTransform {
      */
     public screenToImage(screenX: number, screenY: number, debug: boolean = false): { x: number; y: number } | null {
         if (debug) console.log('🔍 CanvasManager.screenToImage called:', { screenX, screenY });
-        
+
         if (!this.state) {
             if (debug) console.log('❌ CanvasManager: No state available');
             return null;
         }
 
         const canvasRect = this.imageCanvas.getBoundingClientRect();
-        
+
         // Convert to canvas-relative coordinates
         const canvasX = screenX - canvasRect.left;
         const canvasY = screenY - canvasRect.top;
@@ -452,7 +458,7 @@ export class CanvasManager implements CoordinateTransform {
         }
 
         const canvasRect = this.imageCanvas.getBoundingClientRect();
-        
+
         const screenX = canvasRect.left + (imageX * this.state.scale);
         const screenY = canvasRect.top + (imageY * this.state.scale);
 
@@ -486,15 +492,15 @@ export class CanvasManager implements CoordinateTransform {
 
         // Ensure binary values only (0 or 255)
         const binaryValue = value > 127 ? 255 : 0;
-        
+
         const index = y * this.state.imageWidth + x;
         if (this.state.maskData[index] !== binaryValue) {
             this.state.maskData[index] = binaryValue;
             this.state.isDirty = true;
-            
+
             // Update overlay for the single pixel (with small dirty rect for brush effects)
             this.updateMaskOverlay({ x: x - 1, y: y - 1, width: 3, height: 3 });
-            
+
             return true;
         }
 
@@ -524,7 +530,7 @@ export class CanvasManager implements CoordinateTransform {
 
         this.state.maskData.fill(0);
         this.state.isDirty = true;
-        
+
         // Update entire overlay
         this.updateMaskOverlay();
     }
@@ -537,7 +543,7 @@ export class CanvasManager implements CoordinateTransform {
 
         this.state.maskData.fill(255);
         this.state.isDirty = true;
-        
+
         // Update entire overlay
         this.updateMaskOverlay();
     }
@@ -570,7 +576,7 @@ export class CanvasManager implements CoordinateTransform {
 
         const containerWidth = containerRect.width;
         const containerHeight = containerRect.height;
-        
+
         const { displayWidth, displayHeight, scale } = this.calculateContainScaling(
             this.state.imageWidth,
             this.state.imageHeight,
@@ -599,16 +605,16 @@ export class CanvasManager implements CoordinateTransform {
         canvas.width = this.state.imageWidth;
         canvas.height = this.state.imageHeight;
         const ctx = canvas.getContext('2d');
-        
+
         if (!ctx) return null;
 
         const imageData = ctx.createImageData(this.state.imageWidth, this.state.imageHeight);
-        
+
         // Convert mask data to RGBA
         for (let i = 0; i < this.state.maskData.length; i++) {
             const pixelIndex = i * 4;
             const maskValue = this.state.maskData[i];
-            
+
             imageData.data[pixelIndex] = maskValue;     // R
             imageData.data[pixelIndex + 1] = maskValue; // G
             imageData.data[pixelIndex + 2] = maskValue; // B
@@ -643,7 +649,7 @@ export class CanvasManager implements CoordinateTransform {
 
         if (hasChanges) {
             this.state.isDirty = true;
-            
+
             // Calculate optimized dirty rectangle for the brush stamp
             const dirtyRect = this.calculateBrushDirtyRect(imageX, imageY, brushSize);
             this.renderScheduler.addDirtyRect(dirtyRect);
@@ -668,10 +674,10 @@ export class CanvasManager implements CoordinateTransform {
         try {
             // Get stamp positions along the path
             const stampPositions = this.brushEngine.continueStroke(imageX, imageY);
-            
+
             // Even if no stamps are needed now, the stroke is still being updated
             // Don't return early - let the endBrushStroke handle complete rendering
-            
+
             const settings = this.brushEngine.getSettings();
             let hasChanges = false;
             let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -688,7 +694,7 @@ export class CanvasManager implements CoordinateTransform {
                     settings.mode
                 )) {
                     hasChanges = true;
-                    
+
                     // Track bounds for dirty rectangle
                     const radius = Math.ceil(settings.size / 2);
                     minX = Math.min(minX, pos.x - radius);
@@ -700,7 +706,7 @@ export class CanvasManager implements CoordinateTransform {
 
             if (hasChanges) {
                 this.state.isDirty = true;
-                
+
                 // Calculate optimized dirty rectangle
                 const dirtyRect = {
                     x: Math.max(0, minX),
@@ -708,7 +714,7 @@ export class CanvasManager implements CoordinateTransform {
                     width: Math.min(this.state.imageWidth - Math.max(0, minX), maxX - Math.max(0, minX)),
                     height: Math.min(this.state.imageHeight - Math.max(0, minY), maxY - Math.max(0, minY))
                 };
-                
+
                 this.renderScheduler.addDirtyRect(dirtyRect);
                 this.updateMaskOverlay(dirtyRect);
             }
@@ -725,13 +731,13 @@ export class CanvasManager implements CoordinateTransform {
      */
     public endBrushStroke(): BrushStroke | null {
         const stroke = this.brushEngine.endStroke();
-        
+
         // Apply the complete stroke to ensure all points are rendered
         // This fixes issues with fast strokes where some points might be missed
         if (stroke && stroke.points.length > 1) {
             this.applyBrushStroke(stroke);
         }
-        
+
         return stroke;
     }
 
@@ -752,29 +758,29 @@ export class CanvasManager implements CoordinateTransform {
 
         if (hasChanges) {
             this.state.isDirty = true;
-            
+
             // Calculate dirty rectangle for the entire stroke
             if (stroke.points.length > 0) {
                 const radius = Math.ceil(stroke.brushSize / 2);
                 let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-                
+
                 for (const point of stroke.points) {
                     minX = Math.min(minX, point.x - radius);
                     minY = Math.min(minY, point.y - radius);
                     maxX = Math.max(maxX, point.x + radius);
                     maxY = Math.max(maxY, point.y + radius);
                 }
-                
+
                 const dirtyRect = {
                     x: Math.max(0, minX),
                     y: Math.max(0, minY),
                     width: Math.min(this.state.imageWidth - Math.max(0, minX), maxX - Math.max(0, minX)),
                     height: Math.min(this.state.imageHeight - Math.max(0, minY), maxY - Math.max(0, minY))
                 };
-                
+
                 this.updateMaskOverlay(dirtyRect);
             }
-            
+
             // Validate binary invariant
             if (!BrushEngine.validateBinaryMask(this.state.maskData)) {
                 console.warn('Binary mask invariant violated, enforcing binary values');
@@ -807,12 +813,12 @@ export class CanvasManager implements CoordinateTransform {
                 // Update mask data with worker result
                 this.state.maskData = result.maskData;
                 this.state.isDirty = true;
-                
+
                 // Update overlay with dirty rectangle from worker
                 if (result.dirtyRect.width > 0 && result.dirtyRect.height > 0) {
                     this.updateMaskOverlay(result.dirtyRect);
                 }
-                
+
                 // Validate binary invariant
                 const validation = await this.workerManager.validateMask(this.state.maskData);
                 if (!validation.isValid) {
@@ -875,14 +881,14 @@ export class CanvasManager implements CoordinateTransform {
 
         try {
             const result = await this.workerManager.validateMask(this.state.maskData);
-            
+
             if (!result.isValid) {
                 console.warn('Binary mask invariant violated, worker corrected it');
                 this.state.maskData = result.maskData;
                 this.state.isDirty = true;
                 this.updateMaskOverlay();
             }
-            
+
             return result.isValid;
         } catch (error) {
             console.warn('Async mask validation failed, falling back to sync:', error);
@@ -912,19 +918,19 @@ export class CanvasManager implements CoordinateTransform {
      */
     public applyTransform({ scale, translateX, translateY }: { scale: number; translateX: number; translateY: number }): void {
         if (!this.state) return;
-      
+
         const value =
-          `translate(-50%, -50%) ` +
-          `translate(${translateX}px, ${translateY}px) ` + // translate in screen px (applies after scale)
-          `scale(${scale})`;
-      
+            `translate(-50%, -50%) ` +
+            `translate(${translateX}px, ${translateY}px) ` + // translate in screen px (applies after scale)
+            `scale(${scale})`;
+
         const canvases = [this.imageCanvas, this.overlayCanvas];
         canvases.forEach(canvas => {
-          // Force override any CSS that might re-apply centering later
-          canvas.style.setProperty('transform', value, 'important');
-          canvas.style.setProperty('transform-origin', '50% 50%', 'important');
+            // Force override any CSS that might re-apply centering later
+            canvas.style.setProperty('transform', value, 'important');
+            canvas.style.setProperty('transform-origin', '50% 50%', 'important');
         });
-      }
+    }
 
     /**
      * Reset canvas transforms
@@ -933,10 +939,10 @@ export class CanvasManager implements CoordinateTransform {
         const value = 'translate(-50%, -50%)';
         const canvases = [this.imageCanvas, this.overlayCanvas];
         canvases.forEach(canvas => {
-          canvas.style.setProperty('transform', value, 'important');
-          canvas.style.setProperty('transform-origin', '50% 50%', 'important');
+            canvas.style.setProperty('transform', value, 'important');
+            canvas.style.setProperty('transform-origin', '50% 50%', 'important');
         });
-      }
+    }
 
     /**
      * Calculate dirty rectangle for a brush operation
