@@ -93,15 +93,6 @@ def share():
         return redirect(url_for("login"))
     return render_template("share.html")
 
-
-@app.route("/test-inpainting-canvas")
-def test_inpainting_canvas():
-    """Test endpoint for the inpainting mask canvas functionality."""
-    if "username" not in session:
-        return redirect(url_for("login"))
-    return render_template("test-inpainting-canvas.html")
-
-
 @app.route("/save-mask", methods=["POST"])
 def save_mask():
     """Save uploaded mask file for inpainting operations."""
