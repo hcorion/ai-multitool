@@ -72,6 +72,50 @@ export class InpaintingMaskCanvas {
         ctx.putImageData(imageData, 0, 0);
         return exportCanvas.toDataURL('image/png');
     }
+    /**
+     * Export mask asynchronously using WebWorker (with fallback)
+     */
+    async exportMaskAsync() {
+        if (!this.canvasManager) {
+            throw new Error('Canvas not initialized');
+        }
+        const state = this.canvasManager.getState();
+        if (!state) {
+            throw new Error('No image loaded');
+        }
+        try {
+            // Export mask using WebWorker (with fallback)
+            const exportResult = await this.canvasManager.exportMaskAsync();
+            if (!exportResult) {
+                throw new Error('Failed to export mask data');
+            }
+            // Create a temporary canvas for export
+            const exportCanvas = document.createElement('canvas');
+            exportCanvas.width = exportResult.imageWidth;
+            exportCanvas.height = exportResult.imageHeight;
+            const ctx = exportCanvas.getContext('2d');
+            if (!ctx) {
+                throw new Error('Failed to get export canvas context');
+            }
+            // Convert mask data to ImageData
+            const imageData = ctx.createImageData(exportResult.imageWidth, exportResult.imageHeight);
+            // Convert mask data to RGBA
+            for (let i = 0; i < exportResult.maskData.length; i++) {
+                const pixelIndex = i * 4;
+                const maskValue = exportResult.maskData[i];
+                imageData.data[pixelIndex] = maskValue; // R
+                imageData.data[pixelIndex + 1] = maskValue; // G
+                imageData.data[pixelIndex + 2] = maskValue; // B
+                imageData.data[pixelIndex + 3] = 255; // A
+            }
+            ctx.putImageData(imageData, 0, 0);
+            return exportCanvas.toDataURL('image/png');
+        }
+        catch (error) {
+            console.warn('Async mask export failed, falling back to sync:', error);
+            return this.exportMask();
+        }
+    }
     createPopupStructure() {
         // Create the main popup overlay
         this.popupElement = document.createElement('div');
@@ -191,6 +235,8 @@ export class InpaintingMaskCanvas {
         this.canvasManager = new CanvasManager(this.imageCanvas, this.overlayCanvas, this.maskAlphaCanvas);
         // Create history manager
         this.historyManager = new HistoryManager(250); // 250MB memory limit
+        // Connect history manager to canvas manager's worker manager
+        this.historyManager.setWorkerManager(this.canvasManager.getWorkerManager());
         // Create input engine for the overlay canvas (drawing surface)
         console.log('Creating input engine for overlay canvas:', this.overlayCanvas);
         this.inputEngine = new InputEngine(this.overlayCanvas, {
@@ -322,8 +368,22 @@ export class InpaintingMaskCanvas {
             this.setupBrushSizeDragResize(brushSizeDragHandle, brushSizeSlider, brushSizeValue);
         }
         // History controls
-        undoBtn?.addEventListener('click', () => this.undo());
-        redoBtn?.addEventListener('click', () => this.redo());
+        undoBtn?.addEventListener('click', async () => {
+            try {
+                await this.undo();
+            }
+            catch (error) {
+                console.error('Undo operation failed:', error);
+            }
+        });
+        redoBtn?.addEventListener('click', async () => {
+            try {
+                await this.redo();
+            }
+            catch (error) {
+                console.error('Redo operation failed:', error);
+            }
+        });
         // Zoom controls
         zoomInBtn?.addEventListener('click', () => this.zoomIn());
         zoomOutBtn?.addEventListener('click', () => this.zoomOut());
@@ -497,7 +557,7 @@ export class InpaintingMaskCanvas {
         // Prevent context menu on drag handle
         dragHandle.addEventListener('contextmenu', (e) => e.preventDefault());
     }
-    undo() {
+    async undo() {
         if (!this.historyManager || !this.canvasManager) {
             console.warn('History manager or canvas manager not initialized');
             return;
@@ -505,14 +565,14 @@ export class InpaintingMaskCanvas {
         const undoneStroke = this.historyManager.undo();
         if (undoneStroke) {
             console.log('Undoing stroke:', undoneStroke.id);
-            this.replayHistoryToCurrentState();
+            await this.replayHistoryToCurrentStateAsync();
             this.updateHistoryButtons();
         }
         else {
             console.log('Nothing to undo');
         }
     }
-    redo() {
+    async redo() {
         if (!this.historyManager || !this.canvasManager) {
             console.warn('History manager or canvas manager not initialized');
             return;
@@ -520,7 +580,7 @@ export class InpaintingMaskCanvas {
         const redoneStroke = this.historyManager.redo();
         if (redoneStroke) {
             console.log('Redoing stroke:', redoneStroke.id);
-            this.replayHistoryToCurrentState();
+            await this.replayHistoryToCurrentStateAsync();
             this.updateHistoryButtons();
         }
         else {
@@ -546,14 +606,23 @@ export class InpaintingMaskCanvas {
             this.zoomPanController.resetTransform();
         }
     }
-    completeMask() {
+    async completeMask() {
         try {
-            const maskDataUrl = this.exportMask();
+            const maskDataUrl = await this.exportMaskAsync();
             this.config.onMaskComplete(maskDataUrl);
             this.hide();
         }
         catch (error) {
             console.error('Failed to complete mask:', error);
+            // Fallback to sync export
+            try {
+                const maskDataUrl = this.exportMask();
+                this.config.onMaskComplete(maskDataUrl);
+                this.hide();
+            }
+            catch (fallbackError) {
+                console.error('Fallback export also failed:', fallbackError);
+            }
         }
     }
     cancelMask() {
@@ -570,10 +639,10 @@ export class InpaintingMaskCanvas {
             case 'z':
                 if (event.ctrlKey || event.metaKey) {
                     if (event.shiftKey) {
-                        this.redo();
+                        this.redo().catch(error => console.error('Redo operation failed:', error));
                     }
                     else {
-                        this.undo();
+                        this.undo().catch(error => console.error('Undo operation failed:', error));
                     }
                     event.preventDefault();
                 }
@@ -677,22 +746,70 @@ export class InpaintingMaskCanvas {
         else if (evt.type === 'end') {
             const completedStroke = this.canvasManager.endBrushStroke();
             if (completedStroke && this.historyManager) {
-                // Get current mask data for periodic checkpoints
-                const state = this.canvasManager.getState();
-                // Add the completed stroke to history (with mask data for periodic checkpoints)
-                const strokeCommand = this.historyManager.addStroke(completedStroke, state?.maskData);
-                console.log('Added stroke to history:', strokeCommand.id);
-                // Update history button states
-                this.updateHistoryButtons();
-                // Create checkpoint periodically for better performance (legacy - now handled automatically)
-                if (state && this.historyManager.getState().strokeCount % 10 === 0) {
-                    this.historyManager.createCheckpoint(state.maskData);
-                    console.log(`Created checkpoint after ${this.historyManager.getState().strokeCount} strokes`);
-                }
+                // Process stroke asynchronously using WebWorker (with fallback)
+                this.processStrokeAsync(completedStroke);
             }
             this.currentStroke = null;
         }
     };
+    /**
+     * Process a completed stroke asynchronously using WebWorker
+     */
+    async processStrokeAsync(completedStroke) {
+        if (!this.canvasManager || !this.historyManager)
+            return;
+        try {
+            // Get current mask data for periodic checkpoints
+            const state = this.canvasManager.getState();
+            if (!state)
+                return;
+            // Add the completed stroke to history (stroke was already applied during drawing)
+            const strokeCommand = this.historyManager.addStroke(completedStroke, state.maskData);
+            console.log('Added stroke to history (async):', strokeCommand.id);
+            // Update history button states
+            this.updateHistoryButtons();
+            // Create checkpoint periodically using WebWorker (with fallback)
+            if (this.historyManager.getState().strokeCount % 10 === 0) {
+                try {
+                    const checkpoint = await this.historyManager.createTileBasedCheckpointAsync(state.maskData);
+                    console.log(`Created async checkpoint after ${this.historyManager.getState().strokeCount} strokes:`, checkpoint.id);
+                }
+                catch (error) {
+                    console.warn('Async checkpoint creation failed, using sync fallback:', error);
+                    this.historyManager.createCheckpoint(state.maskData);
+                }
+            }
+            // Validate mask periodically using WebWorker (with fallback)
+            if (this.historyManager.getState().strokeCount % 20 === 0) {
+                try {
+                    const isValid = await this.canvasManager.validateMaskAsync();
+                    if (!isValid) {
+                        console.log('Mask binary invariant corrected by WebWorker');
+                    }
+                }
+                catch (error) {
+                    console.warn('Async mask validation failed, using sync fallback:', error);
+                    this.canvasManager.validateMaskBinary();
+                }
+            }
+        }
+        catch (error) {
+            console.error('Async stroke processing failed:', error);
+            // Fallback to synchronous processing
+            console.log('Falling back to synchronous stroke processing');
+            const state = this.canvasManager.getState();
+            if (state && this.historyManager) {
+                const strokeCommand = this.historyManager.addStroke(completedStroke, state.maskData);
+                console.log('Added stroke to history (sync fallback):', strokeCommand.id);
+                this.updateHistoryButtons();
+                // Sync checkpoint creation as fallback
+                if (this.historyManager.getState().strokeCount % 10 === 0) {
+                    this.historyManager.createCheckpoint(state.maskData);
+                    console.log(`Created sync checkpoint after ${this.historyManager.getState().strokeCount} strokes`);
+                }
+            }
+        }
+    }
     /**
      * Set up performance monitoring integration
      */
@@ -839,6 +956,59 @@ export class InpaintingMaskCanvas {
         if (currentStrokes.length > 0 && currentStrokes.length % 20 === 0) {
             this.historyManager.createCheckpoint(state.maskData);
             console.log(`Created checkpoint at stroke ${historyState.currentIndex}`);
+        }
+    }
+    /**
+     * Replay history from the nearest checkpoint to the current state using WebWorker (with fallback)
+     */
+    async replayHistoryToCurrentStateAsync() {
+        if (!this.historyManager || !this.canvasManager)
+            return;
+        const state = this.canvasManager.getState();
+        if (!state)
+            return;
+        const currentStrokes = this.historyManager.getCurrentStrokes();
+        const historyState = this.historyManager.getState();
+        try {
+            // Find the nearest checkpoint
+            const nearestCheckpoint = this.historyManager.getNearestCheckpoint(historyState.currentIndex);
+            if (nearestCheckpoint) {
+                // Restore from checkpoint
+                console.log(`Restoring from checkpoint at stroke ${nearestCheckpoint.strokeIndex} (async)`);
+                const reconstructedMask = this.historyManager.reconstructMaskFromCheckpoint(nearestCheckpoint);
+                state.maskData.set(reconstructedMask);
+                // Replay strokes from checkpoint to current state using WebWorker
+                const strokesToReplay = this.historyManager.getStrokesFromCheckpoint(nearestCheckpoint, historyState.currentIndex);
+                console.log(`Replaying ${strokesToReplay.length} strokes from checkpoint (async)`);
+                for (const stroke of strokesToReplay) {
+                    await this.canvasManager.applyBrushStrokeAsync(stroke);
+                }
+            }
+            else {
+                // No checkpoint available, replay all strokes from empty mask
+                console.log(`No checkpoint found, replaying all ${currentStrokes.length} strokes from empty mask (async)`);
+                state.maskData.fill(0); // Clear mask
+                for (const stroke of currentStrokes) {
+                    await this.canvasManager.applyBrushStrokeAsync(stroke);
+                }
+            }
+            // Update the overlay to reflect the new state
+            this.canvasManager.updateMaskOverlay();
+            // Create a new checkpoint periodically for performance using WebWorker
+            if (currentStrokes.length > 0 && currentStrokes.length % 20 === 0) {
+                try {
+                    const checkpoint = await this.historyManager.createTileBasedCheckpointAsync(state.maskData);
+                    console.log(`Created async checkpoint at stroke ${historyState.currentIndex}:`, checkpoint.id);
+                }
+                catch (error) {
+                    console.warn('Async checkpoint creation failed during replay, using sync fallback:', error);
+                    this.historyManager.createCheckpoint(state.maskData);
+                }
+            }
+        }
+        catch (error) {
+            console.warn('Async history replay failed, falling back to sync:', error);
+            this.replayHistoryToCurrentState();
         }
     }
     /**

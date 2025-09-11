@@ -14,8 +14,10 @@ export class HistoryManager {
     tileSize = 256; // 256x256 tiles
     strokesSinceLastCheckpoint = 0;
     checkpointInterval = 20; // Create checkpoint every 20 strokes
-    constructor(maxMemoryMB = 250) {
+    workerManager = null;
+    constructor(maxMemoryMB = 250, workerManager) {
         this.maxMemoryMB = maxMemoryMB;
+        this.workerManager = workerManager || null;
     }
     /**
      * Add a new stroke to the history
@@ -114,6 +116,12 @@ export class HistoryManager {
         this.imageHeight = height;
     }
     /**
+     * Set the WorkerManager for async operations
+     */
+    setWorkerManager(workerManager) {
+        this.workerManager = workerManager;
+    }
+    /**
      * Create a checkpoint of the current mask state (legacy method for compatibility)
      */
     createCheckpoint(maskData) {
@@ -146,6 +154,41 @@ export class HistoryManager {
         // Manage memory after adding checkpoint
         this.manageMemory();
         return checkpoint;
+    }
+    /**
+     * Create a tile-based checkpoint using WebWorker (with fallback)
+     */
+    async createTileBasedCheckpointAsync(maskData) {
+        if (this.imageWidth === 0 || this.imageHeight === 0) {
+            throw new Error('Image dimensions must be set before creating tile-based checkpoints');
+        }
+        if (this.workerManager) {
+            try {
+                const result = await this.workerManager.createCheckpoint(maskData, this.imageWidth, this.imageHeight, this.tileSize, this.currentIndex);
+                const checkpoint = {
+                    tiles: result.tiles,
+                    timestamp: result.timestamp,
+                    strokeIndex: result.strokeIndex,
+                    id: `checkpoint_${this.nextCheckpointId++}`,
+                    imageWidth: result.imageWidth,
+                    imageHeight: result.imageHeight,
+                    tileSize: result.tileSize
+                };
+                this.checkpoints.push(checkpoint);
+                // Keep checkpoints sorted by stroke index
+                this.checkpoints.sort((a, b) => a.strokeIndex - b.strokeIndex);
+                // Manage memory after adding checkpoint
+                this.manageMemory();
+                return checkpoint;
+            }
+            catch (error) {
+                console.warn('Async checkpoint creation failed, falling back to sync:', error);
+                return this.createTileBasedCheckpoint(maskData);
+            }
+        }
+        else {
+            return this.createTileBasedCheckpoint(maskData);
+        }
     }
     /**
      * Create a full checkpoint (stores complete mask data)

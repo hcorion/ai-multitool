@@ -5,6 +5,7 @@
 import { BrushEngine } from './brush-engine.js';
 import { RenderScheduler } from './render-scheduler.js';
 import { PerformanceMonitor } from './performance-monitor.js';
+import { WorkerManager } from './worker-manager.js';
 export class CanvasManager {
     imageCanvas;
     overlayCanvas;
@@ -14,6 +15,7 @@ export class CanvasManager {
     brushEngine;
     renderScheduler;
     performanceMonitor;
+    workerManager;
     // Performance optimization flags
     lastOverlayUpdateTime = 0;
     overlayUpdateThrottle = 16.67; // ~60 FPS
@@ -30,6 +32,8 @@ export class CanvasManager {
             enableMemoryTracking: true,
             warningThreshold: 45
         });
+        // Initialize worker manager for heavy operations
+        this.workerManager = new WorkerManager();
         this.setupRenderCallbacks();
         this.setupPerformanceMonitoring();
     }
@@ -602,10 +606,88 @@ export class CanvasManager {
         return hasChanges;
     }
     /**
+     * Apply a complete brush stroke path using WebWorker (with fallback)
+     */
+    async applyBrushStrokeAsync(stroke) {
+        if (!this.state)
+            return false;
+        try {
+            const result = await this.workerManager.applyStrokePath(this.state.maskData, this.state.imageWidth, this.state.imageHeight, stroke.points, stroke.brushSize, stroke.mode);
+            if (result.hasChanges) {
+                // Update mask data with worker result
+                this.state.maskData = result.maskData;
+                this.state.isDirty = true;
+                // Update overlay with dirty rectangle from worker
+                if (result.dirtyRect.width > 0 && result.dirtyRect.height > 0) {
+                    this.updateMaskOverlay(result.dirtyRect);
+                }
+                // Validate binary invariant
+                const validation = await this.workerManager.validateMask(this.state.maskData);
+                if (!validation.isValid) {
+                    console.warn('Binary mask invariant violated, worker corrected it');
+                    this.state.maskData = validation.maskData;
+                    // Re-render overlay after correction
+                    this.updateMaskOverlay();
+                }
+            }
+            return result.hasChanges;
+        }
+        catch (error) {
+            console.warn('Async brush stroke failed, falling back to sync:', error);
+            return this.applyBrushStroke(stroke);
+        }
+    }
+    /**
      * Get the brush engine instance
      */
     getBrushEngine() {
         return this.brushEngine;
+    }
+    /**
+     * Get the worker manager instance
+     */
+    getWorkerManager() {
+        return this.workerManager;
+    }
+    /**
+     * Export mask data using WebWorker (with fallback)
+     */
+    async exportMaskAsync() {
+        if (!this.state)
+            return null;
+        try {
+            const result = await this.workerManager.exportMask(this.state.maskData, this.state.imageWidth, this.state.imageHeight);
+            return result;
+        }
+        catch (error) {
+            console.warn('Async mask export failed, falling back to sync:', error);
+            return {
+                maskData: new Uint8Array(this.state.maskData),
+                imageWidth: this.state.imageWidth,
+                imageHeight: this.state.imageHeight
+            };
+        }
+    }
+    /**
+     * Validate mask binary invariant using WebWorker (with fallback)
+     */
+    async validateMaskAsync() {
+        if (!this.state)
+            return true;
+        try {
+            const result = await this.workerManager.validateMask(this.state.maskData);
+            if (!result.isValid) {
+                console.warn('Binary mask invariant violated, worker corrected it');
+                this.state.maskData = result.maskData;
+                this.state.isDirty = true;
+                this.updateMaskOverlay();
+            }
+            return result.isValid;
+        }
+        catch (error) {
+            console.warn('Async mask validation failed, falling back to sync:', error);
+            return this.validateMaskBinary();
+        }
     }
     /**
      * Validate that the current mask maintains binary invariant
@@ -691,7 +773,26 @@ export class CanvasManager {
         this.resetTransform();
         this.performanceMonitor.stop();
         this.renderScheduler.cleanup();
+        this.workerManager.cleanup();
         this.state = null;
         this.loadedImage = null;
+    }
+    /**
+     * Get performance statistics including worker status
+     */
+    getPerformanceStats() {
+        return {
+            canvas: {
+                state: this.state ? {
+                    imageWidth: this.state.imageWidth,
+                    imageHeight: this.state.imageHeight,
+                    isDirty: this.state.isDirty
+                } : null,
+                hasLoadedImage: this.loadedImage !== null
+            },
+            render: this.renderScheduler.getPerformanceMetrics(),
+            performance: this.performanceMonitor.getMetrics(),
+            worker: this.workerManager.getPerformanceStats()
+        };
     }
 }
