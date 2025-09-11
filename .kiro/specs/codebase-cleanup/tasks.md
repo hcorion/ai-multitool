@@ -13,7 +13,12 @@
   - Verify TypeScript compilation succeeds after moves
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5_
 
-- [ ] 2. Clean up redundant reasoning API tests
+- [x] 2. Clean up redundant reasoning API tests
+
+
+
+
+
   - Analyze reasoning test files to identify overlapping functionality
   - Consolidate `test_reasoning_*.py` files into core reasoning tests
   - Remove duplicate integration tests and redundant error handling tests
