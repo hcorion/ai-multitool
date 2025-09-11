@@ -431,12 +431,14 @@ class NovelAIClient:
             **kwargs,
         )
 
+        # Add image and mask to parameters structure
+        parameters["image"] = base_image_b64
+        parameters["mask"] = mask_b64
+
         payload = {
             "action": NovelAIAction.INPAINT.value,
             "model": NovelAIModel.DIFFUSION_4_5_FULL_INPAINTING.value,
             "parameters": parameters,
-            "image": base_image_b64,
-            "mask": mask_b64,
         }
 
         response = self._make_request("ai/generate-image", payload)

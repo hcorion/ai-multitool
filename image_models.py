@@ -167,7 +167,11 @@ class ImageRequestValidator:
 
 def create_request_from_form_data(form_data: Dict[str, Any]) -> Union[ImageGenerationRequest, InpaintingRequest, Img2ImgRequest]:
     """Factory function to create appropriate request object from form data."""
-    operation = Operation(form_data.get("operation", Operation.GENERATE.value))
+    # Handle empty operation field - default to GENERATE for regular image generation
+    operation_value = form_data.get("operation", Operation.GENERATE.value)
+    if not operation_value or operation_value.strip() == "":
+        operation_value = Operation.GENERATE.value
+    operation = Operation(operation_value)
     provider = Provider(form_data.get("provider", Provider.OPENAI.value))
     
     # Validate provider-operation compatibility

@@ -27,9 +27,44 @@ document.addEventListener("DOMContentLoaded", () => {
                 },
                 error: (xhr) => {
                     let errorMessage = "An error occurred while generating the image.";
-                    if (xhr.responseJSON && xhr.responseJSON.error) {
-                        errorMessage = xhr.responseJSON.error;
+                    // Try to extract detailed error information
+                    if (xhr.responseJSON) {
+                        if (xhr.responseJSON.error_message) {
+                            errorMessage = xhr.responseJSON.error_message;
+                        }
+                        else if (xhr.responseJSON.error) {
+                            errorMessage = xhr.responseJSON.error;
+                        }
+                        // Add additional error details if available
+                        if (xhr.responseJSON.error_type) {
+                            errorMessage += ` (${xhr.responseJSON.error_type})`;
+                        }
                     }
+                    else if (xhr.responseText) {
+                        // Try to parse error from response text
+                        try {
+                            const errorData = JSON.parse(xhr.responseText);
+                            if (errorData.error_message) {
+                                errorMessage = errorData.error_message;
+                            }
+                            else if (errorData.error) {
+                                errorMessage = errorData.error;
+                            }
+                        }
+                        catch (e) {
+                            // If parsing fails, include the raw response text for debugging
+                            errorMessage += ` (Status: ${xhr.status}, Response: ${xhr.responseText.substring(0, 200)})`;
+                        }
+                    }
+                    else {
+                        errorMessage += ` (HTTP ${xhr.status}: ${xhr.statusText})`;
+                    }
+                    console.error('Image generation error:', {
+                        status: xhr.status,
+                        statusText: xhr.statusText,
+                        responseJSON: xhr.responseJSON,
+                        responseText: xhr.responseText
+                    });
                     renderImageError(errorMessage);
                     $("#loading-spinner").hide();
                 }
@@ -48,7 +83,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     $("#loading-spinner").hide();
                 },
                 error: () => {
-                    renderImageError("An error occurred while generating the image.");
+                    renderImageError("An error occurred while generating the image with legacy endpoint.");
                     $("#loading-spinner").hide();
                 }
             });
@@ -838,20 +873,38 @@ async function setupInpaintingMode(baseImageUrl, maskDataUrl, maskFileId, origin
  * Save mask data URL to server and return the server path
  */
 async function saveMaskToServer(maskDataUrl) {
-    const formData = new FormData();
-    // Convert data URL to blob
-    const response = await fetch(maskDataUrl);
-    const blob = await response.blob();
-    formData.append('mask', blob, 'mask.png');
-    const saveResponse = await fetch('/save-mask', {
-        method: 'POST',
-        body: formData
-    });
-    if (!saveResponse.ok) {
-        throw new Error('Failed to save mask to server');
+    try {
+        console.log('Saving mask to server, data URL length:', maskDataUrl.length);
+        const formData = new FormData();
+        // Convert data URL to blob
+        const response = await fetch(maskDataUrl);
+        if (!response.ok) {
+            throw new Error(`Failed to convert data URL to blob: ${response.status} ${response.statusText}`);
+        }
+        const blob = await response.blob();
+        console.log('Converted to blob, size:', blob.size, 'type:', blob.type);
+        formData.append('mask', blob, 'mask.png');
+        const saveResponse = await fetch('/save-mask', {
+            method: 'POST',
+            body: formData
+        });
+        console.log('Save response status:', saveResponse.status, saveResponse.statusText);
+        if (!saveResponse.ok) {
+            const errorText = await saveResponse.text();
+            console.error('Save mask error response:', errorText);
+            throw new Error(`Failed to save mask to server: ${saveResponse.status} ${saveResponse.statusText} - ${errorText}`);
+        }
+        const result = await saveResponse.json();
+        console.log('Mask saved successfully:', result);
+        if (!result.success) {
+            throw new Error(result.error || 'Unknown error saving mask');
+        }
+        return result.mask_path;
     }
-    const result = await saveResponse.json();
-    return result.mask_path;
+    catch (error) {
+        console.error('Error in saveMaskToServer:', error);
+        throw error;
+    }
 }
 /**
  * Extract image path from full URL
@@ -859,7 +912,8 @@ async function saveMaskToServer(maskDataUrl) {
 function extractImagePathFromUrl(imageUrl) {
     // Extract the path part from URLs like /static/images/username/image.png
     const url = new URL(imageUrl, window.location.origin);
-    return url.pathname;
+    // Remove leading slash to make it relative for Flask
+    return url.pathname.startsWith('/') ? url.pathname.substring(1) : url.pathname;
 }
 /**
  * Show the inpainting section and populate it with image and mask data

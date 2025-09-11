@@ -107,39 +107,55 @@ def save_mask():
     """Save uploaded mask file for inpainting operations."""
     if "username" not in session:
         return jsonify({"error": "Not authenticated"}), 401
-    
+
     if "mask" not in request.files:
         return jsonify({"error": "No mask file provided"}), 400
-    
+
     mask_file = request.files["mask"]
     if mask_file.filename == "":
         return jsonify({"error": "No mask file selected"}), 400
-    
+
     try:
         username = session["username"]
-        
+
         # Create user directory if it doesn't exist
         user_dir = os.path.join(app.static_folder, "images", username)
         os.makedirs(user_dir, exist_ok=True)
-        
+
         # Generate unique filename for the mask
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         mask_filename = f"mask_{timestamp}.png"
         mask_path = os.path.join(user_dir, mask_filename)
-        
+
         # Save the mask file
         mask_file.save(mask_path)
-        
-        # Return the relative path for use in inpainting requests
-        relative_path = f"/static/images/{username}/{mask_filename}"
-        
-        return jsonify({
-            "success": True,
-            "mask_path": relative_path,
-            "filename": mask_filename
-        })
-        
+
+        # Verify the file was saved correctly
+        if not os.path.exists(mask_path):
+            raise IOError(f"Mask file was not saved correctly: {mask_path}")
+
+        # Get file size for verification
+        file_size = os.path.getsize(mask_path)
+
+        # Return the relative path for use in inpainting requests (without leading slash for Flask)
+        relative_path = f"static/images/{username}/{mask_filename}"
+
+        # Log successful save for debugging
+        print(f"Mask saved successfully: {mask_path} ({file_size} bytes)")
+
+        return jsonify(
+            {
+                "success": True,
+                "mask_path": relative_path,
+                "filename": mask_filename,
+                "file_size": file_size,
+            }
+        )
+
     except Exception as e:
+        import logging
+
+        logging.error(f"Error saving mask: {e}", exc_info=True)
         return jsonify({"error": f"Failed to save mask: {str(e)}"}), 500
 
 
@@ -703,6 +719,7 @@ class ConversationManager:
             conversation = self.get_conversation(username, conversation_id)
             if not conversation:
                 import logging
+
                 logging.warning(
                     f"Conversation {conversation_id} not found for user {username} when retrieving reasoning data"
                 )
@@ -711,6 +728,7 @@ class ConversationManager:
             # Validate message index
             if message_index < 0 or message_index >= len(conversation.messages):
                 import logging
+
                 logging.warning(
                     f"Invalid message index {message_index} for conversation {conversation_id}. "
                     f"Valid range: 0-{len(conversation.messages) - 1}"
@@ -721,6 +739,7 @@ class ConversationManager:
 
             # Log message details for debugging
             import logging
+
             logging.debug(
                 f"Retrieving reasoning data for message {message_index} in conversation {conversation_id}: "
                 f"role={message.role}, has_reasoning={message.reasoning_data is not None}"
@@ -733,6 +752,7 @@ class ConversationManager:
                     validated_data = validate_reasoning_data(message.reasoning_data)
                     if validated_data:
                         import logging
+
                         summary_length = len(validated_data.get("complete_summary", ""))
                         parts_count = len(validated_data.get("summary_parts", []))
                         logging.debug(
@@ -741,12 +761,14 @@ class ConversationManager:
                     return validated_data
                 except ValueError as e:
                     import logging
+
                     logging.warning(
                         f"Invalid reasoning data for message {message_index} in conversation {conversation_id}: {e}"
                     )
                     return None
             else:
                 import logging
+
                 logging.debug(
                     f"No reasoning data available for message {message_index} in conversation {conversation_id}"
                 )
@@ -755,6 +777,7 @@ class ConversationManager:
 
         except Exception as e:
             import logging
+
             logging.error(
                 f"Unexpected error retrieving reasoning data for message {message_index} in conversation {conversation_id}: {e}",
                 exc_info=True,
@@ -825,34 +848,45 @@ class ConversationManager:
                     "available": False,
                     "reason": "conversation_not_found",
                     "message_count": 0,
-                    "reasoning_count": 0
+                    "reasoning_count": 0,
                 }
 
             total_messages = len(conversation.messages)
-            assistant_messages = [msg for msg in conversation.messages if msg.role == "assistant"]
-            messages_with_reasoning = [msg for msg in assistant_messages if msg.reasoning_data]
+            assistant_messages = [
+                msg for msg in conversation.messages if msg.role == "assistant"
+            ]
+            messages_with_reasoning = [
+                msg for msg in assistant_messages if msg.reasoning_data
+            ]
 
             return {
                 "available": len(messages_with_reasoning) > 0,
-                "reason": "available" if len(messages_with_reasoning) > 0 else "no_reasoning_data",
+                "reason": "available"
+                if len(messages_with_reasoning) > 0
+                else "no_reasoning_data",
                 "message_count": total_messages,
                 "assistant_message_count": len(assistant_messages),
                 "reasoning_count": len(messages_with_reasoning),
-                "reasoning_percentage": (len(messages_with_reasoning) / len(assistant_messages) * 100) if assistant_messages else 0
+                "reasoning_percentage": (
+                    len(messages_with_reasoning) / len(assistant_messages) * 100
+                )
+                if assistant_messages
+                else 0,
             }
 
         except Exception as e:
             import logging
+
             logging.error(
                 f"Error getting reasoning availability status for conversation {conversation_id}: {e}",
-                exc_info=True
+                exc_info=True,
             )
             return {
                 "available": False,
                 "reason": "error",
                 "message_count": 0,
                 "reasoning_count": 0,
-                "error": str(e)
+                "error": str(e),
             }
 
 
@@ -889,9 +923,11 @@ code
             try:
                 params["reasoning"] = {"effort": "high", "summary": "detailed"}
                 import logging
+
                 logging.debug("Added reasoning configuration to API request")
             except Exception as e:
                 import logging
+
                 logging.warning(f"Failed to add reasoning configuration: {e}")
                 # Continue without reasoning - chat should still work
 
@@ -1353,6 +1389,7 @@ def generate_novelai_inpaint_image(
     username: str,
     size: tuple[int, int],
     seed: int = 0,
+    character_prompts: Optional[List[Dict[str, str]]] = None,
 ) -> GeneratedImageData:
     """Generate an inpainted image using NovelAI and return processed data."""
     if not app.static_folder:
@@ -1362,6 +1399,20 @@ def generate_novelai_inpaint_image(
         raise ValueError("NovelAI API key not configured")
 
     revised_prompt = make_prompt_dynamic(prompt, username, app.static_folder, seed)
+
+    # Process character prompts if provided
+    processed_character_prompts = []
+    if character_prompts:
+        try:
+            processed_character_prompts = make_character_prompts_dynamic(
+                character_prompts,
+                username,
+                app.static_folder,
+                seed,
+            )
+        except (ValueError, LookupError) as e:
+            raise ValueError(f"Error processing character prompts: {str(e)}")
+
     width, height = size
 
     # Create NovelAI client
@@ -1377,6 +1428,7 @@ def generate_novelai_inpaint_image(
             width=width,
             height=height,
             seed=seed,
+            character_prompts=processed_character_prompts,
         )
 
         file_bytes = io.BytesIO(image_bytes)
@@ -1391,6 +1443,33 @@ def generate_novelai_inpaint_image(
         }
         if negative_prompt:
             image_metadata["Negative Prompt"] = negative_prompt
+
+        # Add character prompt metadata (both original and processed)
+        if character_prompts and processed_character_prompts:
+            for i, (original_char_prompt, processed_char_prompt) in enumerate(
+                zip(character_prompts, processed_character_prompts)
+            ):
+                char_num = i + 1
+                # Only include character metadata if positive prompt exists
+                if original_char_prompt.get("positive", "").strip():
+                    # Save original prompt (with dynamic prompt syntax) for copying
+                    image_metadata[f"Character {char_num} Prompt"] = (
+                        original_char_prompt["positive"]
+                    )
+                    # Save processed prompt for reference
+                    image_metadata[f"Character {char_num} Processed Prompt"] = (
+                        processed_char_prompt["positive"]
+                    )
+
+                    # Only include negative prompts if they exist
+                    if original_char_prompt.get("negative", "").strip():
+                        image_metadata[f"Character {char_num} Negative"] = (
+                            original_char_prompt["negative"]
+                        )
+                    if processed_char_prompt.get("negative", "").strip():
+                        image_metadata[f"Character {char_num} Processed Negative"] = (
+                            processed_char_prompt["negative"]
+                        )
 
         saved_data = process_image_response(
             file_bytes, prompt, revised_prompt, username, image_metadata
@@ -2291,6 +2370,30 @@ def _handle_inpainting_request(
 ) -> ImageOperationResponse:
     """Handle inpainting requests."""
     try:
+        # Validate inpainting request parameters
+        if not image_request.base_image_path:
+            raise ValueError("Base image path is required for inpainting")
+
+        if not image_request.mask_path:
+            raise ValueError("Mask path is required for inpainting")
+
+        if not image_request.prompt:
+            raise ValueError("Prompt is required for inpainting")
+
+        # Check if files exist and are readable
+        if not os.path.exists(image_request.base_image_path):
+            raise FileNotFoundError(
+                f"Base image file not found: {image_request.base_image_path}"
+            )
+
+        if not os.path.exists(image_request.mask_path):
+            raise FileNotFoundError(f"Mask file not found: {image_request.mask_path}")
+
+        # Generate a seed for the provider
+        seed = generate_seed_for_provider(image_request.provider.value)
+        if not seed:
+            raise ValueError("Unable to generate seed for provider")
+
         # Route to appropriate provider inpainting function
         if image_request.provider == Provider.OPENAI:
             # Use OpenAI inpainting
@@ -2299,14 +2402,18 @@ def _handle_inpainting_request(
                 mask_path=image_request.mask_path,
                 prompt=image_request.prompt,
                 username=session["username"],
+                seed=seed,
             )
         elif image_request.provider == Provider.NOVELAI:
             # Use NovelAI inpainting
-            # Read and encode images
-            with open(image_request.base_image_path, "rb") as f:
-                base_image_data = f.read()
-            with open(image_request.mask_path, "rb") as f:
-                mask_data = f.read()
+            try:
+                # Read and encode images
+                with open(image_request.base_image_path, "rb") as f:
+                    base_image_data = f.read()
+                with open(image_request.mask_path, "rb") as f:
+                    mask_data = f.read()
+            except IOError as e:
+                raise IOError(f"Failed to read image files: {str(e)}")
 
             generated_data = generate_novelai_inpaint_image(
                 base_image=base_image_data,
@@ -2315,6 +2422,8 @@ def _handle_inpainting_request(
                 negative_prompt=image_request.negative_prompt,
                 username=session["username"],
                 size=(image_request.width, image_request.height),
+                seed=seed,
+                character_prompts=image_request.character_prompts,
             )
         else:
             raise ValueError(
@@ -2334,9 +2443,25 @@ def _handle_inpainting_request(
             revised_prompt=revised_prompt,
         )
 
-    except Exception as e:
+    except (ValueError, FileNotFoundError, IOError) as e:
+        # These are user-facing errors that should be shown to the user
         return create_error_response(
-            error=e, provider=image_request.provider, operation=image_request.operation
+            error=e,
+            provider=image_request.provider,
+            operation=image_request.operation,
+            error_message=str(e),
+        )
+    except Exception as e:
+        # Log unexpected errors for debugging
+        import logging
+
+        logging.error(f"Unexpected error in inpainting request: {e}", exc_info=True)
+
+        return create_error_response(
+            error=e,
+            provider=image_request.provider,
+            operation=image_request.operation,
+            error_message=f"Inpainting failed: {str(e)}",
         )
 
 
@@ -2535,20 +2660,29 @@ def converse():
                 # Get the response ID, final text, and reasoning data for storage
                 response_id = event_processor.get_response_id()
                 final_text = event_processor.accumulated_text
-                
+
                 # Get reasoning data with graceful degradation
                 reasoning_data = None
                 try:
                     reasoning_data = event_processor.get_reasoning_data()
                     if reasoning_data:
                         import logging
-                        logging.debug(f"Successfully retrieved reasoning data for response {response_id}")
+
+                        logging.debug(
+                            f"Successfully retrieved reasoning data for response {response_id}"
+                        )
                     else:
                         import logging
-                        logging.debug(f"No reasoning data available for response {response_id}")
+
+                        logging.debug(
+                            f"No reasoning data available for response {response_id}"
+                        )
                 except Exception as e:
                     import logging
-                    logging.warning(f"Failed to retrieve reasoning data for response {response_id}: {e}")
+
+                    logging.warning(
+                        f"Failed to retrieve reasoning data for response {response_id}: {e}"
+                    )
                     # Continue without reasoning data - chat functionality should not be affected
 
                 if final_text and response_id:
@@ -2562,17 +2696,24 @@ def converse():
                             response_id,
                             reasoning_data,
                         )
-                        
+
                         # Log reasoning data status for debugging
                         if reasoning_data:
                             import logging
-                            logging.info(f"Saved assistant response with reasoning data for conversation {conversation_id}")
+
+                            logging.info(
+                                f"Saved assistant response with reasoning data for conversation {conversation_id}"
+                            )
                         else:
                             import logging
-                            logging.info(f"Saved assistant response without reasoning data for conversation {conversation_id}")
-                            
+
+                            logging.info(
+                                f"Saved assistant response without reasoning data for conversation {conversation_id}"
+                            )
+
                     except ConversationStorageError as e:
                         import logging
+
                         logging.error(f"Failed to save assistant response: {e}")
                         event_queue.put(
                             json.dumps(
@@ -2586,7 +2727,11 @@ def converse():
                         )
                     except Exception as e:
                         import logging
-                        logging.error(f"Unexpected error saving assistant response: {e}", exc_info=True)
+
+                        logging.error(
+                            f"Unexpected error saving assistant response: {e}",
+                            exc_info=True,
+                        )
                         event_queue.put(
                             json.dumps(
                                 {
@@ -2710,33 +2855,45 @@ def get_message_reasoning(conversation_id: str, message_index: int):
         # Validate conversation ownership by attempting to retrieve it
         conversation = conversation_manager.get_conversation(username, conversation_id)
         if not conversation:
-            return jsonify({
-                "error": "Conversation not found",
-                "message": "The requested conversation does not exist or you don't have access to it."
-            }), 404
+            return jsonify(
+                {
+                    "error": "Conversation not found",
+                    "message": "The requested conversation does not exist or you don't have access to it.",
+                }
+            ), 404
 
         # Validate message index
-        message_count = conversation_manager.get_conversation_message_count(username, conversation_id)
+        message_count = conversation_manager.get_conversation_message_count(
+            username, conversation_id
+        )
         if message_index < 0 or message_index >= message_count:
-            return jsonify({
-                "error": "Invalid message index",
-                "message": f"Message index {message_index} is out of range. Valid range: 0-{message_count - 1}."
-            }), 400
+            return jsonify(
+                {
+                    "error": "Invalid message index",
+                    "message": f"Message index {message_index} is out of range. Valid range: 0-{message_count - 1}.",
+                }
+            ), 400
 
         # Get the message to verify it exists and is an assistant message
-        message = conversation_manager.get_message_by_index(username, conversation_id, message_index)
+        message = conversation_manager.get_message_by_index(
+            username, conversation_id, message_index
+        )
         if not message:
-            return jsonify({
-                "error": "Message not found",
-                "message": "The requested message could not be retrieved."
-            }), 404
+            return jsonify(
+                {
+                    "error": "Message not found",
+                    "message": "The requested message could not be retrieved.",
+                }
+            ), 404
 
         # Only assistant messages can have reasoning data
         if message.role != "assistant":
-            return jsonify({
-                "error": "No reasoning available",
-                "message": "Reasoning data is only available for assistant messages."
-            }), 400
+            return jsonify(
+                {
+                    "error": "No reasoning available",
+                    "message": "Reasoning data is only available for assistant messages.",
+                }
+            ), 400
 
         # Retrieve reasoning data
         reasoning_data = conversation_manager.get_message_reasoning_data(
@@ -2744,42 +2901,47 @@ def get_message_reasoning(conversation_id: str, message_index: int):
         )
 
         if reasoning_data is None:
-            return jsonify({
-                "error": "No reasoning data",
-                "message": "No reasoning data is available for this message."
-            }), 404
+            return jsonify(
+                {
+                    "error": "No reasoning data",
+                    "message": "No reasoning data is available for this message.",
+                }
+            ), 404
 
         # Return structured reasoning data
-        return jsonify({
-            "success": True,
-            "conversation_id": conversation_id,
-            "message_index": message_index,
-            "message_role": message.role,
-            "message_text": message.text,
-            "response_id": message.response_id,
-            "reasoning": {
-                "summary_parts": reasoning_data.get("summary_parts", []),
-                "complete_summary": reasoning_data.get("complete_summary", ""),
-                "timestamp": reasoning_data.get("timestamp", 0),
-                "response_id": reasoning_data.get("response_id", "")
+        return jsonify(
+            {
+                "success": True,
+                "conversation_id": conversation_id,
+                "message_index": message_index,
+                "message_role": message.role,
+                "message_text": message.text,
+                "response_id": message.response_id,
+                "reasoning": {
+                    "summary_parts": reasoning_data.get("summary_parts", []),
+                    "complete_summary": reasoning_data.get("complete_summary", ""),
+                    "timestamp": reasoning_data.get("timestamp", 0),
+                    "response_id": reasoning_data.get("response_id", ""),
+                },
             }
-        })
+        )
 
     except ValueError as e:
         import logging
+
         logging.warning(f"Validation error in get_message_reasoning: {e}")
-        return jsonify({
-            "error": "Invalid request",
-            "message": str(e)
-        }), 400
+        return jsonify({"error": "Invalid request", "message": str(e)}), 400
 
     except Exception as e:
         import logging
+
         logging.error(f"Unexpected error in get_message_reasoning: {e}", exc_info=True)
-        return jsonify({
-            "error": "Internal server error",
-            "message": "An unexpected error occurred while retrieving reasoning data."
-        }), 500
+        return jsonify(
+            {
+                "error": "Internal server error",
+                "message": "An unexpected error occurred while retrieving reasoning data.",
+            }
+        ), 500
 
 
 class StreamEventProcessor:
@@ -3023,14 +3185,17 @@ class StreamEventProcessor:
 
         except AttributeError as e:
             import logging
+
             logging.debug(f"Reasoning part event missing expected attributes: {e}")
             # Continue processing - reasoning is optional
         except (TypeError, ValueError) as e:
             import logging
+
             logging.warning(f"Error parsing reasoning summary part: {e}")
             # Continue processing - reasoning is optional
         except Exception as e:
             import logging
+
             logging.warning(f"Unexpected error processing reasoning summary part: {e}")
             # Continue processing - reasoning failures should not block chat
 
@@ -3054,15 +3219,20 @@ class StreamEventProcessor:
 
         except AttributeError as e:
             import logging
+
             logging.debug(f"Reasoning delta event missing expected attributes: {e}")
             # Continue processing - reasoning is optional
         except (TypeError, ValueError) as e:
             import logging
+
             logging.warning(f"Error parsing reasoning summary text delta: {e}")
             # Continue processing - reasoning is optional
         except Exception as e:
             import logging
-            logging.warning(f"Unexpected error processing reasoning summary text delta: {e}")
+
+            logging.warning(
+                f"Unexpected error processing reasoning summary text delta: {e}"
+            )
             # Continue processing - reasoning failures should not block chat
 
     def _handle_reasoning_summary_text_done(self, event: Any) -> None:
@@ -3085,15 +3255,20 @@ class StreamEventProcessor:
 
         except AttributeError as e:
             import logging
+
             logging.debug(f"Reasoning done event missing expected attributes: {e}")
             # Continue processing - reasoning is optional
         except (TypeError, ValueError) as e:
             import logging
+
             logging.warning(f"Error parsing reasoning summary text done: {e}")
             # Continue processing - reasoning is optional
         except Exception as e:
             import logging
-            logging.warning(f"Unexpected error processing reasoning summary text done: {e}")
+
+            logging.warning(
+                f"Unexpected error processing reasoning summary text done: {e}"
+            )
             # Continue processing - reasoning failures should not block chat
 
     def _handle_reasoning_summary_part_done(self, event: Any) -> None:
@@ -3104,38 +3279,49 @@ class StreamEventProcessor:
             pass
         except AttributeError as e:
             import logging
+
             logging.debug(f"Reasoning part done event missing expected attributes: {e}")
             # Continue processing - reasoning is optional
         except Exception as e:
             import logging
-            logging.warning(f"Unexpected error processing reasoning summary part done: {e}")
+
+            logging.warning(
+                f"Unexpected error processing reasoning summary part done: {e}"
+            )
             # Continue processing - reasoning failures should not block chat
 
     def get_reasoning_data(self) -> Dict[str, Any] | None:
         """Get the reasoning data from the processed stream with comprehensive error handling."""
         try:
             # Only return reasoning data if we have meaningful content
-            if (
-                self.reasoning_data.get("complete_summary")
-                or self.reasoning_data.get("summary_parts")
+            if self.reasoning_data.get("complete_summary") or self.reasoning_data.get(
+                "summary_parts"
             ):
                 # Validate the reasoning data before returning
                 validated_data = validate_reasoning_data(self.reasoning_data.copy())
                 if validated_data:
                     import logging
-                    logging.debug(f"Successfully retrieved reasoning data with {len(validated_data.get('complete_summary', ''))} characters")
+
+                    logging.debug(
+                        f"Successfully retrieved reasoning data with {len(validated_data.get('complete_summary', ''))} characters"
+                    )
                 return validated_data
             else:
                 import logging
-                logging.debug("No reasoning data available - summary and parts are empty")
+
+                logging.debug(
+                    "No reasoning data available - summary and parts are empty"
+                )
             return None
         except ValueError as e:
             import logging
+
             logging.warning(f"Reasoning data validation failed: {e}")
             # Return None instead of raising - reasoning is optional
             return None
         except Exception as e:
             import logging
+
             logging.warning(f"Unexpected error getting reasoning data: {e}")
             # Return None instead of raising - reasoning is optional
             return None
