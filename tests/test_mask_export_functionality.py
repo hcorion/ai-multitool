@@ -494,8 +494,8 @@ class TestMaskExportFunctionality:
         
         result = driver.execute_script("""
             return new Promise((resolve) => {
-                import('/static/js/inpainting-mask-canvas.js').then(({ InpaintingMaskCanvas }) => {
-                    import('/static/js/brush-engine.js').then(({ BrushEngine }) => {
+                import('/static/js/inpainting/inpainting-mask-canvas.js').then(({ InpaintingMaskCanvas }) => {
+                    import('/static/js/inpainting/brush-engine.js').then(({ BrushEngine }) => {
                         try {
                             // Create test image
                             const testCanvas = document.createElement('canvas');

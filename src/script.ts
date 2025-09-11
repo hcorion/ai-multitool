@@ -1,6 +1,6 @@
 import * as utils from "./utils.js";
 import * as chat from "./chat.js";
-import { InpaintingMaskCanvas } from "./inpainting-mask-canvas.js";
+import { InpaintingMaskCanvas } from "./inpainting/inpainting-mask-canvas.js";
 
 // TypeScript interfaces for the new image API
 interface ImageOperationResponse {

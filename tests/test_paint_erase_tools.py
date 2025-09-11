@@ -39,7 +39,7 @@ class TestPaintEraseTools:
         # Execute JavaScript to test paint tool
         result = driver.execute_script("""
             return new Promise((resolve) => {
-                import('/static/js/brush-engine.js').then(({ BrushEngine }) => {
+                import('/static/js/inpainting/brush-engine.js').then(({ BrushEngine }) => {
                     // Create test mask
                     const width = 50;
                     const height = 50;
@@ -101,7 +101,7 @@ class TestPaintEraseTools:
         # Execute JavaScript to test erase tool
         result = driver.execute_script("""
             return new Promise((resolve) => {
-                import('/static/js/brush-engine.js').then(({ BrushEngine }) => {
+                import('/static/js/inpainting/brush-engine.js').then(({ BrushEngine }) => {
                     // Create test mask with some painted areas
                     const width = 50;
                     const height = 50;
@@ -168,7 +168,7 @@ class TestPaintEraseTools:
         # Execute JavaScript to test brush size range
         result = driver.execute_script("""
             return new Promise((resolve) => {
-                import('/static/js/brush-engine.js').then(({ BrushEngine }) => {
+                import('/static/js/inpainting/brush-engine.js').then(({ BrushEngine }) => {
                     const testSizes = [1, 25, 50, 100, 150, 200];
                     const results = [];
                     

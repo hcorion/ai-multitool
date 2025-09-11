@@ -202,8 +202,8 @@ class TestMaskExportUnit:
             return new Promise(async (resolve) => {
                 try {
                     // Import required classes
-                    const { CanvasManager } = await import('/static/js/canvas-manager.js');
-                    const { BrushEngine } = await import('/static/js/brush-engine.js');
+                    const { CanvasManager } = await import('/static/js/inpainting/canvas-manager.js');
+                    const { BrushEngine } = await import('/static/js/inpainting/brush-engine.js');
                     
                     // Create test canvases
                     const imageCanvas = document.createElement('canvas');

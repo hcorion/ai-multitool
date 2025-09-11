@@ -4,7 +4,7 @@
  * Generated from Python test cases
  */
 
-import { BrushEngine } from '../src/brush-engine.js';
+import { BrushEngine } from '../src/inpainting/brush-engine.js';
 
 describe('BrushEngine Binary Mask Enforcement', () => {
 

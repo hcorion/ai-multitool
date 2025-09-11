@@ -1,6 +1,6 @@
 import * as utils from "./utils.js";
 import * as chat from "./chat.js";
-import { InpaintingMaskCanvas } from "./inpainting-mask-canvas.js";
+import { InpaintingMaskCanvas } from "./inpainting/inpainting-mask-canvas.js";
 document.addEventListener("DOMContentLoaded", () => {
     $("#loading-spinner").hide();
     $("#prompt-form").on("submit", (event) => {

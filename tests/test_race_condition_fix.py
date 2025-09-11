@@ -43,11 +43,11 @@ class TestRaceConditionFix:
             return new Promise((resolve) => {
                 // Import required modules
                 Promise.all([
-                    import('/static/js/inpainting-mask-canvas.js'),
-                    import('/static/js/canvas-manager.js'),
-                    import('/static/js/brush-engine.js'),
-                    import('/static/js/input-engine.js'),
-                    import('/static/js/render-scheduler.js')
+                    import('/static/js/inpainting/inpainting-mask-canvas.js'),
+                    import('/static/js/inpainting/canvas-manager.js'),
+                    import('/static/js/inpainting/brush-engine.js'),
+                    import('/static/js/inpainting/input-engine.js'),
+                    import('/static/js/inpainting/render-scheduler.js')
                 ]).then(([
                     { InpaintingMaskCanvas },
                     { CanvasManager },
@@ -182,11 +182,11 @@ class TestRaceConditionFix:
             return new Promise((resolve) => {
                 // Import required modules
                 Promise.all([
-                    import('/static/js/inpainting-mask-canvas.js'),
-                    import('/static/js/canvas-manager.js'),
-                    import('/static/js/brush-engine.js'),
-                    import('/static/js/input-engine.js'),
-                    import('/static/js/render-scheduler.js')
+                    import('/static/js/inpainting/inpainting-mask-canvas.js'),
+                    import('/static/js/inpainting/canvas-manager.js'),
+                    import('/static/js/inpainting/brush-engine.js'),
+                    import('/static/js/inpainting/input-engine.js'),
+                    import('/static/js/inpainting/render-scheduler.js')
                 ]).then(([
                     { InpaintingMaskCanvas },
                     { CanvasManager },
@@ -326,7 +326,7 @@ class TestRaceConditionFix:
         # Execute test for event ordering
         result = driver.execute_script("""
             return new Promise((resolve) => {
-                import('/static/js/render-scheduler.js').then(({ RenderScheduler }) => {
+                import('/static/js/inpainting/render-scheduler.js').then(({ RenderScheduler }) => {
                     try {
                         const scheduler = new RenderScheduler();
                         const processedEvents = [];
