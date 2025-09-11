@@ -52,6 +52,8 @@ class ImageGenerationRequest:
     quality: Quality = Quality.HIGH
     model: Optional[str] = None
     character_prompts: Optional[list[dict[str, str]]] = None
+    variety: bool = False
+    seed: int = 0
     
     def __post_init__(self):
         """Validate request parameters after initialization."""
@@ -216,6 +218,17 @@ def create_request_from_form_data(form_data: Dict[str, Any]) -> Union[ImageGener
     model = form_data.get("model")
     character_prompts_final = character_prompts if character_prompts else None
     
+    # Extract seed from form data, default to 0 if not provided or invalid
+    seed = 0
+    try:
+        seed_str = form_data.get("seed", "0")
+        seed = int(seed_str) if seed_str else 0
+    except (ValueError, TypeError):
+        seed = 0
+    
+    # Extract variety flag from form data
+    variety = form_data.get("variety", "false").lower() == "on"
+    
     # Set default model if not provided
     if not model:
         model = ImageRequestValidator.get_default_model(provider, operation)
@@ -236,6 +249,8 @@ def create_request_from_form_data(form_data: Dict[str, Any]) -> Union[ImageGener
             quality=quality,
             model=model,
             character_prompts=character_prompts_final,
+            variety=variety,
+            seed=seed,
             base_image_path=form_data.get("base_image_path", ""),
             mask_path=form_data.get("mask_path", "")
         )
@@ -250,6 +265,8 @@ def create_request_from_form_data(form_data: Dict[str, Any]) -> Union[ImageGener
             quality=quality,
             model=model,
             character_prompts=character_prompts_final,
+            variety=variety,
+            seed=seed,
             base_image_path=form_data.get("base_image_path", ""),
             strength=float(form_data.get("strength", 0.7))
         )
@@ -263,7 +280,9 @@ def create_request_from_form_data(form_data: Dict[str, Any]) -> Union[ImageGener
             height=height,
             quality=quality,
             model=model,
-            character_prompts=character_prompts_final
+            character_prompts=character_prompts_final,
+            variety=variety,
+            seed=seed
         )
 
 

@@ -1277,6 +1277,7 @@ def generate_novelai_image(
     size: tuple[int, int],
     seed: int = 0,
     upscale: bool = False,
+    variety: bool = False,
     grid_dynamic_prompt: GridDynamicPromptInfo | None = None,
     character_prompts: Optional[List[Dict[str, str]]] = None,
 ) -> GeneratedImageData:
@@ -1318,6 +1319,7 @@ def generate_novelai_image(
             width=width,
             height=height,
             seed=seed,
+            variety=variety,
             character_prompts=processed_character_prompts,
         )
 
@@ -1389,6 +1391,7 @@ def generate_novelai_inpaint_image(
     username: str,
     size: tuple[int, int],
     seed: int = 0,
+    variety: bool = False,
     character_prompts: Optional[List[Dict[str, str]]] = None,
 ) -> GeneratedImageData:
     """Generate an inpainted image using NovelAI and return processed data."""
@@ -1428,6 +1431,7 @@ def generate_novelai_inpaint_image(
             width=width,
             height=height,
             seed=seed,
+            variety=variety,
             character_prompts=processed_character_prompts,
         )
 
@@ -1498,6 +1502,7 @@ def generate_novelai_img2img_image(
     size: tuple[int, int],
     seed: int = 0,
     strength: float = 0.7,
+    variety: bool = False,
 ) -> GeneratedImageData:
     """Generate an img2img image using NovelAI and return processed data."""
     if not app.static_folder:
@@ -1522,6 +1527,7 @@ def generate_novelai_img2img_image(
             width=width,
             height=height,
             seed=seed,
+            variety=variety,
         )
 
         file_bytes = io.BytesIO(image_bytes)
@@ -2044,6 +2050,8 @@ def generate_image(
         aspect_ratio = request.form.get("aspect_ratio")
         upscale_str = request.form.get("upscale", "false")
         upscale = upscale_str.lower() == "true"
+        variety_str = request.form.get("variety", "false")
+        variety = variety_str.lower() == "true"
 
         if not size:
             raise ValueError("Unable to get 'size' field.")
@@ -2060,6 +2068,7 @@ def generate_image(
             size=(int(split_size[0]), int(split_size[1])),
             seed=seed,
             upscale=upscale,
+            variety=variety,
             grid_dynamic_prompt=grid_dynamic_prompt,
             character_prompts=character_prompts,
         )
@@ -2305,10 +2314,12 @@ def _handle_generation_request(
 ) -> ImageOperationResponse:
     """Handle image generation requests."""
     try:
-        # Generate a seed for the provider
-        seed = generate_seed_for_provider(image_request.provider.value)
-        if not seed:
-            raise ValueError("Unable to generate seed for provider")
+        # Use seed from request, or generate one if not provided (0 means random)
+        seed = image_request.seed
+        if not seed or seed <= 0:
+            seed = generate_seed_for_provider(image_request.provider.value)
+            if not seed:
+                raise ValueError("Unable to generate seed for provider")
 
         # Route directly to the appropriate generation function based on provider
         if image_request.provider == Provider.OPENAI:
@@ -2344,6 +2355,7 @@ def _handle_generation_request(
                 size=(image_request.width, image_request.height),
                 seed=seed,
                 upscale=False,  # Default to False for new endpoint
+                variety=image_request.variety,
                 grid_dynamic_prompt=None,
                 character_prompts=character_prompts,
             )
@@ -2389,10 +2401,12 @@ def _handle_inpainting_request(
         if not os.path.exists(image_request.mask_path):
             raise FileNotFoundError(f"Mask file not found: {image_request.mask_path}")
 
-        # Generate a seed for the provider
-        seed = generate_seed_for_provider(image_request.provider.value)
-        if not seed:
-            raise ValueError("Unable to generate seed for provider")
+        # Use seed from request, or generate one if not provided (0 means random)
+        seed = image_request.seed
+        if not seed or seed <= 0:
+            seed = generate_seed_for_provider(image_request.provider.value)
+            if not seed:
+                raise ValueError("Unable to generate seed for provider")
 
         # Route to appropriate provider inpainting function
         if image_request.provider == Provider.OPENAI:
@@ -2423,6 +2437,7 @@ def _handle_inpainting_request(
                 username=session["username"],
                 size=(image_request.width, image_request.height),
                 seed=seed,
+                variety=image_request.variety,
                 character_prompts=image_request.character_prompts,
             )
         else:
@@ -2478,6 +2493,13 @@ def _handle_img2img_request(image_request: Img2ImgRequest) -> ImageOperationResp
         with open(image_request.base_image_path, "rb") as f:
             base_image_data = f.read()
 
+        # Use seed from request, or generate one if not provided (0 means random)
+        seed = image_request.seed
+        if not seed or seed <= 0:
+            seed = generate_seed_for_provider(image_request.provider.value)
+            if not seed:
+                raise ValueError("Unable to generate seed for provider")
+
         generated_data = generate_novelai_img2img_image(
             base_image=base_image_data,
             prompt=image_request.prompt,
@@ -2485,6 +2507,8 @@ def _handle_img2img_request(image_request: Img2ImgRequest) -> ImageOperationResp
             strength=image_request.strength,
             username=session["username"],
             size=(image_request.width, image_request.height),
+            seed=seed,
+            variety=image_request.variety,
         )
 
         revised_prompt = getattr(generated_data, "revised_prompt", None)
