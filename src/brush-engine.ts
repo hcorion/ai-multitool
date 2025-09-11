@@ -40,7 +40,7 @@ export class BrushEngine {
             mode: this.settings.mode,
             timestamp: Date.now()
         };
-        
+
         this.lastStampPosition = { x, y };
         return this.currentStroke;
     }
@@ -63,10 +63,8 @@ export class BrushEngine {
             this.settings.spacing
         );
 
-        // Update last stamp position to the last calculated stamp
-        if (stamps.length > 0) {
-            this.lastStampPosition = stamps[stamps.length - 1];
-        }
+        // Always update last stamp position to the current position to ensure continuity
+        this.lastStampPosition = { x, y };
 
         return stamps;
     }
@@ -91,34 +89,34 @@ export class BrushEngine {
         spacing: number
     ): { x: number; y: number }[] {
         const stamps: { x: number; y: number }[] = [];
-        
+
         // Calculate distance between points
         const dx = end.x - start.x;
         const dy = end.y - start.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
-        
-        // Calculate spacing distance (0.35 × brush diameter)
-        const spacingDistance = brushSize * spacing;
-        
-        // If distance is less than spacing, no new stamps needed
-        if (distance < spacingDistance) {
+
+        // Calculate spacing distance (reduce spacing for better continuity)
+        const spacingDistance = brushSize * Math.min(spacing, 0.25); // Cap at 0.25 for better coverage
+
+        // If distance is very small, no new stamps needed
+        if (distance < 1) {
             return stamps;
         }
-        
-        // Calculate number of stamps needed
-        const numStamps = Math.floor(distance / spacingDistance);
-        
-        // Calculate step increments
-        const stepX = dx / distance * spacingDistance;
-        const stepY = dy / distance * spacingDistance;
-        
-        // Generate stamp positions
+
+        // Calculate number of stamps needed to ensure continuous coverage
+        const numStamps = Math.max(1, Math.ceil(distance / spacingDistance));
+
+        // Calculate actual step size to ensure we reach the end point
+        const stepX = dx / numStamps;
+        const stepY = dy / numStamps;
+
+        // Generate stamp positions, ensuring we always reach the end point
         for (let i = 1; i <= numStamps; i++) {
             const stampX = Math.round(start.x + stepX * i);
             const stampY = Math.round(start.y + stepY * i);
             stamps.push({ x: stampX, y: stampY });
         }
-        
+
         return stamps;
     }
 
@@ -138,12 +136,12 @@ export class BrushEngine {
         const cx = Math.round(centerX);
         const cy = Math.round(centerY);
         const radius = Math.floor(brushSize / 2);
-        
+
         // Binary value based on mode
         const stampValue = mode === 'paint' ? 255 : 0;
-        
+
         let hasChanges = false;
-        
+
         // Apply circular stamp using integer arithmetic for crisp edges
         for (let y = cy - radius; y <= cy + radius; y++) {
             for (let x = cx - radius; x <= cx + radius; x++) {
@@ -151,16 +149,16 @@ export class BrushEngine {
                 if (x < 0 || x >= imageWidth || y < 0 || y >= imageHeight) {
                     continue;
                 }
-                
+
                 // Check if point is within circle using integer distance
                 const dx = x - cx;
                 const dy = y - cy;
                 const distanceSquared = dx * dx + dy * dy;
                 const radiusSquared = radius * radius;
-                
+
                 if (distanceSquared <= radiusSquared) {
                     const index = y * imageWidth + x;
-                    
+
                     // Only update if value is different (binary enforcement)
                     if (maskData[index] !== stampValue) {
                         maskData[index] = stampValue;
@@ -169,7 +167,7 @@ export class BrushEngine {
                 }
             }
         }
-        
+
         return hasChanges;
     }
 
@@ -185,20 +183,20 @@ export class BrushEngine {
         mode: 'paint' | 'erase'
     ): boolean {
         let hasChanges = false;
-        
+
         if (path.length === 0) return false;
-        
+
         // Apply initial stamp
         if (this.applyStamp(maskData, imageWidth, imageHeight, path[0].x, path[0].y, brushSize, mode)) {
             hasChanges = true;
         }
-        
+
         // Apply stamps along the path with proper spacing
         let lastStampPos = path[0];
-        
+
         for (let i = 1; i < path.length; i++) {
             const currentPos = path[i];
-            
+
             // Calculate intermediate stamps
             const stamps = this.calculateStampPositions(
                 lastStampPos,
@@ -206,7 +204,7 @@ export class BrushEngine {
                 brushSize,
                 this.settings.spacing
             );
-            
+
             // Apply each stamp
             for (const stampPos of stamps) {
                 if (this.applyStamp(maskData, imageWidth, imageHeight, stampPos.x, stampPos.y, brushSize, mode)) {
@@ -215,7 +213,7 @@ export class BrushEngine {
                 lastStampPos = stampPos;
             }
         }
-        
+
         return hasChanges;
     }
 
@@ -248,32 +246,32 @@ export class BrushEngine {
         const canvas = document.createElement('canvas');
         const radius = Math.floor(size / 2);
         const diameter = radius * 2 + 1;
-        
+
         canvas.width = diameter;
         canvas.height = diameter;
-        
+
         const ctx = canvas.getContext('2d');
         if (!ctx) {
             throw new Error('Failed to get canvas context for brush preview');
         }
-        
+
         // Clear canvas
         ctx.clearRect(0, 0, diameter, diameter);
-        
+
         // Draw circle outline
         ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
         ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.arc(radius, radius, radius - 0.5, 0, Math.PI * 2);
         ctx.stroke();
-        
+
         // Draw inner circle for better visibility
         ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
         ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.arc(radius, radius, radius - 1.5, 0, Math.PI * 2);
         ctx.stroke();
-        
+
         return canvas;
     }
 
@@ -307,14 +305,14 @@ export class BrushEngine {
         imageHeight: number
     ): { x: number; y: number; width: number; height: number } | null {
         if (stroke.points.length === 0) return null;
-        
+
         const radius = Math.floor(stroke.brushSize / 2);
-        
+
         let minX = imageWidth;
         let minY = imageHeight;
         let maxX = -1;
         let maxY = -1;
-        
+
         // Find bounds of all points plus brush radius
         for (const point of stroke.points) {
             minX = Math.min(minX, point.x - radius);
@@ -322,15 +320,15 @@ export class BrushEngine {
             maxX = Math.max(maxX, point.x + radius);
             maxY = Math.max(maxY, point.y + radius);
         }
-        
+
         // Clamp to image bounds
         minX = Math.max(0, minX);
         minY = Math.max(0, minY);
         maxX = Math.min(imageWidth - 1, maxX);
         maxY = Math.min(imageHeight - 1, maxY);
-        
+
         if (minX > maxX || minY > maxY) return null;
-        
+
         return {
             x: minX,
             y: minY,

@@ -766,6 +766,7 @@ async function openInpaintingMaskCanvas(imageUrl) {
         containerElement: document.body,
         onMaskComplete: (maskDataUrl) => {
             console.log('Mask completed:', maskDataUrl);
+            window.open(maskDataUrl, '_blank');
             // TODO: Integrate with existing inpainting workflow
             // This will be implemented in later tasks
         },

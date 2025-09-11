@@ -531,8 +531,8 @@ export class CanvasManager {
         try {
             // Get stamp positions along the path
             const stampPositions = this.brushEngine.continueStroke(imageX, imageY);
-            if (stampPositions.length === 0)
-                return false;
+            // Even if no stamps are needed now, the stroke is still being updated
+            // Don't return early - let the endBrushStroke handle complete rendering
             const settings = this.brushEngine.getSettings();
             let hasChanges = false;
             let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -568,10 +568,16 @@ export class CanvasManager {
         }
     }
     /**
-     * End the current brush stroke
+     * End the current brush stroke and ensure complete rendering
      */
     endBrushStroke() {
-        return this.brushEngine.endStroke();
+        const stroke = this.brushEngine.endStroke();
+        // Apply the complete stroke to ensure all points are rendered
+        // This fixes issues with fast strokes where some points might be missed
+        if (stroke && stroke.points.length > 1) {
+            this.applyBrushStroke(stroke);
+        }
+        return stroke;
     }
     /**
      * Apply a complete brush stroke path

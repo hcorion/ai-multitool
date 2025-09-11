@@ -37,10 +37,8 @@ export class BrushEngine {
         this.currentStroke.points.push({ x, y });
         // Calculate stamps needed between last position and current position
         const stamps = this.calculateStampPositions(this.lastStampPosition, { x, y }, this.settings.size, this.settings.spacing);
-        // Update last stamp position to the last calculated stamp
-        if (stamps.length > 0) {
-            this.lastStampPosition = stamps[stamps.length - 1];
-        }
+        // Always update last stamp position to the current position to ensure continuity
+        this.lastStampPosition = { x, y };
         return stamps;
     }
     /**
@@ -61,18 +59,18 @@ export class BrushEngine {
         const dx = end.x - start.x;
         const dy = end.y - start.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
-        // Calculate spacing distance (0.35 × brush diameter)
-        const spacingDistance = brushSize * spacing;
-        // If distance is less than spacing, no new stamps needed
-        if (distance < spacingDistance) {
+        // Calculate spacing distance (reduce spacing for better continuity)
+        const spacingDistance = brushSize * Math.min(spacing, 0.25); // Cap at 0.25 for better coverage
+        // If distance is very small, no new stamps needed
+        if (distance < 1) {
             return stamps;
         }
-        // Calculate number of stamps needed
-        const numStamps = Math.floor(distance / spacingDistance);
-        // Calculate step increments
-        const stepX = dx / distance * spacingDistance;
-        const stepY = dy / distance * spacingDistance;
-        // Generate stamp positions
+        // Calculate number of stamps needed to ensure continuous coverage
+        const numStamps = Math.max(1, Math.ceil(distance / spacingDistance));
+        // Calculate actual step size to ensure we reach the end point
+        const stepX = dx / numStamps;
+        const stepY = dy / numStamps;
+        // Generate stamp positions, ensuring we always reach the end point
         for (let i = 1; i <= numStamps; i++) {
             const stampX = Math.round(start.x + stepX * i);
             const stampY = Math.round(start.y + stepY * i);
