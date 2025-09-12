@@ -307,8 +307,8 @@ class TestNovelAIClient:
                 assert payload["action"] == "infill"
                 assert payload["model"] == "nai-diffusion-4-5-full-inpainting"
                 assert payload["parameters"]["v4_prompt"]["caption"]["base_caption"] == "inpaint this area"
-                assert "image" in payload
-                assert "mask" in payload
+                assert "image" in payload["parameters"]
+                assert "mask" in payload["parameters"]
     
     def test_generate_inpaint_image_with_negative_prompt(self):
         """Test inpainting with negative prompt."""
@@ -422,8 +422,8 @@ class TestNovelAIClient:
                 # Verify encoded data is in payload
                 call_args = mock_request.call_args
                 payload = call_args[0][1]
-                assert payload["image"] == "base64_base_image"
-                assert payload["mask"] == "base64_processed_mask"
+                assert payload["parameters"]["image"] == "base64_base_image"
+                assert payload["parameters"]["mask"] == "base64_processed_mask"
     
     def test_generate_inpaint_image_zip_extraction_error(self):
         """Test error handling when inpainting ZIP extraction fails."""

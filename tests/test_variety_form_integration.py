@@ -23,12 +23,14 @@ class TestVarietyFormIntegration:
         
         with app.test_client() as client:
             # Test with variety enabled
-            response = client.post('/', data={
+            response = client.post('/image', data={
                 'provider': 'novelai',
+                'operation': 'generate',
                 'prompt': 'test prompt',
-                'size': '1024x1024',
+                'width': '1024',
+                'height': '1024',
                 'seed': '42',
-                'variety': 'true'
+                'variety': 'on'
             })
             
             # Verify the function was called with variety=True
@@ -40,12 +42,14 @@ class TestVarietyFormIntegration:
             mock_generate.reset_mock()
             
             # Test with variety disabled
-            response = client.post('/', data={
+            response = client.post('/image', data={
                 'provider': 'novelai',
+                'operation': 'generate',
                 'prompt': 'test prompt',
-                'size': '1024x1024',
+                'width': '1024',
+                'height': '1024',
                 'seed': '42',
-                'variety': 'false'
+                'variety': 'off'
             })
             
             # Verify the function was called with variety=False
@@ -57,10 +61,12 @@ class TestVarietyFormIntegration:
             mock_generate.reset_mock()
             
             # Test with variety parameter missing (should default to False)
-            response = client.post('/', data={
+            response = client.post('/image', data={
                 'provider': 'novelai',
+                'operation': 'generate',
                 'prompt': 'test prompt',
-                'size': '1024x1024',
+                'width': '1024',
+                'height': '1024',
                 'seed': '42'
             })
             

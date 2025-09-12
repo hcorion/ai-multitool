@@ -57,6 +57,7 @@ class TestGenerateNovelAIImageRefactored:
             width=512,
             height=768,
             seed=42,
+            variety=False,
             character_prompts=[],
         )
 
@@ -125,6 +126,7 @@ class TestGenerateNovelAIImageRefactored:
             width=1024,
             height=1024,
             seed=0,
+            variety=False,
             character_prompts=[
                 {"positive": "processed char 1", "negative": "processed neg 1"},
                 {"positive": "processed char 2", "negative": ""},

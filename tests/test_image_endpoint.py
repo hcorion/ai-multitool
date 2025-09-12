@@ -47,6 +47,7 @@ class TestImageEndpoint:
         mock_generated_data.image_name = 'image.png'
         mock_generated_data.prompt = 'test prompt'
         mock_generated_data.revised_prompt = 'revised test prompt'
+        mock_generated_data.metadata = {'test': 'metadata'}
         mock_generate.return_value = mock_generated_data
         
         response = client.post('/image', data={
@@ -67,14 +68,19 @@ class TestImageEndpoint:
         assert data['provider'] == 'openai'
         assert data['operation'] == 'generate'
     
+    @patch('app.os.path.exists')
     @patch('app.generate_openai_inpaint_image')
-    def test_inpaint_request_success(self, mock_inpaint, client, authenticated_session):
+    def test_inpaint_request_success(self, mock_inpaint, mock_exists, client, authenticated_session):
         """Test successful inpainting request."""
+        # Mock file existence checks
+        mock_exists.return_value = True
+        
         # Mock the inpainting function
         mock_generated_data = Mock()
         mock_generated_data.local_image_path = '/path/to/inpainted.png'
         mock_generated_data.image_name = 'inpainted.png'
         mock_generated_data.revised_prompt = None
+        mock_generated_data.metadata = {'test': 'metadata'}
         mock_inpaint.return_value = mock_generated_data
         
         response = client.post('/image', data={
@@ -93,18 +99,22 @@ class TestImageEndpoint:
         assert data['provider'] == 'openai'
         assert data['operation'] == 'inpaint'
     
-    @patch('app.NovelAIClient')
+    @patch('app.novelai_api_key', 'test-api-key')
+    @patch('app.os.path.exists')
+    @patch('app.generate_novelai_img2img_image')
     @patch('builtins.open', new_callable=mock_open, read_data=b'fake_image_data')
-    def test_img2img_request_success(self, mock_file, mock_novelai_client, client, authenticated_session):
+    def test_img2img_request_success(self, mock_file, mock_img2img, mock_exists, client, authenticated_session):
         """Test successful img2img request."""
-        # Mock NovelAI client
-        mock_client_instance = Mock()
+        # Mock file existence checks
+        mock_exists.return_value = True
+        
+        # Mock the img2img function
         mock_generated_data = Mock()
         mock_generated_data.local_image_path = '/path/to/img2img.png'
         mock_generated_data.image_name = 'img2img.png'
         mock_generated_data.revised_prompt = None
-        mock_client_instance.generate_img2img_image.return_value = mock_generated_data
-        mock_novelai_client.return_value = mock_client_instance
+        mock_generated_data.metadata = {'test': 'metadata'}
+        mock_img2img.return_value = mock_generated_data
         
         response = client.post('/image', data={
             'prompt': 'transform this',

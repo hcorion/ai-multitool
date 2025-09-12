@@ -53,6 +53,7 @@ class TestFrontendIntegration:
         mock_generated_data.image_name = 'image.png'
         mock_generated_data.prompt = 'test prompt'
         mock_generated_data.revised_prompt = 'revised test prompt'
+        mock_generated_data.metadata = {'test': 'metadata'}
         mock_generate.return_value = mock_generated_data
         
         response = client.post('/image', data={
@@ -99,6 +100,7 @@ class TestFrontendIntegration:
         mock_generated_data.image_name = 'image.png'
         mock_generated_data.prompt = 'test prompt'
         mock_generated_data.revised_prompt = 'revised test prompt'
+        mock_generated_data.metadata = {'test': 'metadata'}
         mock_generate.return_value = mock_generated_data
         
         # Test basic generation with new endpoint
@@ -153,6 +155,7 @@ class TestEndpointCompatibility:
         mock_generated_data.image_name = 'image.png'
         mock_generated_data.prompt = 'test prompt'
         mock_generated_data.revised_prompt = 'revised test prompt'
+        mock_generated_data.metadata = {'test': 'metadata'}
         mock_generate.return_value = mock_generated_data
         
         # Test legacy endpoint no longer supports POST

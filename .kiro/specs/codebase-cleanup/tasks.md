@@ -103,7 +103,12 @@
   - Either remove the useless tests, or replace with something that actually tests the functionality.
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
 
-- [ ] 8. Consolidate misc. tests
+- [x] 8. Consolidate misc. tests
+
+
+
+
+
   - Cleanup race condition, worker, zoom pan tests
   - Verify remaining tests cover essential functionality
   - Ensure all tests are passing
