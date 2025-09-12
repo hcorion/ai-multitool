@@ -136,7 +136,7 @@ class TestInpaintingIntegration:
             return new Promise(async (resolve) => {
                 try {
                     // Import the mask file manager
-                    const { maskFileManager } = await import('/static/js/mask-file-manager.js');
+                    const { maskFileManager } = await import('/static/js/inpainting/mask-file-manager.js');
                     
                     // Test basic functionality
                     const testDataUrl = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==';
@@ -183,7 +183,7 @@ class TestInpaintingIntegration:
             return new Promise(async (resolve) => {
                 try {
                     // Import required classes
-                    const { InpaintingMaskCanvas } = await import('/static/js/inpainting-mask-canvas.js');
+                    const { InpaintingMaskCanvas } = await import('/static/js/inpainting/inpainting-mask-canvas.js');
                     
                     // Create test image
                     const testCanvas = document.createElement('canvas');
