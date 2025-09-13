@@ -1,6 +1,7 @@
 import * as utils from "./utils.js";
 import * as chat from "./chat.js";
 import { InpaintingMaskCanvas } from "./inpainting/inpainting-mask-canvas.js";
+import { getElementByIdSafe } from './dom_utils.js';
 document.addEventListener("DOMContentLoaded", () => {
     $("#loading-spinner").hide();
     $("#prompt-form").on("submit", (event) => {
@@ -224,32 +225,38 @@ function handleTabClick(evt) {
     }
 }
 function providerChanged() {
-    const selection = document.getElementById("provider");
+    const selection = getElementByIdSafe("provider", HTMLSelectElement);
+    if (!selection)
+        return;
     if (selection.value == "openai") {
         $(".stabilityai").hide();
         $(".novelai").hide();
         $(".openai").show();
         hideCharacterPromptInterface();
-        document.getElementById("size").selectedIndex = 0;
+        const sizeSelect = getElementByIdSafe("size", HTMLSelectElement);
+        if (sizeSelect)
+            sizeSelect.selectedIndex = 0;
     }
-    else if ((selection.value == "stabilityai")) {
+    else if (selection.value == "stabilityai") {
         $(".openai").hide();
         $(".novelai").hide();
         $(".stabilityai").show();
         hideCharacterPromptInterface();
         modelChanged(selection.value);
     }
-    else if ((selection.value == "novelai")) {
+    else if (selection.value == "novelai") {
         $(".openai").hide();
         $(".stabilityai").hide();
         $(".novelai").show();
         showCharacterPromptInterface();
         // This is ugly, but index #3 is where the novelai size options start
-        document.getElementById("size").selectedIndex = 3;
+        const sizeSelect = getElementByIdSafe("size", HTMLSelectElement);
+        if (sizeSelect)
+            sizeSelect.selectedIndex = 3;
         modelChanged(selection.value);
     }
     else {
-        throw new Error(`Tried to switch to unsupported provider ${selection}`);
+        throw new Error(`Tried to switch to unsupported provider ${selection.value}`);
     }
 }
 function modelButtonChanged() {
@@ -258,7 +265,7 @@ function modelButtonChanged() {
 }
 function modelChanged(provider) {
     if (provider == "stabilityai") {
-        const selection = document.getElementById("model");
+        const selection = getElementByIdSafe("model", HTMLSelectElement);
         if (selection && !selection.hidden) {
             if (selection.value == "sd3-turbo") {
                 $(".negativeprompt").hide();
@@ -361,8 +368,12 @@ function lastGrid() {
 }
 function openGenModal(evt) {
     const src = evt.currentTarget.src;
-    document.getElementById("image-modal").style.display = "block";
-    document.getElementById("modal-image").src = src;
+    const imageModal = getElementByIdSafe("image-modal", HTMLDivElement);
+    if (imageModal)
+        imageModal.style.display = "block";
+    const modalImage = getElementByIdSafe("modal-image", HTMLImageElement);
+    if (modalImage)
+        modalImage.src = src;
     document.getElementById("image-modal").addEventListener("wheel", (event) => {
         event.preventDefault(); // Prevent background scrolling when the modal is open
     });
@@ -778,7 +789,9 @@ function closeGridModal() {
     $("#grid-image-modal").hide();
 }
 function closeGenModal() {
-    document.getElementById("image-modal").style.display = "none";
+    const imageModal = getElementByIdSafe("image-modal", HTMLDivElement);
+    if (imageModal)
+        imageModal.style.display = "none";
 }
 /**
  * Opens the inpainting mask canvas for the given image
