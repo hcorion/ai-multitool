@@ -55,7 +55,7 @@ class ImageGenerationRequest:
     character_prompts: Optional[list[dict[str, str]]] = None
     variety: bool = False
     seed: int = 0,
-    grid_dynamic_prompt_info: Optional[GridDynamicPromptInfo] = None
+    grid_dynamic_prompt: Optional[GridDynamicPromptInfo] = None
     
     def __post_init__(self):
         """Validate request parameters after initialization."""

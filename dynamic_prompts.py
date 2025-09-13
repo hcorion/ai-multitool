@@ -284,12 +284,6 @@ def make_prompt_dynamic(
         r"\[(.+?):(\d+-?\d*)\]", replace_brackets_section_negative, revised_prompt
     )
 
-    # Validate that grid prompt override was actually used if specified
-    if grid_prompt and not used_grid_prompt:
-        raise LookupError(
-            f"Tried to use grid prompt but no prompt file matching {grid_prompt.prompt_file} was found in the prompt!"
-        )
-
     return revised_prompt
 
 

@@ -1384,6 +1384,7 @@ def generate_novelai_inpaint_image(
     size: tuple[int, int],
     seed: int = 0,
     variety: bool = False,
+    grid_dynamic_prompt: GridDynamicPromptInfo | None = None,
     character_prompts: Optional[List[Dict[str, str]]] = None,
 ) -> GeneratedImageData:
     """Generate an inpainted image using NovelAI and return processed data."""
@@ -1393,7 +1394,7 @@ def generate_novelai_inpaint_image(
     if not novelai_api_key:
         raise ValueError("NovelAI API key not configured")
 
-    revised_prompt = make_prompt_dynamic(prompt, username, app.static_folder, seed)
+    revised_prompt = make_prompt_dynamic(prompt, username, app.static_folder, seed, grid_dynamic_prompt)
 
     # Process character prompts if provided
     processed_character_prompts = []
@@ -1404,6 +1405,7 @@ def generate_novelai_inpaint_image(
                 username,
                 app.static_folder,
                 seed,
+                grid_dynamic_prompt,
             )
         except (ValueError, LookupError) as e:
             raise ValueError(f"Error processing character prompts: {str(e)}")
@@ -2070,9 +2072,9 @@ def generate_image(
 
 
 def generate_image_grid(
+    form_data: str,
     provider: str,
-    prompt: str,
-    size: str | None,
+    prompt: str | None,
     seed: int | None,
     grid_prompt_file: str,
     request: Request,
@@ -2091,132 +2093,31 @@ def generate_image_grid(
 
     if len(dynamic_prompts) == 0:
         raise ValueError("No prompts available in file!")
-
-    if not seed:
+    
+    if not seed or seed <= 0:
         seed = generate_seed_for_provider(provider)
+        if not seed:
+            raise ValueError("Unable to generate seed for provider")
 
     # Generate images using the unified image generation system
     image_data_list: Dict[str, GeneratedImageData] = dict()
     generation_errors: List[str] = []
 
+
     for dynamic_prompt in dynamic_prompts:
-        # Create a request object for this specific prompt
-        form_data = {
-            "prompt": prompt,
-            "provider": provider,
-            "operation": "generate",
-            "seed": str(seed),
-        }
-
-        # Add size/dimensions based on provider
-        if provider == "openai":
-            if size:
-                width, height = size.split("x")
-                form_data["width"] = width
-                form_data["height"] = height
-        elif provider == "novelai":
-            if size:
-                form_data["size"] = size
-        elif provider == "stabilityai":
-            # Handle aspect ratio for Stability AI
-            if hasattr(request, "form") and "aspect_ratio" in request.form:
-                form_data["aspect_ratio"] = request.form["aspect_ratio"]
-
-        # Add other form fields from the original request
-        if hasattr(request, "form"):
-            for key in [
-                "negative_prompt",
-                "quality",
-                "upscale",
-                "variety",
-                "add-follow-prompt",
-            ]:
-                if key in request.form:
-                    form_data[key] = request.form[key]
-
-            # Handle character prompts for NovelAI
-            if provider == "novelai":
-                character_prompts = []
-                i = 0
-                while f"character_prompts[{i}][positive]" in request.form:
-                    positive_prompt = request.form.get(
-                        f"character_prompts[{i}][positive]", ""
-                    ).strip()
-                    negative_prompt = request.form.get(
-                        f"character_prompts[{i}][negative]", ""
-                    ).strip()
-
-                    # Only add if there's at least a positive prompt
-                    if positive_prompt:
-                        char_prompt = {
-                            "positive": positive_prompt,
-                            "negative": negative_prompt,
-                        }
-                        character_prompts.append(char_prompt)
-                    i += 1
-
-                # Pass character prompts directly to form_data for processing
-                if character_prompts:
-                    for idx, char_prompt in enumerate(character_prompts):
-                        form_data[f"character_prompts[{idx}][positive]"] = char_prompt[
-                            "positive"
-                        ]
-                        form_data[f"character_prompts[{idx}][negative]"] = char_prompt[
-                            "negative"
-                        ]
-
-        # Capture original character prompts before processing
-        original_character_prompts = []
-        if provider == "novelai" and hasattr(request, "form"):
-            char_index = 0
-            while f"character_prompts[{char_index}][positive]" in request.form:
-                positive_prompt = request.form.get(
-                    f"character_prompts[{char_index}][positive]", ""
-                ).strip()
-                negative_prompt = request.form.get(
-                    f"character_prompts[{char_index}][negative]", ""
-                ).strip()
-                original_character_prompts.append(
-                    {"positive": positive_prompt, "negative": negative_prompt}
-                )
-                char_index += 1
-
-        # Add metadata to form_data before creating the request
-        # This ensures the original prompt information is preserved
-        form_data["metadata_original_prompt"] = prompt
-        form_data["metadata_grid_dynamic_prompt"] = dynamic_prompt
-        form_data["metadata_grid_prompt_file"] = grid_prompt_file
-
-        # Add original character prompts to form_data for metadata preservation
-        if provider == "novelai" and hasattr(request, "form"):
-            char_index = 0
-            while f"character_prompts[{char_index}][positive]" in request.form:
-                positive_prompt = request.form.get(
-                    f"character_prompts[{char_index}][positive]", ""
-                ).strip()
-                negative_prompt = request.form.get(
-                    f"character_prompts[{char_index}][negative]", ""
-                ).strip()
-
-                if positive_prompt:
-                    form_data[f"metadata_original_character_{char_index}_positive"] = (
-                        positive_prompt
-                    )
-                if negative_prompt:
-                    form_data[f"metadata_original_character_{char_index}_negative"] = (
-                        negative_prompt
-                    )
-                char_index += 1
-
         # Create the image request using the unified system
         try:
             image_request = create_request_from_form_data(form_data)
-            image_request.grid_dynamic_prompt_info = GridDynamicPromptInfo(
+            image_request.grid_dynamic_prompt = GridDynamicPromptInfo(
                         str_to_replace_with=dynamic_prompt, prompt_file=grid_prompt_file
                     )
-
+            # Override seed with the locked grid seed
+            image_request.seed = seed
             # Generate the image using the unified handler
-            response = _handle_generation_request(image_request)
+            if image_request.operation == Operation.INPAINT:
+                response = _handle_inpainting_request(image_request)
+            else:
+                response = _handle_generation_request(image_request)
 
             if response.success:
                 # Convert the response to GeneratedImageData format
@@ -2475,7 +2376,6 @@ def handle_image_request():
             grid_prompt_file = form_data.get("grid-prompt-file")
             provider = form_data.get("provider", "openai")
             prompt = form_data.get("prompt", "")
-            size = form_data.get("size")
             seed = (
                 int(form_data.get("seed", 0))
                 if form_data.get("seed", "0").isdigit()
@@ -2484,9 +2384,9 @@ def handle_image_request():
 
             try:
                 grid_result = generate_image_grid(
+                    form_data=form_data,
                     provider=provider,
                     prompt=prompt,
-                    size=size,
                     seed=seed,
                     grid_prompt_file=grid_prompt_file,
                     request=request,
@@ -2618,7 +2518,7 @@ def _handle_generation_request(
                 seed=seed,
                 upscale=False,  # Default to False for new endpoint
                 variety=image_request.variety,
-                grid_dynamic_prompt=image_request.grid_dynamic_prompt_info,
+                grid_dynamic_prompt=image_request.grid_dynamic_prompt,
                 character_prompts=character_prompts
             )
         else:
@@ -2701,6 +2601,7 @@ def _handle_inpainting_request(
                 seed=seed,
                 variety=image_request.variety,
                 character_prompts=image_request.character_prompts,
+                grid_dynamic_prompt=image_request.grid_dynamic_prompt,
             )
         else:
             raise ValueError(
