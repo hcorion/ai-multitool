@@ -234,7 +234,7 @@ class TestGridGeneration:
 
     @patch('app._handle_generation_request')
     def test_grid_generation_processes_character_prompts_with_grid_override(self, mock_handler, client):
-        """Test that character prompts are processed with grid prompt overrides."""
+        """Test that character prompts are passed with grid dynamic prompt info for processing."""
         # Mock successful image generation responses
         mock_response = MagicMock()
         mock_response.success = True
@@ -283,15 +283,18 @@ class TestGridGeneration:
                 assert request_obj.character_prompts is not None
                 assert len(request_obj.character_prompts) == 1
                 
-                # The character prompt should have the grid prompt replaced
+                # The character prompts should still contain the original placeholders
+                # Processing happens inside the generation functions, not at the grid level
                 char_prompt = request_obj.character_prompts[0]
-                # Should be either "a red character" or "a blue character"
-                assert 'red character' in char_prompt['positive'] or 'blue character' in char_prompt['positive']
-                # Should be either "bad red things" or "bad blue things"  
-                assert 'red things' in char_prompt['negative'] or 'blue things' in char_prompt['negative']
-                # Should NOT contain the original __colors__ placeholder
-                assert '__colors__' not in char_prompt['positive']
-                assert '__colors__' not in char_prompt['negative']
+                assert char_prompt['positive'] == 'a __colors__ character'
+                assert char_prompt['negative'] == 'bad __colors__ things'
+                
+                # But the request should have grid_dynamic_prompt set for processing
+                assert hasattr(request_obj, 'grid_dynamic_prompt')
+                assert request_obj.grid_dynamic_prompt is not None
+                assert request_obj.grid_dynamic_prompt.prompt_file == 'colors'
+                # Should be either "red" or "blue"
+                assert request_obj.grid_dynamic_prompt.str_to_replace_with in ['red', 'blue']
 
     @patch('app._handle_generation_request')
     def test_grid_generation_with_grid_prompt_only_in_character_prompts(self, mock_handler, client):
@@ -347,20 +350,23 @@ class TestGridGeneration:
                 assert request_obj.character_prompts is not None
                 assert len(request_obj.character_prompts) == 2
                 
-                # First character prompt should have grid replacement
+                # First character prompt should still contain the original placeholders
+                # Processing happens inside the generation functions
                 char_prompt_0 = request_obj.character_prompts[0]
-                # Should be "a red dragon", "a blue dragon", or "a green dragon"
-                assert any(color in char_prompt_0['positive'] for color in ['red dragon', 'blue dragon', 'green dragon'])
-                # Should be "ugly red things", "ugly blue things", or "ugly green things"
-                assert any(color in char_prompt_0['negative'] for color in ['red things', 'blue things', 'green things'])
-                # Should NOT contain the original __colors__ placeholder
-                assert '__colors__' not in char_prompt_0['positive']
-                assert '__colors__' not in char_prompt_0['negative']
+                assert char_prompt_0['positive'] == 'a __colors__ dragon'
+                assert char_prompt_0['negative'] == 'ugly __colors__ things'
                 
                 # Second character prompt should remain unchanged (no grid placeholder)
                 char_prompt_1 = request_obj.character_prompts[1]
                 assert char_prompt_1['positive'] == 'a wizard'
                 assert char_prompt_1['negative'] == 'bad quality'
+                
+                # But the request should have grid_dynamic_prompt set for processing
+                assert hasattr(request_obj, 'grid_dynamic_prompt')
+                assert request_obj.grid_dynamic_prompt is not None
+                assert request_obj.grid_dynamic_prompt.prompt_file == 'colors'
+                # Should be "red", "blue", or "green"
+                assert request_obj.grid_dynamic_prompt.str_to_replace_with in ['red', 'blue', 'green']
 
     @patch('app._handle_generation_request')
     def test_grid_generation_metadata_includes_processed_prompts(self, mock_handler, client):
@@ -414,7 +420,7 @@ class TestGridGeneration:
 
     @patch('app._handle_generation_request')
     def test_individual_grid_image_metadata_contains_processed_prompts(self, mock_handler, client):
-        """Test that individual grid images have metadata with processed prompts."""
+        """Test that individual grid images receive proper grid dynamic prompt info for processing."""
         # Mock successful image generation responses
         mock_response = MagicMock()
         mock_response.success = True
@@ -466,11 +472,16 @@ class TestGridGeneration:
                 assert len(request_obj.character_prompts) == 1
                 
                 char_prompt = request_obj.character_prompts[0]
-                # Should contain either "red" or "blue" instead of "__colors__"
-                assert '__colors__' not in char_prompt['positive']
-                assert '__colors__' not in char_prompt['negative']
-                assert ('red character' in char_prompt['positive'] or 'blue character' in char_prompt['positive'])
-                assert ('red things' in char_prompt['negative'] or 'blue things' in char_prompt['negative'])
+                # Should still contain the original placeholders - processing happens in generation functions
+                assert char_prompt['positive'] == 'a __colors__ character'
+                assert char_prompt['negative'] == 'bad __colors__ things'
+                
+                # But the request should have grid_dynamic_prompt set for processing
+                assert hasattr(request_obj, 'grid_dynamic_prompt')
+                assert request_obj.grid_dynamic_prompt is not None
+                assert request_obj.grid_dynamic_prompt.prompt_file == 'colors'
+                # Should be either "red" or "blue"
+                assert request_obj.grid_dynamic_prompt.str_to_replace_with in ['red', 'blue']
 
     @patch('app._handle_generation_request')
     def test_grid_generation_metadata_uses_frontend_expected_keys(self, mock_handler, client):
