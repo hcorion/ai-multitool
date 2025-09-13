@@ -14,20 +14,27 @@ export type MessageHistory = {
     messages: ChatMessage[];
 };
 
-export function onConversationSelected(conversationId: string, successCallback: (chatData: MessageHistory) => void): void {
+export async function onConversationSelected(conversationId: string): Promise<MessageHistory> {
     console.log(`conversation: ${conversationId}`);
-    $.ajax({
-        type: "GET",
-        url: "/chat?thread_id=" + encodeURIComponent(conversationId),
-        contentType: "application/json",
-        scriptCharset: "utf-8",
-        success: (response: string) => {
-            let chatData: MessageHistory = JSON.parse(response);
-            successCallback(chatData);
-        },
-        error: (error) => {
-            throw new Error(`Error: ${error}`);
-        },
+    
+    return new Promise((resolve, reject) => {
+        $.ajax({
+            type: "GET",
+            url: "/chat?thread_id=" + encodeURIComponent(conversationId),
+            contentType: "application/json",
+            scriptCharset: "utf-8",
+            success: (response: string) => {
+                try {
+                    const chatData: MessageHistory = JSON.parse(response);
+                    resolve(chatData);
+                } catch (error) {
+                    reject(new Error(`Failed to parse chat data: ${error}`));
+                }
+            },
+            error: (error) => {
+                reject(new Error(`Error loading conversation: ${error}`));
+            },
+        });
     });
 }
 

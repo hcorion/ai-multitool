@@ -1,18 +1,25 @@
 import * as utils from "./utils.js";
-export function onConversationSelected(conversationId, successCallback) {
+export async function onConversationSelected(conversationId) {
     console.log(`conversation: ${conversationId}`);
-    $.ajax({
-        type: "GET",
-        url: "/chat?thread_id=" + encodeURIComponent(conversationId),
-        contentType: "application/json",
-        scriptCharset: "utf-8",
-        success: (response) => {
-            let chatData = JSON.parse(response);
-            successCallback(chatData);
-        },
-        error: (error) => {
-            throw new Error(`Error: ${error}`);
-        },
+    return new Promise((resolve, reject) => {
+        $.ajax({
+            type: "GET",
+            url: "/chat?thread_id=" + encodeURIComponent(conversationId),
+            contentType: "application/json",
+            scriptCharset: "utf-8",
+            success: (response) => {
+                try {
+                    const chatData = JSON.parse(response);
+                    resolve(chatData);
+                }
+                catch (error) {
+                    reject(new Error(`Failed to parse chat data: ${error}`));
+                }
+            },
+            error: (error) => {
+                reject(new Error(`Error loading conversation: ${error}`));
+            },
+        });
     });
 }
 showdown.extension("highlight", function () {

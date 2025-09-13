@@ -4,8 +4,12 @@ import("./chat.js").then((chat) => {
     const conversationId = urlParams.get('id')
     if (conversationId) {
         // @ts-ignore
-        chat.onConversationSelected(conversationId, (chatData: chat.MessageHistory) => {
-            chat.refreshChatMessages(chatData.messages);
-        })
+        chat.onConversationSelected(conversationId)
+            .then((chatData: any) => {
+                chat.refreshChatMessages(chatData.messages);
+            })
+            .catch((error) => {
+                console.error('Failed to load conversation:', error);
+            });
     }
 });

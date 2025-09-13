@@ -1234,7 +1234,8 @@ function onConversationSelected(ev) {
     let conversationId = this.getAttribute("data-conversation-id");
     console.log(`conversation: ${conversationId}`);
     const chatInput = document.getElementById("chat-input");
-    chat.onConversationSelected(conversationId, (chatData) => {
+    chat.onConversationSelected(conversationId)
+        .then((chatData) => {
         chatInput.value = ""; // Clear input field
         chat.refreshChatMessages(chatData.messages);
         currentThreadId = chatData.threadId;

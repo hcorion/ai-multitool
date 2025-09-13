@@ -806,23 +806,7 @@ export class InpaintingMaskCanvas {
             this.hide();
         } catch (error) {
             console.error('Failed to complete mask:', error);
-            // Fallback to sync export
-            try {
-                const { dataUrl, fileId } = this.exportMaskAsTemporaryFile();
-                this.config.onMaskComplete(dataUrl, fileId);
-                this.hide();
-            } catch (fallbackError) {
-                console.error('Fallback export also failed:', fallbackError);
-                // Last resort - basic export without file management
-                try {
-                    const maskDataUrl = this.exportMask();
-                    this.config.onMaskComplete(maskDataUrl);
-                    this.hide();
-                } catch (finalError) {
-                    console.error('All export methods failed:', finalError);
-                    this.showError('Failed to export mask. Please try again.');
-                }
-            }
+            this.showError('Failed to export mask. Please try again.');
         }
     }
 
@@ -991,8 +975,7 @@ export class InpaintingMaskCanvas {
                     const checkpoint = await this.historyManager.createTileBasedCheckpointAsync(state.maskData);
                     console.log(`Created async checkpoint after ${this.historyManager.getState().strokeCount} strokes:`, checkpoint.id);
                 } catch (error) {
-                    console.warn('Async checkpoint creation failed, using sync fallback:', error);
-                    this.historyManager.createCheckpoint(state.maskData);
+                    console.warn('Async checkpoint creation failed:', error);
                 }
             }
 
@@ -1004,27 +987,11 @@ export class InpaintingMaskCanvas {
                         console.log('Mask binary invariant corrected by WebWorker');
                     }
                 } catch (error) {
-                    console.warn('Async mask validation failed, using sync fallback:', error);
-                    this.canvasManager.validateMaskBinary();
+                    console.warn('Async mask validation failed:', error);
                 }
             }
         } catch (error) {
             console.error('Async stroke processing failed:', error);
-            
-            // Fallback to synchronous processing
-            console.log('Falling back to synchronous stroke processing');
-            const state = this.canvasManager.getState();
-            if (state && this.historyManager) {
-                const strokeCommand = this.historyManager.addStroke(completedStroke, state.maskData);
-                console.log('Added stroke to history (sync fallback):', strokeCommand.id);
-                this.updateHistoryButtons();
-                
-                // Sync checkpoint creation as fallback
-                if (this.historyManager.getState().strokeCount % 10 === 0) {
-                    this.historyManager.createCheckpoint(state.maskData);
-                    console.log(`Created sync checkpoint after ${this.historyManager.getState().strokeCount} strokes`);
-                }
-            }
         }
     }
 
@@ -1192,8 +1159,9 @@ export class InpaintingMaskCanvas {
         
         // Create a new checkpoint periodically for performance
         if (currentStrokes.length > 0 && currentStrokes.length % 20 === 0) {
-            this.historyManager.createCheckpoint(state.maskData);
-            console.log(`Created checkpoint at stroke ${historyState.currentIndex}`);
+            this.historyManager.createTileBasedCheckpointAsync(state.maskData)
+                .then(() => console.log(`Created async checkpoint at stroke ${historyState.currentIndex}`))
+                .catch(error => console.warn('Async checkpoint creation failed during replay:', error));
         }
     }
 
@@ -1245,8 +1213,7 @@ export class InpaintingMaskCanvas {
                     const checkpoint = await this.historyManager.createTileBasedCheckpointAsync(state.maskData);
                     console.log(`Created async checkpoint at stroke ${historyState.currentIndex}:`, checkpoint.id);
                 } catch (error) {
-                    console.warn('Async checkpoint creation failed during replay, using sync fallback:', error);
-                    this.historyManager.createCheckpoint(state.maskData);
+                    console.warn('Async checkpoint creation failed during replay:', error);
                 }
             }
         } catch (error) {

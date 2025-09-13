@@ -175,16 +175,7 @@ export class HistoryManager {
         this.workerManager = workerManager;
     }
 
-    /**
-     * Create a checkpoint of the current mask state (legacy method for compatibility)
-     */
-    public createCheckpoint(maskData: Uint8Array): Checkpoint {
-        // For backward compatibility, if image dimensions are not set, create a full checkpoint
-        if (this.imageWidth === 0 || this.imageHeight === 0) {
-            return this.createFullCheckpoint(maskData);
-        }
-        return this.createTileBasedCheckpoint(maskData);
-    }
+
 
     /**
      * Create a tile-based checkpoint of the current mask state

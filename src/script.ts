@@ -1413,9 +1413,10 @@ function onConversationSelected(this: HTMLDivElement, ev: MouseEvent) {
     console.log(`conversation: ${conversationId}`);
     const chatInput = document.getElementById("chat-input") as HTMLTextAreaElement;
 
-    chat.onConversationSelected(conversationId, (chatData: chat.MessageHistory) => {
-        chatInput.value = ""; // Clear input field
-        chat.refreshChatMessages(chatData.messages);
+    chat.onConversationSelected(conversationId)
+        .then((chatData: chat.MessageHistory) => {
+            chatInput.value = ""; // Clear input field
+            chat.refreshChatMessages(chatData.messages);
         currentThreadId = chatData.threadId;
         // Expose currentThreadId to window for reasoning modal access
         (window as any).currentThreadId = currentThreadId;

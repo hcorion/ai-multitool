@@ -756,9 +756,9 @@ export class CanvasManager {
         }
         catch (error) {
             console.warn('Async mask export failed, falling back to sync:', error);
-            // Validate binary invariant in fallback
+            // Validate binary invariant
             if (!BrushEngine.validateBinaryMask(this.state.maskData)) {
-                console.warn('Binary mask invariant violated during sync fallback, enforcing binary values');
+                console.warn('Binary mask invariant violated, enforcing binary values');
                 BrushEngine.enforceBinaryMask(this.state.maskData);
             }
             return {

@@ -1,4 +1,6 @@
 - Change format for replacement | syntax to just {x|y}
 - Add replacement syntax for emphasis randomness
 - Make generate grid input box allow the user to pick from an existing list
-- 
+- Unify processed and revised names in metadata
+- Add ability to define prompt file replacement with follow-up options. For example, color prompt defines secondary and tertiary colours, 
+    so the second time this replacement gets used in a prompt it will use the secondary prompt option.
