@@ -20,90 +20,69 @@ document.addEventListener("DOMContentLoaded", () => {
     $("#loading-spinner").hide();
     $("#prompt-form").on("submit", (event: JQuery.SubmitEvent) => {
         event.preventDefault();
-        const formData: string = $("#prompt-form").serialize();
 
         $("#loading-spinner").show();
 
-        // Check if we should use the new /image endpoint or legacy / endpoint
-        const useNewEndpoint = shouldUseNewImageEndpoint();
+        // Always use the unified /image endpoint - it handles both regular and grid generation
+        const formData: string = $("#prompt-form").serialize();
 
-        if (useNewEndpoint) {
-            // Use new /image endpoint with JSON response
-            $.ajax({
-                type: "POST",
-                url: "/image",
-                data: formData,
-                dataType: "json",
-                success: (response: ImageOperationResponse) => {
-                    if (response.success) {
-                        renderImageResult(response);
-                    } else {
-                        renderImageError(response.error_message || "Unknown error occurred");
-                    }
-                    $("#loading-spinner").hide();
-                },
-                error: (xhr: JQuery.jqXHR) => {
-                    let errorMessage = "An error occurred while generating the image.";
+        // Use new /image endpoint with JSON response
+        $.ajax({
+            type: "POST",
+            url: "/image",
+            data: formData,
+            dataType: "json",
+            success: (response: ImageOperationResponse) => {
+                if (response.success) {
+                    renderImageResult(response);
+                } else {
+                    renderImageError(response.error_message || "Unknown error occurred");
+                }
+                $("#loading-spinner").hide();
+            },
+            error: (xhr: JQuery.jqXHR) => {
+                let errorMessage = "An error occurred while generating the image.";
 
-                    // Try to extract detailed error information
-                    if (xhr.responseJSON) {
-                        if (xhr.responseJSON.error_message) {
-                            errorMessage = xhr.responseJSON.error_message;
-                        } else if (xhr.responseJSON.error) {
-                            errorMessage = xhr.responseJSON.error;
-                        }
-
-                        // Add additional error details if available
-                        if (xhr.responseJSON.error_type) {
-                            errorMessage += ` (${xhr.responseJSON.error_type})`;
-                        }
-                    } else if (xhr.responseText) {
-                        // Try to parse error from response text
-                        try {
-                            const errorData = JSON.parse(xhr.responseText);
-                            if (errorData.error_message) {
-                                errorMessage = errorData.error_message;
-                            } else if (errorData.error) {
-                                errorMessage = errorData.error;
-                            }
-                        } catch (e) {
-                            // If parsing fails, include the raw response text for debugging
-                            errorMessage += ` (Status: ${xhr.status}, Response: ${xhr.responseText.substring(0, 200)})`;
-                        }
-                    } else {
-                        errorMessage += ` (HTTP ${xhr.status}: ${xhr.statusText})`;
+                // Try to extract detailed error information
+                if (xhr.responseJSON) {
+                    if (xhr.responseJSON.error_message) {
+                        errorMessage = xhr.responseJSON.error_message;
+                    } else if (xhr.responseJSON.error) {
+                        errorMessage = xhr.responseJSON.error;
                     }
 
-                    console.error('Image generation error:', {
-                        status: xhr.status,
-                        statusText: xhr.statusText,
-                        responseJSON: xhr.responseJSON,
-                        responseText: xhr.responseText
-                    });
-
-                    renderImageError(errorMessage);
-                    $("#loading-spinner").hide();
+                    // Add additional error details if available
+                    if (xhr.responseJSON.error_type) {
+                        errorMessage += ` (${xhr.responseJSON.error_type})`;
+                    }
+                } else if (xhr.responseText) {
+                    // Try to parse error from response text
+                    try {
+                        const errorData = JSON.parse(xhr.responseText);
+                        if (errorData.error_message) {
+                            errorMessage = errorData.error_message;
+                        } else if (errorData.error) {
+                            errorMessage = errorData.error;
+                        }
+                    } catch (e) {
+                        // If parsing fails, include the raw response text for debugging
+                        errorMessage += ` (Status: ${xhr.status}, Response: ${xhr.responseText.substring(0, 200)})`;
+                    }
+                } else {
+                    errorMessage += ` (HTTP ${xhr.status}: ${xhr.statusText})`;
                 }
-            });
-        } else {
-            // Use legacy / endpoint with HTML response
-            $.ajax({
-                type: "POST",
-                url: "/",
-                data: formData,
-                success: (response: string) => {
-                    $("#result-section").html(response);
 
-                    addEventListenerToElement("generatedImage", "click", openGenModal);
-                    addEventListenerToElement("generatedImageClose", "click", closeGenModal);
-                    $("#loading-spinner").hide();
-                },
-                error: () => {
-                    renderImageError("An error occurred while generating the image with legacy endpoint.");
-                    $("#loading-spinner").hide();
-                }
-            });
-        }
+                console.error('Image generation error:', {
+                    status: xhr.status,
+                    statusText: xhr.statusText,
+                    responseJSON: xhr.responseJSON,
+                    responseText: xhr.responseText
+                });
+
+                renderImageError(errorMessage);
+                $("#loading-spinner").hide();
+            }
+        });
     });
 
     // Image gen elements
@@ -157,6 +136,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
     addEventListenerToElement("advanced-generate-grid", "change", toggleAdvancedInput);
+    addEventListenerToElement("advanced-toggle", "click", toggleShowAdvanced);
 
     addEventListener("keydown", keyDownEvent);
 
@@ -184,12 +164,6 @@ function keyDownEvent(evt: KeyboardEvent) {
 }
 
 // Helper functions for new image API
-function shouldUseNewImageEndpoint(): boolean {
-    // For now, always use the new endpoint for basic generation
-    // In the future, this could check for advanced features like grid generation
-    const advancedGrid = $("#advanced-generate-grid").is(":checked");
-    return !advancedGrid; // Use new endpoint unless advanced grid is enabled
-}
 
 function renderImageResult(response: ImageOperationResponse): void {
     // Extract character prompts from metadata
@@ -2187,7 +2161,10 @@ async function deletePromptFile(fileName: string): Promise<void> {
     }
 }
 
+// Advanced options functionality - using existing implementations
+
+// Grid generation is now handled by the unified backend endpoint
+
 // Make prompt file functions globally accessible
 (window as any).editPromptFile = editPromptFile;
-(window as any).deletePromptFile = deletePromptFile;
 (window as any).deletePromptFile = deletePromptFile;

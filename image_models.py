@@ -5,6 +5,7 @@ Data models for unified image generation API with strict typing.
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional, Dict, Any, Union
+from dynamic_prompts import GridDynamicPromptInfo
 
 
 class Provider(str, Enum):
@@ -53,7 +54,8 @@ class ImageGenerationRequest:
     model: Optional[str] = None
     character_prompts: Optional[list[dict[str, str]]] = None
     variety: bool = False
-    seed: int = 0
+    seed: int = 0,
+    grid_dynamic_prompt_info: Optional[GridDynamicPromptInfo] = None
     
     def __post_init__(self):
         """Validate request parameters after initialization."""

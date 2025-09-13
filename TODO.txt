@@ -1,0 +1,4 @@
+- Change format for replacement | syntax to just {x|y}
+- Add replacement syntax for emphasis randomness
+- Make generate grid input box allow the user to pick from an existing list
+- 

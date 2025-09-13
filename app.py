@@ -93,6 +93,7 @@ def share():
         return redirect(url_for("login"))
     return render_template("share.html")
 
+
 @app.route("/save-mask", methods=["POST"])
 def save_mask():
     """Save uploaded mask file for inpainting operations."""
@@ -2076,8 +2077,10 @@ def generate_image_grid(
     grid_prompt_file: str,
     request: Request,
 ) -> GeneratedImageData:
+    """Generate a grid of images using the unified image generation system."""
     if not app.static_folder:
         raise ValueError("Static folder is undefined!")
+
     username = session["username"]
     dynamic_prompts = get_prompts_for_name(
         username, app.static_folder, grid_prompt_file
@@ -2092,75 +2095,292 @@ def generate_image_grid(
     if not seed:
         seed = generate_seed_for_provider(provider)
 
+    # Generate images using the unified image generation system
     image_data_list: Dict[str, GeneratedImageData] = dict()
+    generation_errors: List[str] = []
+
     for dynamic_prompt in dynamic_prompts:
-        image_data_list[dynamic_prompt] = generate_image(
-            provider,
-            prompt,
-            size,
-            request,
-            seed,
-            GridDynamicPromptInfo(
-                str_to_replace_with=dynamic_prompt, prompt_file=grid_prompt_file
-            ),
-        )
-        print("Image generated!")
+        # Create a request object for this specific prompt
+        form_data = {
+            "prompt": prompt,
+            "provider": provider,
+            "operation": "generate",
+            "seed": str(seed),
+        }
+
+        # Add size/dimensions based on provider
+        if provider == "openai":
+            if size:
+                width, height = size.split("x")
+                form_data["width"] = width
+                form_data["height"] = height
+        elif provider == "novelai":
+            if size:
+                form_data["size"] = size
+        elif provider == "stabilityai":
+            # Handle aspect ratio for Stability AI
+            if hasattr(request, "form") and "aspect_ratio" in request.form:
+                form_data["aspect_ratio"] = request.form["aspect_ratio"]
+
+        # Add other form fields from the original request
+        if hasattr(request, "form"):
+            for key in [
+                "negative_prompt",
+                "quality",
+                "upscale",
+                "variety",
+                "add-follow-prompt",
+            ]:
+                if key in request.form:
+                    form_data[key] = request.form[key]
+
+            # Handle character prompts for NovelAI
+            if provider == "novelai":
+                character_prompts = []
+                i = 0
+                while f"character_prompts[{i}][positive]" in request.form:
+                    positive_prompt = request.form.get(
+                        f"character_prompts[{i}][positive]", ""
+                    ).strip()
+                    negative_prompt = request.form.get(
+                        f"character_prompts[{i}][negative]", ""
+                    ).strip()
+
+                    # Only add if there's at least a positive prompt
+                    if positive_prompt:
+                        char_prompt = {
+                            "positive": positive_prompt,
+                            "negative": negative_prompt,
+                        }
+                        character_prompts.append(char_prompt)
+                    i += 1
+
+                # Pass character prompts directly to form_data for processing
+                if character_prompts:
+                    for idx, char_prompt in enumerate(character_prompts):
+                        form_data[f"character_prompts[{idx}][positive]"] = char_prompt[
+                            "positive"
+                        ]
+                        form_data[f"character_prompts[{idx}][negative]"] = char_prompt[
+                            "negative"
+                        ]
+
+        # Capture original character prompts before processing
+        original_character_prompts = []
+        if provider == "novelai" and hasattr(request, "form"):
+            char_index = 0
+            while f"character_prompts[{char_index}][positive]" in request.form:
+                positive_prompt = request.form.get(
+                    f"character_prompts[{char_index}][positive]", ""
+                ).strip()
+                negative_prompt = request.form.get(
+                    f"character_prompts[{char_index}][negative]", ""
+                ).strip()
+                original_character_prompts.append(
+                    {"positive": positive_prompt, "negative": negative_prompt}
+                )
+                char_index += 1
+
+        # Add metadata to form_data before creating the request
+        # This ensures the original prompt information is preserved
+        form_data["metadata_original_prompt"] = prompt
+        form_data["metadata_grid_dynamic_prompt"] = dynamic_prompt
+        form_data["metadata_grid_prompt_file"] = grid_prompt_file
+
+        # Add original character prompts to form_data for metadata preservation
+        if provider == "novelai" and hasattr(request, "form"):
+            char_index = 0
+            while f"character_prompts[{char_index}][positive]" in request.form:
+                positive_prompt = request.form.get(
+                    f"character_prompts[{char_index}][positive]", ""
+                ).strip()
+                negative_prompt = request.form.get(
+                    f"character_prompts[{char_index}][negative]", ""
+                ).strip()
+
+                if positive_prompt:
+                    form_data[f"metadata_original_character_{char_index}_positive"] = (
+                        positive_prompt
+                    )
+                if negative_prompt:
+                    form_data[f"metadata_original_character_{char_index}_negative"] = (
+                        negative_prompt
+                    )
+                char_index += 1
+
+        # Create the image request using the unified system
+        try:
+            image_request = create_request_from_form_data(form_data)
+            image_request.grid_dynamic_prompt_info = GridDynamicPromptInfo(
+                        str_to_replace_with=dynamic_prompt, prompt_file=grid_prompt_file
+                    )
+
+            # Generate the image using the unified handler
+            response = _handle_generation_request(image_request)
+
+            if response.success:
+                # Convert the response to GeneratedImageData format
+                image_data_list[dynamic_prompt] = GeneratedImageData(
+                    local_image_path=response.image_path,
+                    revised_prompt=response.revised_prompt or image_request.prompt,
+                    prompt=image_request.prompt,
+                    image_name=response.image_name,
+                    metadata=response.metadata,
+                )
+                import logging
+
+                logging.info(
+                    f"Grid generation: Image generated for prompt '{dynamic_prompt}'"
+                )
+            else:
+                error_msg = f"Prompt '{dynamic_prompt}': {response.error_message or 'Unknown error'}"
+                if response.error_type:
+                    error_msg += f" ({response.error_type})"
+                generation_errors.append(error_msg)
+                import logging
+
+                logging.warning(
+                    f"Grid generation: Failed to generate image - {error_msg}"
+                )
+                continue
+
+        except Exception as e:
+            error_msg = f"Prompt '{dynamic_prompt}': {str(e)}"
+            generation_errors.append(error_msg)
+            import logging
+
+            logging.error(
+                f"Grid generation: Exception during image generation - {error_msg}"
+            )
+            continue
+
         # Don't hammer the API servers
-        time.sleep(random.randrange(5, 15))
+        time.sleep(random.randrange(2, 8))
 
+    if not image_data_list:
+        if generation_errors:
+            error_summary = (
+                f"No images were successfully generated from {len(dynamic_prompts)} prompts. Errors encountered:\n"
+                + "\n".join(f"- {error}" for error in generation_errors)
+            )
+
+            # Add helpful context based on common error patterns
+            error_text = " ".join(generation_errors).lower()
+            if "rate limit" in error_text or "quota" in error_text:
+                error_summary += "\n\nTip: This appears to be a rate limiting issue. Try again in a few minutes or check your API quota."
+            elif "api key" in error_text or "authentication" in error_text:
+                error_summary += "\n\nTip: This appears to be an authentication issue. Check that your API keys are properly configured."
+            elif "invalid" in error_text and "prompt" in error_text:
+                error_summary += "\n\nTip: Some prompts may contain invalid content. Check your prompt file for problematic text."
+            elif "timeout" in error_text or "connection" in error_text:
+                error_summary += "\n\nTip: This appears to be a network connectivity issue. Check your internet connection and try again."
+        else:
+            error_summary = f"No images were successfully generated from {len(dynamic_prompts)} prompts. No specific errors recorded. This may indicate a configuration issue."
+        raise ValueError(error_summary)
+
+    # Create the grid image using ImageMagick
     file_count = get_file_count(username, app.static_folder)
-
     image_name = f"{str(file_count).zfill(10)}-grid_{grid_prompt_file}.png"
-    image_thumb_name = f"{str(file_count).zfill(10)}-grid_{grid_prompt_file}.thumb.png"
+    image_thumb_name = f"{str(file_count).zfill(10)}-grid_{grid_prompt_file}.thumb.jpg"
     image_path = os.path.join(app.static_folder, "images", username)
     image_filename = os.path.join(image_path, image_name)
     image_thumb_filename = os.path.join(image_path, image_thumb_name)
     image_thumb_filename_apng = image_thumb_filename.replace(
-        ".thumb.png", ".thumb.apng"
+        ".thumb.jpg", ".thumb.apng"
     )
 
+    # Create the montage using ImageMagick
     with WandImage() as img:  # type: ignore
         for dynamic_prompt, image_data in image_data_list.items():
+            # Extract the actual file path from the web path
+            actual_image_path = image_data.local_image_path
+            if actual_image_path.startswith("static/"):
+                actual_image_path = os.path.join(
+                    app.static_folder, actual_image_path[7:]
+                )
+
             with WandImage() as wand_image:  # type: ignore
                 wand_image.options["label"] = dynamic_prompt  # type: ignore
-                wand_image.read(filename=image_data.local_image_path)  # type: ignore
+                wand_image.read(filename=actual_image_path)  # type: ignore
                 img.image_add(wand_image)  # type: ignore
-        style = wand.font.Font("Roboto-Light.ttf", 65, "black")
+
+        # Create the montage with labels
+        try:
+            style = wand.font.Font("Roboto-Light.ttf", 65, "black")
+        except:
+            # Fallback if font is not available
+            style = None
+
         img.montage(mode="concatenate", font=style)  # type: ignore
         img.save(filename=image_filename)  # type: ignore
 
-    image_to_copy = PILImage.open(image_data_list[dynamic_prompts[0]].local_image_path)
-    png_info = PngInfo()
-    for key, value in image_to_copy.info.items():
-        if isinstance(key, str):
-            png_info.add_text(key, value)
-    target_image = PILImage.open(image_filename)
-    target_image.save(image_filename, pnginfo=png_info)
+    # Copy metadata from the first image
+    first_image_data = list(image_data_list.values())[0]
+    first_image_path = first_image_data.local_image_path
+    if first_image_path.startswith("static/"):
+        first_image_path = os.path.join(app.static_folder, first_image_path[7:])
 
-    with WandImage() as animated_img:  # type: ignore
-        for dynamic_prompt, image_data in image_data_list.items():
-            with WandImage(
-                filename=image_data.local_image_path.replace(".png", ".thumb.jpg")
-            ) as frame_image:  # type: ignore
-                frame_image.delay = 100  # type: ignore
-                animated_img.sequence.append(frame_image)  # type: ignore
-        animated_img.coalesce()  # type: ignore
-        animated_img.optimize_layers()  # type: ignore
-        animated_img.format = "apng"
-        animated_img.save(filename=image_thumb_filename_apng)  # type: ignore
-    # This is really weird but ImageMagick refuses to write an animated apng if it doesn't end in .apng
-    # So we have to do this song and dance to get our animated .thumb.png
-    os.rename(image_thumb_filename_apng, image_thumb_filename)
+    try:
+        image_to_copy = PILImage.open(first_image_path)
+        png_info = PngInfo()
+        for key, value in image_to_copy.info.items():
+            if isinstance(key, str):
+                png_info.add_text(key, value)
+
+        # Add grid-specific metadata
+        png_info.add_text("Grid Prompt File", grid_prompt_file)
+        png_info.add_text("Grid Prompts", ", ".join(dynamic_prompts))
+
+        target_image = PILImage.open(image_filename)
+        target_image.save(image_filename, pnginfo=png_info)
+    except Exception as e:
+        print(f"Warning: Could not copy metadata to grid image: {e}")
+
+    # Create animated thumbnail
+    try:
+        with WandImage() as animated_img:  # type: ignore
+            for dynamic_prompt, image_data in image_data_list.items():
+                # Get the thumbnail path
+                thumb_path = image_data.local_image_path.replace(".png", ".thumb.jpg")
+                if thumb_path.startswith("static/"):
+                    thumb_path = os.path.join(app.static_folder, thumb_path[7:])
+
+                if os.path.exists(thumb_path):
+                    with WandImage(filename=thumb_path) as frame_image:  # type: ignore
+                        frame_image.delay = 100  # type: ignore
+                        animated_img.sequence.append(frame_image)  # type: ignore
+
+            if len(animated_img.sequence) > 0:
+                animated_img.coalesce()  # type: ignore
+                animated_img.optimize_layers()  # type: ignore
+                animated_img.format = "apng"
+                animated_img.save(filename=image_thumb_filename_apng)  # type: ignore
+
+                # Rename to .thumb.jpg
+                os.rename(image_thumb_filename_apng, image_thumb_filename)
+    except Exception as e:
+        print(f"Warning: Could not create animated thumbnail: {e}")
+        # Create a static thumbnail from the grid image
+        try:
+            with WandImage(filename=image_filename) as thumb_img:  # type: ignore
+                thumb_img.resize(300, 300)  # type: ignore
+                thumb_img.save(filename=image_thumb_filename)  # type: ignore
+        except Exception as e2:
+            print(f"Warning: Could not create static thumbnail: {e2}")
 
     # Convert to web-relative path
     local_image_path = f"static/images/{username}/{image_name}"
 
     return GeneratedImageData(
         local_image_path=local_image_path,
-        revised_prompt=image_data_list[dynamic_prompts[0]].revised_prompt,
+        revised_prompt=f"Grid generated from {grid_prompt_file}: {', '.join(dynamic_prompts)}",
         prompt=prompt,
         image_name=image_name,
-        metadata={},
+        metadata={
+            "Grid Prompt File": grid_prompt_file,
+            "Grid Prompts": ", ".join(dynamic_prompts),
+            "Grid Image Count": str(len(image_data_list)),
+        },
     )
 
 
@@ -2246,8 +2466,59 @@ def handle_image_request():
         return jsonify({"error": "Not authenticated"}), 401
 
     try:
-        # Create request object from form data
-        image_request = create_request_from_form_data(request.form.to_dict())
+        # Check if this is a grid generation request
+        form_data = request.form.to_dict()
+        if form_data.get("advanced-generate-grid") == "on" and form_data.get(
+            "grid-prompt-file"
+        ):
+            # Handle grid generation using the legacy function but with unified backend
+            grid_prompt_file = form_data.get("grid-prompt-file")
+            provider = form_data.get("provider", "openai")
+            prompt = form_data.get("prompt", "")
+            size = form_data.get("size")
+            seed = (
+                int(form_data.get("seed", 0))
+                if form_data.get("seed", "0").isdigit()
+                else None
+            )
+
+            try:
+                grid_result = generate_image_grid(
+                    provider=provider,
+                    prompt=prompt,
+                    size=size,
+                    seed=seed,
+                    grid_prompt_file=grid_prompt_file,
+                    request=request,
+                )
+
+                return jsonify(
+                    {
+                        "success": True,
+                        "image_path": grid_result.local_image_path,
+                        "image_name": grid_result.image_name,
+                        "revised_prompt": grid_result.revised_prompt,
+                        "provider": provider,
+                        "operation": "grid_generate",
+                        "timestamp": int(time.time()),
+                        "metadata": grid_result.metadata,
+                    }
+                )
+
+            except Exception as e:
+                return jsonify(
+                    {
+                        "success": False,
+                        "error_message": f"Grid generation failed: {str(e)}",
+                        "error_type": "grid_generation_error",
+                        "provider": provider,
+                        "operation": "grid_generate",
+                        "timestamp": int(time.time()),
+                    }
+                ), 400
+
+        # Create request object from form data for regular operations
+        image_request = create_request_from_form_data(form_data)
 
         # Route to appropriate handler based on operation
         if image_request.operation == Operation.GENERATE:
@@ -2347,8 +2618,8 @@ def _handle_generation_request(
                 seed=seed,
                 upscale=False,  # Default to False for new endpoint
                 variety=image_request.variety,
-                grid_dynamic_prompt=None,
-                character_prompts=character_prompts,
+                grid_dynamic_prompt=image_request.grid_dynamic_prompt_info,
+                character_prompts=character_prompts
             )
         else:
             raise ValueError(f"Unsupported provider: {image_request.provider.value}")
@@ -3525,6 +3796,39 @@ def save_prompt_file():
 
     except Exception as e:
         return jsonify({"error": f"Failed to save file: {str(e)}"}), 500
+
+
+@app.route("/prompt-files/<filename>", methods=["GET"])
+def get_prompt_file(filename: str):
+    """Get a specific prompt file content."""
+    if "username" not in session:
+        return jsonify({"error": "Not authenticated"}), 401
+
+    if not app.static_folder:
+        return jsonify({"error": "Static folder not configured"}), 500
+
+    try:
+        # Validate filename
+        if not re.match(r"^[a-zA-Z0-9_-]+$", filename):
+            return jsonify({"error": "Invalid filename"}), 400
+
+        username = session["username"]
+        prompts_dir = os.path.join(app.static_folder, "prompts", username)
+        file_path = os.path.join(prompts_dir, f"{filename}.txt")
+
+        if not os.path.exists(file_path):
+            return jsonify({"error": "File not found"}), 404
+
+        with open(file_path, "r", encoding="utf-8") as f:
+            content = f.read().strip()
+
+        # Split content into lines and filter out empty lines
+        lines = [line.strip() for line in content.split("\n") if line.strip()]
+
+        return jsonify({"name": filename, "content": lines, "line_count": len(lines)})
+
+    except Exception as e:
+        return jsonify({"error": f"Failed to read file: {str(e)}"}), 500
 
 
 @app.route("/prompt-files/<filename>", methods=["DELETE"])

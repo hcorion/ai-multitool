@@ -114,7 +114,15 @@
   - Ensure all tests are passing
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
 
-- [ ] 10. Connect Generate Grid to unified image API
+- [x] 10. Connect Generate Grid to unified image API
+
+
+
+
+
+
+
+
   - Identify Generate Grid functionality in frontend code
   - Update Generate Grid to use unified `/image` endpoint for batch generation
   - Remove legacy Generate Grid implementation that bypasses unified API

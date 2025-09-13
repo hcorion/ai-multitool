@@ -5,89 +5,68 @@ document.addEventListener("DOMContentLoaded", () => {
     $("#loading-spinner").hide();
     $("#prompt-form").on("submit", (event) => {
         event.preventDefault();
-        const formData = $("#prompt-form").serialize();
         $("#loading-spinner").show();
-        // Check if we should use the new /image endpoint or legacy / endpoint
-        const useNewEndpoint = shouldUseNewImageEndpoint();
-        if (useNewEndpoint) {
-            // Use new /image endpoint with JSON response
-            $.ajax({
-                type: "POST",
-                url: "/image",
-                data: formData,
-                dataType: "json",
-                success: (response) => {
-                    if (response.success) {
-                        renderImageResult(response);
-                    }
-                    else {
-                        renderImageError(response.error_message || "Unknown error occurred");
-                    }
-                    $("#loading-spinner").hide();
-                },
-                error: (xhr) => {
-                    let errorMessage = "An error occurred while generating the image.";
-                    // Try to extract detailed error information
-                    if (xhr.responseJSON) {
-                        if (xhr.responseJSON.error_message) {
-                            errorMessage = xhr.responseJSON.error_message;
-                        }
-                        else if (xhr.responseJSON.error) {
-                            errorMessage = xhr.responseJSON.error;
-                        }
-                        // Add additional error details if available
-                        if (xhr.responseJSON.error_type) {
-                            errorMessage += ` (${xhr.responseJSON.error_type})`;
-                        }
-                    }
-                    else if (xhr.responseText) {
-                        // Try to parse error from response text
-                        try {
-                            const errorData = JSON.parse(xhr.responseText);
-                            if (errorData.error_message) {
-                                errorMessage = errorData.error_message;
-                            }
-                            else if (errorData.error) {
-                                errorMessage = errorData.error;
-                            }
-                        }
-                        catch (e) {
-                            // If parsing fails, include the raw response text for debugging
-                            errorMessage += ` (Status: ${xhr.status}, Response: ${xhr.responseText.substring(0, 200)})`;
-                        }
-                    }
-                    else {
-                        errorMessage += ` (HTTP ${xhr.status}: ${xhr.statusText})`;
-                    }
-                    console.error('Image generation error:', {
-                        status: xhr.status,
-                        statusText: xhr.statusText,
-                        responseJSON: xhr.responseJSON,
-                        responseText: xhr.responseText
-                    });
-                    renderImageError(errorMessage);
-                    $("#loading-spinner").hide();
+        // Always use the unified /image endpoint - it handles both regular and grid generation
+        const formData = $("#prompt-form").serialize();
+        // Use new /image endpoint with JSON response
+        $.ajax({
+            type: "POST",
+            url: "/image",
+            data: formData,
+            dataType: "json",
+            success: (response) => {
+                if (response.success) {
+                    renderImageResult(response);
                 }
-            });
-        }
-        else {
-            // Use legacy / endpoint with HTML response
-            $.ajax({
-                type: "POST",
-                url: "/",
-                data: formData,
-                success: (response) => {
-                    $("#result-section").html(response);
-                    addEventListenerToElement("generatedImage", "click", openGenModal);
-                    addEventListenerToElement("generatedImageClose", "click", closeGenModal);
-                    $("#loading-spinner").hide();
-                },
-                error: () => {
-                    renderImageError("An error occurred while generating the image with legacy endpoint.");
-                    $("#loading-spinner").hide();
+                else {
+                    renderImageError(response.error_message || "Unknown error occurred");
                 }
-            });
-        }
+                $("#loading-spinner").hide();
+            },
+            error: (xhr) => {
+                let errorMessage = "An error occurred while generating the image.";
+                // Try to extract detailed error information
+                if (xhr.responseJSON) {
+                    if (xhr.responseJSON.error_message) {
+                        errorMessage = xhr.responseJSON.error_message;
+                    }
+                    else if (xhr.responseJSON.error) {
+                        errorMessage = xhr.responseJSON.error;
+                    }
+                    // Add additional error details if available
+                    if (xhr.responseJSON.error_type) {
+                        errorMessage += ` (${xhr.responseJSON.error_type})`;
+                    }
+                }
+                else if (xhr.responseText) {
+                    // Try to parse error from response text
+                    try {
+                        const errorData = JSON.parse(xhr.responseText);
+                        if (errorData.error_message) {
+                            errorMessage = errorData.error_message;
+                        }
+                        else if (errorData.error) {
+                            errorMessage = errorData.error;
+                        }
+                    }
+                    catch (e) {
+                        // If parsing fails, include the raw response text for debugging
+                        errorMessage += ` (Status: ${xhr.status}, Response: ${xhr.responseText.substring(0, 200)})`;
+                    }
+                }
+                else {
+                    errorMessage += ` (HTTP ${xhr.status}: ${xhr.statusText})`;
+                }
+                console.error('Image generation error:', {
+                    status: xhr.status,
+                    statusText: xhr.statusText,
+                    responseJSON: xhr.responseJSON,
+                    responseText: xhr.responseText
+                });
+                renderImageError(errorMessage);
+                $("#loading-spinner").hide();
+            }
+        });
     });
     // Image gen elements
     addEventListenerToElement("provider", "change", providerChanged);
@@ -131,6 +110,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
     addEventListenerToElement("advanced-generate-grid", "change", toggleAdvancedInput);
+    addEventListenerToElement("advanced-toggle", "click", toggleShowAdvanced);
     addEventListener("keydown", keyDownEvent);
     document.getElementById("generationTab").click();
     // Character prompt event listeners
@@ -152,12 +132,6 @@ function keyDownEvent(evt) {
     }
 }
 // Helper functions for new image API
-function shouldUseNewImageEndpoint() {
-    // For now, always use the new endpoint for basic generation
-    // In the future, this could check for advanced features like grid generation
-    const advancedGrid = $("#advanced-generate-grid").is(":checked");
-    return !advancedGrid; // Use new endpoint unless advanced grid is enabled
-}
 function renderImageResult(response) {
     // Extract character prompts from metadata
     let characterPromptsHtml = '';
@@ -1916,7 +1890,8 @@ async function deletePromptFile(fileName) {
         alert(`Error deleting file: ${error}`);
     }
 }
+// Advanced options functionality - using existing implementations
+// Grid generation is now handled by the unified backend endpoint
 // Make prompt file functions globally accessible
 window.editPromptFile = editPromptFile;
-window.deletePromptFile = deletePromptFile;
 window.deletePromptFile = deletePromptFile;
