@@ -33,7 +33,6 @@ export class MaskFileManager {
         this.temporaryFiles.set(id, maskFile);
         // Cleanup old files if we exceed the limit
         this.enforceFileLimit();
-        console.log(`Stored temporary mask file: ${id}`);
         return id;
     }
     /**
@@ -47,7 +46,6 @@ export class MaskFileManager {
         // Check if file has expired
         if (this.isExpired(file)) {
             this.temporaryFiles.delete(id);
-            console.log(`Removed expired mask file: ${id}`);
             return null;
         }
         return file;
@@ -57,9 +55,6 @@ export class MaskFileManager {
      */
     removeMaskFile(id) {
         const removed = this.temporaryFiles.delete(id);
-        if (removed) {
-            console.log(`Removed temporary mask file: ${id}`);
-        }
         return removed;
     }
     /**
@@ -74,9 +69,6 @@ export class MaskFileManager {
                 cleanedCount++;
             }
         }
-        if (cleanedCount > 0) {
-            console.log(`Cleaned up ${cleanedCount} expired mask files`);
-        }
         return cleanedCount;
     }
     /**
@@ -85,9 +77,6 @@ export class MaskFileManager {
     cleanupAllFiles() {
         const count = this.temporaryFiles.size;
         this.temporaryFiles.clear();
-        if (count > 0) {
-            console.log(`Cleaned up all ${count} temporary mask files`);
-        }
         return count;
     }
     /**
@@ -143,7 +132,6 @@ export class MaskFileManager {
         this.cleanupInterval = window.setInterval(() => {
             this.cleanupExpiredFiles();
         }, intervalMs);
-        console.log(`Started automatic mask file cleanup (interval: ${intervalMs}ms)`);
     }
     /**
      * Stop automatic cleanup
@@ -152,7 +140,6 @@ export class MaskFileManager {
         if (this.cleanupInterval !== null) {
             clearInterval(this.cleanupInterval);
             this.cleanupInterval = null;
-            console.log('Stopped automatic mask file cleanup');
         }
     }
     /**
@@ -191,7 +178,6 @@ export class MaskFileManager {
         for (let i = 0; i < filesToRemove; i++) {
             const [id] = sortedFiles[i];
             this.temporaryFiles.delete(id);
-            console.log(`Removed old mask file due to limit: ${id}`);
         }
     }
 }

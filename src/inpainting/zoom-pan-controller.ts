@@ -557,7 +557,7 @@ export class ZoomPanController {
     /**
      * Convert screen coordinates to image coordinates with current transform
      */
-    public screenToImage(screenX: number, screenY: number, debug = false): { x: number; y: number } | null {
+    public screenToImage(screenX: number, screenY: number): { x: number; y: number } | null {
         if (!this.imageBounds) return null;
       
         const rect = this.canvas.getBoundingClientRect();

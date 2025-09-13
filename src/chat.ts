@@ -15,8 +15,6 @@ export type MessageHistory = {
 };
 
 export async function onConversationSelected(conversationId: string): Promise<MessageHistory> {
-    console.log(`conversation: ${conversationId}`);
-    
     return new Promise((resolve, reject) => {
         $.ajax({
             type: "GET",
@@ -268,7 +266,7 @@ function escapeHtml(text: string): string {
 }
 
 function showReasoningError(message: string): void {
-    console.log(message);
+    console.error(message);
     const error = document.getElementById("reasoning-error");
     if (!error) return;
     

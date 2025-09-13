@@ -60,9 +60,7 @@ class TestExamplePatterns:
         # The response might be 200, 302 (redirect), or 404 depending on implementation
         assert response.status_code in [200, 302, 404]
         
-        # Test POST request (example)
-        # response = client.post('/image', data={'prompt': 'test'})
-        # assert response.status_code == 200
+        # Test POST request would go here if needed for specific endpoint testing
     
     def test_with_temp_directory(self, temp_dir):
         """Example test using temporary directory for file operations."""

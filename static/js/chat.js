@@ -1,6 +1,5 @@
 import * as utils from "./utils.js";
 export async function onConversationSelected(conversationId) {
-    console.log(`conversation: ${conversationId}`);
     return new Promise((resolve, reject) => {
         $.ajax({
             type: "GET",
@@ -231,7 +230,7 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 function showReasoningError(message) {
-    console.log(message);
+    console.error(message);
     const error = document.getElementById("reasoning-error");
     if (!error)
         return;

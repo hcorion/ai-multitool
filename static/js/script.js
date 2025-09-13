@@ -742,7 +742,6 @@ function updateGridModalImage() {
             // This will be used by the character prompt interface implementation
             if (characterPrompts.length > 0) {
                 window.pendingCharacterPrompts = characterPrompts;
-                console.log("Character prompts found in metadata:", characterPrompts);
                 // If NovelAI is currently selected, populate immediately
                 const provider = document.getElementById("provider");
                 if (provider && provider.value === "novelai") {
@@ -790,7 +789,6 @@ async function openInpaintingMaskCanvas(imageUrl, originalPrompt, originalNegati
         imageUrl: imageUrl,
         containerElement: document.body,
         onMaskComplete: async (maskDataUrl, maskFileId) => {
-            console.log('Mask completed:', maskDataUrl);
             try {
                 // Save the mask to the server and set up inpainting
                 await setupInpaintingMode(imageUrl, maskDataUrl, maskFileId, originalPrompt, originalNegativePrompt, originalCharacterPrompts);
@@ -801,7 +799,6 @@ async function openInpaintingMaskCanvas(imageUrl, originalPrompt, originalNegati
             }
         },
         onCancel: () => {
-            console.log('Mask editing cancelled');
         }
     });
     try {
@@ -836,7 +833,6 @@ async function setupInpaintingMode(baseImageUrl, maskDataUrl, maskFileId, origin
         if (inpaintingSection) {
             inpaintingSection.scrollIntoView({ behavior: 'smooth' });
         }
-        console.log('Inpainting mode setup complete');
     }
     catch (error) {
         console.error('Error setting up inpainting mode:', error);
@@ -848,7 +844,6 @@ async function setupInpaintingMode(baseImageUrl, maskDataUrl, maskFileId, origin
  */
 async function saveMaskToServer(maskDataUrl) {
     try {
-        console.log('Saving mask to server, data URL length:', maskDataUrl.length);
         const formData = new FormData();
         // Convert data URL to blob
         const response = await fetch(maskDataUrl);
@@ -856,20 +851,17 @@ async function saveMaskToServer(maskDataUrl) {
             throw new Error(`Failed to convert data URL to blob: ${response.status} ${response.statusText}`);
         }
         const blob = await response.blob();
-        console.log('Converted to blob, size:', blob.size, 'type:', blob.type);
         formData.append('mask', blob, 'mask.png');
         const saveResponse = await fetch('/save-mask', {
             method: 'POST',
             body: formData
         });
-        console.log('Save response status:', saveResponse.status, saveResponse.statusText);
         if (!saveResponse.ok) {
             const errorText = await saveResponse.text();
             console.error('Save mask error response:', errorText);
             throw new Error(`Failed to save mask to server: ${saveResponse.status} ${saveResponse.statusText} - ${errorText}`);
         }
         const result = await saveResponse.json();
-        console.log('Mask saved successfully:', result);
         if (!result.success) {
             throw new Error(result.error || 'Unknown error saving mask');
         }
@@ -1001,7 +993,6 @@ function extractPromptsFromMetadata(metadata) {
     for (const charNum of characterNumbers) {
         characterPrompts.push(characterMap[charNum]);
     }
-    console.log('Extracted prompts from metadata:', { prompt, negativePrompt, characterPrompts });
     return { prompt, negativePrompt, characterPrompts };
 }
 /**
@@ -1033,10 +1024,8 @@ function copyPromptToForm(prompt, negativePrompt, characterPrompts) {
         else {
             // Store character prompts for later use if user switches to NovelAI
             window.pendingCharacterPrompts = characterPrompts;
-            console.log('Character prompts stored for when NovelAI is selected:', characterPrompts);
         }
     }
-    console.log('Copied prompts to form:', { prompt, negativePrompt, characterPrompts });
 }
 /**
  * Clear inpainting mode and return to normal generation
@@ -1068,7 +1057,6 @@ function clearInpaintingMode() {
 window.openInpaintingMaskCanvas = openInpaintingMaskCanvas;
 window.clearInpaintingMode = clearInpaintingMode;
 function toggleShowAdvanced(event) {
-    console.log("show advanced");
     const advancedDropdown = document.getElementById("advanced-dropdown");
     // Toggle visibility based on current state.
     if (advancedDropdown.style.display === "none") {
@@ -1108,7 +1096,6 @@ function chatTabLoaded() {
 function refreshConversationList() {
     const conversationsList = document.getElementById("conversations-list");
     $.get("/get-all-conversations", (response) => {
-        console.log("convos pulled");
         let conversations = JSON.parse(response);
         allConversations = conversations;
         let children = [];
@@ -1117,7 +1104,6 @@ function refreshConversationList() {
             var convoItem = document.createElement("div");
             convoItem.className = "conversation-item";
             let creationDate = new Date(value.data.created_at * 1000);
-            console.log(`date: ${value.data.created_at}`);
             convoItem.textContent = `${value.chat_name}\n${creationDate.toDateString()}`;
             convoItem.setAttribute("data-conversation-id", key);
             convoItem.addEventListener("click", onConversationSelected);
@@ -1141,7 +1127,6 @@ function updateConversationTitle(conversationId, newTitle) {
         }),
         success: (response) => {
             if (response.success) {
-                console.log("Title updated successfully:", newTitle);
                 // Update local conversations cache with the server response
                 allConversations = response.conversations;
                 // Refresh the conversation list display
@@ -1188,19 +1173,16 @@ function scheduleConversationTitleRefresh(conversationId) {
         attempts++;
         // Stop checking after max attempts or if conversation no longer exists
         if (attempts > maxAttempts || !allConversations[conversationId]) {
-            console.log(`Stopped checking for title update for conversation ${conversationId}`);
             return;
         }
         // Check if the title is still "New Chat" (meaning it hasn't been updated yet)
         if (allConversations[conversationId].chat_name === "New Chat") {
-            console.log(`Checking for title update for conversation ${conversationId} (attempt ${attempts})`);
             // Refresh the conversation list to get updated titles
             $.get("/get-all-conversations", (response) => {
                 try {
                     let conversations = JSON.parse(response);
                     // Check if this conversation's title has been updated
                     if (conversations[conversationId] && conversations[conversationId].chat_name !== "New Chat") {
-                        console.log(`Title updated for conversation ${conversationId}: ${conversations[conversationId].chat_name}`);
                         // Update local cache
                         allConversations = conversations;
                         // Refresh the conversation list display
@@ -1222,17 +1204,12 @@ function scheduleConversationTitleRefresh(conversationId) {
                 setTimeout(checkForTitleUpdate, checkInterval);
             });
         }
-        else {
-            // Title has already been updated, stop checking
-            console.log(`Title already updated for conversation ${conversationId}: ${allConversations[conversationId].chat_name}`);
-        }
     };
     // Start the first check after a short delay to give the server time to generate the title
     setTimeout(checkForTitleUpdate, 2000); // Wait 2 seconds before first check
 }
 function onConversationSelected(ev) {
     let conversationId = this.getAttribute("data-conversation-id");
-    console.log(`conversation: ${conversationId}`);
     const chatInput = document.getElementById("chat-input");
     chat.onConversationSelected(conversationId)
         .then((chatData) => {
@@ -1277,7 +1254,7 @@ async function fetchWithStreaming(url, data, processChunk) {
             }
         }
         else {
-            console.log("Response body is not readable");
+            console.error("Response body is not readable");
         }
     }
     catch (error) {
@@ -1311,7 +1288,6 @@ function sendChatMessage() {
         if (currentThreadId) {
             const shareUrl = `${document.baseURI}/share?id=${currentThreadId}`;
             utils.copyToClipboard(shareUrl);
-            console.log(shareUrl);
         }
         return;
     }
@@ -1322,7 +1298,6 @@ function sendChatMessage() {
         chat_name: chatName,
         thread_id: currentThreadId,
     }, (chunkData) => {
-        console.log("succeess");
         var parsedData = JSON.parse(chunkData);
         // Weird hack to prevent "too stringified" json blobs getting converted to just strings.
         let chatData = typeof parsedData === "string" ? JSON.parse(parsedData) : parsedData;

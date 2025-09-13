@@ -73,14 +73,13 @@ export class WorkerManager {
         if (this.capabilities.webWorkerSupported) {
             try {
                 await this.initializeWorker();
-                console.log('WebWorker initialized successfully');
             } catch (error) {
                 console.warn('Failed to initialize WebWorker, falling back to main thread:', error);
                 this.capabilities.webWorkerSupported = false;
                 this.worker = null;
             }
         } else {
-            console.log('WebWorker not supported, using main thread processing');
+            console.error('WebWorker not supported, using main thread processing');
         }
 
         this.isInitialized = true;

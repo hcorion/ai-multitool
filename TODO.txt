@@ -4,3 +4,5 @@
 - Unify processed and revised names in metadata
 - Add ability to define prompt file replacement with follow-up options. For example, color prompt defines secondary and tertiary colours, 
     so the second time this replacement gets used in a prompt it will use the secondary prompt option.
+- Fix inpainting cursor
+- Add support for novelai vibe encoding/decoding

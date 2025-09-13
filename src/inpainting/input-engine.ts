@@ -69,7 +69,6 @@ export class InputEngine {
     };
 
     constructor(canvas: HTMLCanvasElement, settings: Partial<InputSettings> = {}) {
-        console.log('InputEngine constructor called with canvas:', canvas);
         this.canvas = canvas;
         this.settings = {
             enableDrawing: true,
@@ -77,7 +76,6 @@ export class InputEngine {
             capturePointer: true,
             ...settings
         };
-        console.log('InputEngine settings:', this.settings);
 
         // Initialize render scheduler for batched processing
         this.renderScheduler = new RenderScheduler();
@@ -85,15 +83,12 @@ export class InputEngine {
 
         this.setupEventListeners();
         this.setupTouchAction();
-        console.log('InputEngine initialization complete');
     }
 
     /**
      * Set up pointer event listeners
      */
     private setupEventListeners(): void {
-        console.log('Setting up event listeners on canvas:', this.canvas);
-
         // Pointer Events API handlers
         this.canvas.addEventListener('pointerdown', this.bound.pointerDown);
         this.canvas.addEventListener('pointermove', this.bound.pointerMove);

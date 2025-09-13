@@ -271,19 +271,16 @@ export class InpaintingMaskCanvas {
         // Connect history manager to canvas manager's worker manager
         this.historyManager.setWorkerManager(this.canvasManager.getWorkerManager());
         // Create input engine for the overlay canvas (drawing surface)
-        console.log('Creating input engine for overlay canvas:', this.overlayCanvas);
         this.inputEngine = new InputEngine(this.overlayCanvas, {
             enableDrawing: true,
             preventScrolling: true,
             capturePointer: true
         });
-        console.log('Input engine created:', this.inputEngine);
         // Set up input event handler
         this.inputEngine.setEventHandler(this.handleInputEvent.bind(this));
-        console.log('Input event handler set');
         // Set up coordinate transformer for cursor preview
         // IMPORTANT: This must use the SAME logic as the actual drawing system
-        const coordinateTransformer = (clientX, clientY) => this.zoomPanController?.screenToImage(clientX, clientY, false) ?? null;
+        const coordinateTransformer = (clientX, clientY) => this.zoomPanController?.screenToImage(clientX, clientY) ?? null;
         // Add getTransform method to access zoom scale
         coordinateTransformer.getTransform = () => ({
             ...this.zoomPanController.getTransform(),
@@ -316,7 +313,6 @@ export class InpaintingMaskCanvas {
             perf: this.canvasManager.getPerformanceMonitor(),
             scheduler: this.canvasManager.getRenderScheduler()
         };
-        console.log('Zoom/pan controller created');
         // Add additional event listeners to the container for better UX
         // This allows zoom/pan to work anywhere in the container, not just on the canvas
         this.setupContainerEventListeners();
@@ -456,16 +452,13 @@ export class InpaintingMaskCanvas {
                         this.zoomPanController.setCanvasBounds(state.displayWidth, state.displayHeight);
                     }
                     this.zoomPanController.enable();
-                    console.log('Zoom/pan controller configured and enabled');
                 }
             }
             // Enable input handling after image is loaded
             if (this.inputEngine) {
-                console.log('Enabling input engine');
                 this.inputEngine.enable();
                 this.inputEngine.updateCursorSize(this.currentBrushSize);
                 this.inputEngine.updateCursorMode('paint'); // Default to paint mode
-                console.log('Input engine enabled and configured');
             }
             else {
                 console.error('Input engine not found when trying to enable');
@@ -597,12 +590,8 @@ export class InpaintingMaskCanvas {
         }
         const undoneStroke = this.historyManager.undo();
         if (undoneStroke) {
-            console.log('Undoing stroke:', undoneStroke.id);
             await this.replayHistoryToCurrentStateAsync();
             this.updateHistoryButtons();
-        }
-        else {
-            console.log('Nothing to undo');
         }
     }
     async redo() {
@@ -612,12 +601,8 @@ export class InpaintingMaskCanvas {
         }
         const redoneStroke = this.historyManager.redo();
         if (redoneStroke) {
-            console.log('Redoing stroke:', redoneStroke.id);
             await this.replayHistoryToCurrentStateAsync();
             this.updateHistoryButtons();
-        }
-        else {
-            console.log('Nothing to redo');
         }
     }
     zoomIn() {
@@ -748,19 +733,9 @@ export class InpaintingMaskCanvas {
             return;
         const cx = evt.clientX ?? evt.screenX;
         const cy = evt.clientY ?? evt.screenY;
-        const debugNow = evt.type === 'start' || evt.type === 'end';
-        const img = this.zoomPanController.screenToImage(cx, cy, debugNow);
+        const img = this.zoomPanController.screenToImage(cx, cy);
         if (!img)
             return;
-        // Optional: log the exact on-screen stamp location
-        if (debugNow) {
-            const back = this.zoomPanController.imageToScreen(img.x, img.y);
-            console.log('hit-test delta(px):', {
-                dx: Math.round(back.x - cx),
-                dy: Math.round(back.y - cy),
-                transform: this.zoomPanController.getTransform()
-            });
-        }
         const brush = this.canvasManager.getBrushEngine();
         const settings = brush.getSettings();
         if (evt.type === 'start') {
@@ -802,14 +777,12 @@ export class InpaintingMaskCanvas {
                 return;
             // Add the completed stroke to history (stroke was already applied during drawing)
             const strokeCommand = this.historyManager.addStroke(completedStroke, state.maskData);
-            console.log('Added stroke to history (async):', strokeCommand.id);
             // Update history button states
             this.updateHistoryButtons();
             // Create checkpoint periodically using WebWorker (with fallback)
             if (this.historyManager.getState().strokeCount % 10 === 0) {
                 try {
                     const checkpoint = await this.historyManager.createTileBasedCheckpointAsync(state.maskData);
-                    console.log(`Created async checkpoint after ${this.historyManager.getState().strokeCount} strokes:`, checkpoint.id);
                 }
                 catch (error) {
                     console.warn('Async checkpoint creation failed:', error);
@@ -818,10 +791,7 @@ export class InpaintingMaskCanvas {
             // Validate mask periodically using WebWorker (with fallback)
             if (this.historyManager.getState().strokeCount % 20 === 0) {
                 try {
-                    const isValid = await this.canvasManager.validateMaskAsync();
-                    if (!isValid) {
-                        console.log('Mask binary invariant corrected by WebWorker');
-                    }
+                    await this.canvasManager.validateMaskAsync();
                 }
                 catch (error) {
                     console.warn('Async mask validation failed:', error);
@@ -864,7 +834,6 @@ export class InpaintingMaskCanvas {
      */
     handleZoomPanEvent = {
         onTransformStart: () => {
-            console.log('Zoom/pan gesture started - disabling drawing');
             this.isZoomPanActive = true;
             // Disable drawing in input engine
             if (this.inputEngine) {
@@ -872,7 +841,6 @@ export class InpaintingMaskCanvas {
             }
         },
         onTransformUpdate: (transform) => {
-            console.log('Zoom/pan transform updated:', transform);
             // Apply transform to canvases
             if (this.canvasManager) {
                 this.canvasManager.applyTransform(transform);
@@ -883,7 +851,6 @@ export class InpaintingMaskCanvas {
             }
         },
         onTransformEnd: () => {
-            console.log('Zoom/pan gesture ended - re-enabling drawing');
             this.isZoomPanActive = false;
             // Re-enable drawing in input engine
             if (this.inputEngine) {
@@ -954,19 +921,16 @@ export class InpaintingMaskCanvas {
         const nearestCheckpoint = this.historyManager.getNearestCheckpoint(historyState.currentIndex);
         if (nearestCheckpoint) {
             // Restore from checkpoint
-            console.log(`Restoring from checkpoint at stroke ${nearestCheckpoint.strokeIndex}`);
             const reconstructedMask = this.historyManager.reconstructMaskFromCheckpoint(nearestCheckpoint);
             state.maskData.set(reconstructedMask);
             // Replay strokes from checkpoint to current state
             const strokesToReplay = this.historyManager.getStrokesFromCheckpoint(nearestCheckpoint, historyState.currentIndex);
-            console.log(`Replaying ${strokesToReplay.length} strokes from checkpoint`);
             for (const stroke of strokesToReplay) {
                 this.canvasManager.applyBrushStroke(stroke);
             }
         }
         else {
             // No checkpoint available, replay all strokes from empty mask
-            console.log(`No checkpoint found, replaying all ${currentStrokes.length} strokes from empty mask`);
             state.maskData.fill(0); // Clear mask
             for (const stroke of currentStrokes) {
                 this.canvasManager.applyBrushStroke(stroke);
@@ -977,7 +941,6 @@ export class InpaintingMaskCanvas {
         // Create a new checkpoint periodically for performance
         if (currentStrokes.length > 0 && currentStrokes.length % 20 === 0) {
             this.historyManager.createTileBasedCheckpointAsync(state.maskData)
-                .then(() => console.log(`Created async checkpoint at stroke ${historyState.currentIndex}`))
                 .catch(error => console.warn('Async checkpoint creation failed during replay:', error));
         }
     }
@@ -997,19 +960,16 @@ export class InpaintingMaskCanvas {
             const nearestCheckpoint = this.historyManager.getNearestCheckpoint(historyState.currentIndex);
             if (nearestCheckpoint) {
                 // Restore from checkpoint
-                console.log(`Restoring from checkpoint at stroke ${nearestCheckpoint.strokeIndex} (async)`);
                 const reconstructedMask = this.historyManager.reconstructMaskFromCheckpoint(nearestCheckpoint);
                 state.maskData.set(reconstructedMask);
                 // Replay strokes from checkpoint to current state using WebWorker
                 const strokesToReplay = this.historyManager.getStrokesFromCheckpoint(nearestCheckpoint, historyState.currentIndex);
-                console.log(`Replaying ${strokesToReplay.length} strokes from checkpoint (async)`);
                 for (const stroke of strokesToReplay) {
                     await this.canvasManager.applyBrushStrokeAsync(stroke);
                 }
             }
             else {
                 // No checkpoint available, replay all strokes from empty mask
-                console.log(`No checkpoint found, replaying all ${currentStrokes.length} strokes from empty mask (async)`);
                 state.maskData.fill(0); // Clear mask
                 for (const stroke of currentStrokes) {
                     await this.canvasManager.applyBrushStrokeAsync(stroke);
@@ -1020,8 +980,7 @@ export class InpaintingMaskCanvas {
             // Create a new checkpoint periodically for performance using WebWorker
             if (currentStrokes.length > 0 && currentStrokes.length % 20 === 0) {
                 try {
-                    const checkpoint = await this.historyManager.createTileBasedCheckpointAsync(state.maskData);
-                    console.log(`Created async checkpoint at stroke ${historyState.currentIndex}:`, checkpoint.id);
+                    await this.historyManager.createTileBasedCheckpointAsync(state.maskData);
                 }
                 catch (error) {
                     console.warn('Async checkpoint creation failed during replay:', error);

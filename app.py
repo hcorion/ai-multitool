@@ -1,7 +1,7 @@
 import base64
 import io
 import json
-from json import JSONDecodeError
+import logging
 import os
 import random
 import re
@@ -12,25 +12,14 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
+from json import JSONDecodeError
 from queue import Queue
-from typing import Any, AnyStr, Dict, Generator, List, Mapping, Optional, NoReturn
+from typing import Any, AnyStr, Dict, Generator, List, Mapping, NoReturn, Optional
 
 import openai
 import requests
 import wand
 import wand.font
-from novelai_client import NovelAIClient, NovelAIClientError, NovelAIAPIError
-from image_models import (
-    Provider,
-    Operation,
-    ImageGenerationRequest,
-    InpaintingRequest,
-    Img2ImgRequest,
-    ImageOperationResponse,
-    create_request_from_form_data,
-    create_success_response,
-    create_error_response,
-)
 from flask import (
     Flask,
     Request,
@@ -56,6 +45,18 @@ from dynamic_prompts import (
     make_character_prompts_dynamic,
     make_prompt_dynamic,
 )
+from image_models import (
+    ImageGenerationRequest,
+    ImageOperationResponse,
+    Img2ImgRequest,
+    InpaintingRequest,
+    Operation,
+    Provider,
+    create_error_response,
+    create_request_from_form_data,
+    create_success_response,
+)
+from novelai_client import NovelAIAPIError, NovelAIClient, NovelAIClientError
 
 app = Flask(__name__)
 
@@ -132,9 +133,6 @@ def save_mask():
         # Return the relative path for use in inpainting requests (without leading slash for Flask)
         relative_path = f"static/images/{username}/{mask_filename}"
 
-        # Log successful save for debugging
-        print(f"Mask saved successfully: {mask_path} ({file_size} bytes)")
-
         return jsonify(
             {
                 "success": True,
@@ -145,8 +143,6 @@ def save_mask():
         )
 
     except Exception as e:
-        import logging
-
         logging.error(f"Error saving mask: {e}", exc_info=True)
         return jsonify({"error": f"Failed to save mask: {str(e)}"}), 500
 
@@ -430,8 +426,6 @@ class ConversationManager:
                         self._update_cache(username, user_conversations)
                         return user_conversations
                 except json.JSONDecodeError as e:
-                    import logging
-
                     logging.error(
                         f"JSON decode error loading conversations for {username}: {e}"
                     )
@@ -446,20 +440,14 @@ class ConversationManager:
                         logging.error(f"Failed to create backup: {backup_error}")
                     return UserConversations()
                 except IOError as e:
-                    import logging
-
                     logging.error(f"IO error loading conversations for {username}: {e}")
                     return UserConversations()
                 except ValueError as e:
-                    import logging
-
                     logging.error(
                         f"Validation error loading conversations for {username}: {e}"
                     )
                     return UserConversations()
                 except Exception as e:
-                    import logging
-
                     logging.error(
                         f"Unexpected error loading conversations for {username}: {e}",
                         exc_info=True,
@@ -498,8 +486,6 @@ class ConversationManager:
                 self._update_cache(username, user_conversations)
 
             except IOError as e:
-                import logging
-
                 logging.error(f"IO error saving conversations for {username}: {e}")
                 # Clean up temp file if it exists
                 try:
@@ -511,8 +497,6 @@ class ConversationManager:
                     f"Failed to save conversations for {username}: {e}"
                 )
             except JSONDecodeError as e:
-                import logging
-
                 logging.error(
                     f"JSON encode error saving conversations for {username}: {e}"
                 )
@@ -526,8 +510,6 @@ class ConversationManager:
                     f"Failed to encode conversations for {username}: {e}"
                 )
             except Exception as e:
-                import logging
-
                 logging.error(
                     f"Unexpected error saving conversations for {username}: {e}",
                     exc_info=True,
@@ -636,8 +618,6 @@ class ConversationManager:
 
             conversation = user_conversations.get_conversation(conversation_id)
             if not conversation:
-                import logging
-
                 logging.warning(
                     f"Conversation {conversation_id} not found for user {username}"
                 )
@@ -645,8 +625,6 @@ class ConversationManager:
 
             # Validate and sanitize the title
             if not title:
-                import logging
-
                 logging.warning(
                     f"Invalid title provided for conversation {conversation_id}: {title}"
                 )
@@ -664,23 +642,17 @@ class ConversationManager:
             # Save the updated conversations
             self._save_user_conversations(username, user_conversations)
 
-            import logging
-
             logging.info(
                 f"Updated title for conversation {conversation_id} to '{clean_title}'"
             )
             return True
 
         except ConversationStorageError as e:
-            import logging
-
             logging.error(
                 f"Storage error updating title for conversation {conversation_id}: {e}"
             )
             return False
         except Exception as e:
-            import logging
-
             logging.error(
                 f"Unexpected error updating title for conversation {conversation_id}: {e}",
                 exc_info=True,
@@ -710,8 +682,6 @@ class ConversationManager:
         try:
             conversation = self.get_conversation(username, conversation_id)
             if not conversation:
-                import logging
-
                 logging.warning(
                     f"Conversation {conversation_id} not found for user {username} when retrieving reasoning data"
                 )
@@ -719,8 +689,6 @@ class ConversationManager:
 
             # Validate message index
             if message_index < 0 or message_index >= len(conversation.messages):
-                import logging
-
                 logging.warning(
                     f"Invalid message index {message_index} for conversation {conversation_id}. "
                     f"Valid range: 0-{len(conversation.messages) - 1}"
@@ -730,8 +698,6 @@ class ConversationManager:
             message = conversation.messages[message_index]
 
             # Log message details for debugging
-            import logging
-
             logging.debug(
                 f"Retrieving reasoning data for message {message_index} in conversation {conversation_id}: "
                 f"role={message.role}, has_reasoning={message.reasoning_data is not None}"
@@ -743,8 +709,6 @@ class ConversationManager:
                     # Validate the reasoning data before returning
                     validated_data = validate_reasoning_data(message.reasoning_data)
                     if validated_data:
-                        import logging
-
                         summary_length = len(validated_data.get("complete_summary", ""))
                         parts_count = len(validated_data.get("summary_parts", []))
                         logging.debug(
@@ -752,15 +716,11 @@ class ConversationManager:
                         )
                     return validated_data
                 except ValueError as e:
-                    import logging
-
                     logging.warning(
                         f"Invalid reasoning data for message {message_index} in conversation {conversation_id}: {e}"
                     )
                     return None
             else:
-                import logging
-
                 logging.debug(
                     f"No reasoning data available for message {message_index} in conversation {conversation_id}"
                 )
@@ -768,8 +728,6 @@ class ConversationManager:
             return None
 
         except Exception as e:
-            import logging
-
             logging.error(
                 f"Unexpected error retrieving reasoning data for message {message_index} in conversation {conversation_id}: {e}",
                 exc_info=True,
@@ -792,8 +750,6 @@ class ConversationManager:
             return conversation.messages[message_index]
 
         except Exception as e:
-            import logging
-
             logging.error(
                 f"Error retrieving message {message_index} from conversation {conversation_id}: {e}",
                 exc_info=True,
@@ -822,8 +778,6 @@ class ConversationManager:
                 return 0
             return len(conversation.messages)
         except Exception as e:
-            import logging
-
             logging.error(
                 f"Error getting message count for conversation {conversation_id}: {e}"
             )
@@ -867,8 +821,6 @@ class ConversationManager:
             }
 
         except Exception as e:
-            import logging
-
             logging.error(
                 f"Error getting reasoning availability status for conversation {conversation_id}: {e}",
                 exc_info=True,
@@ -914,12 +866,8 @@ code
             # Add reasoning configuration with error handling
             try:
                 params["reasoning"] = {"effort": "high", "summary": "detailed"}
-                import logging
-
                 logging.debug("Added reasoning configuration to API request")
             except Exception as e:
-                import logging
-
                 logging.warning(f"Failed to add reasoning configuration: {e}")
                 # Continue without reasoning - chat should still work
 
@@ -942,8 +890,6 @@ code
 
     def _handle_rate_limit_error(self, error: openai.RateLimitError) -> dict[str, str]:
         """Handle rate limiting errors with detailed logging and user guidance."""
-        import logging
-
         logging.error(f"Rate limit exceeded: {error}")
 
         # Extract retry information if available
@@ -962,8 +908,6 @@ code
 
     def _handle_api_error(self, error: openai.APIError) -> dict[str, str]:
         """Handle OpenAI API errors with comprehensive error mapping."""
-        import logging
-
         logging.error(f"OpenAI API error: {error}")
 
         # Handle specific error types with user-friendly messages
@@ -1023,8 +967,6 @@ code
 
     def _handle_general_error(self, error: Exception) -> dict[str, str]:
         """Handle general errors with logging and user-friendly messages."""
-        import logging
-
         logging.error(f"General error in ResponsesAPIClient: {error}", exc_info=True)
 
         # Handle specific exception types
@@ -1060,7 +1002,6 @@ code
         try:
             event_processor.process_stream(stream)
         except Exception as e:
-            print(f"Error in process_stream_with_processor: {e}")
             event_processor.event_queue.put(
                 json.dumps(
                     {"type": "error", "message": "Error processing response stream"}
@@ -1095,7 +1036,6 @@ code
                             "response_id": getattr(event, "response_id", None),
                         }
         except Exception as e:
-            print(f"Error processing stream events: {e}")
             yield {"type": "error", "message": "Error processing response stream"}
 
     def generate_conversation_title(self, user_message: str) -> str:
@@ -1119,26 +1059,18 @@ code
             if hasattr(response, "output_text") and response.output_text:
                 return self._sanitize_title(response.output_text)
             else:
-                import logging
-
                 logging.warning("Empty response from o3-mini for title generation")
                 return self._generate_fallback_title()
 
         except openai.RateLimitError as e:
-            import logging
-
             logging.warning(f"Rate limit exceeded for title generation: {e}")
             return self._generate_fallback_title()
 
         except openai.APIError as e:
-            import logging
-
             logging.error(f"OpenAI API error during title generation: {e}")
             return self._generate_fallback_title()
 
         except Exception as e:
-            import logging
-
             logging.error(
                 f"Unexpected error during title generation: {e}", exc_info=True
             )
@@ -1169,8 +1101,6 @@ Generate only the title (no quotes, no extra text)."""
     def _sanitize_title(self, title: str) -> str:
         """Ensure title meets length and content requirements."""
         if not title:
-            import logging
-
             logging.error("No title to sanitize!")
             return self._generate_fallback_title()
 
@@ -1193,8 +1123,6 @@ Generate only the title (no quotes, no extra text)."""
             "hi",
             "hello",
         ]:
-            import logging
-
             logging.error(f'Title "{title.strip()}" too generic!')
             return self._generate_fallback_title()
 
@@ -1394,7 +1322,9 @@ def generate_novelai_inpaint_image(
     if not novelai_api_key:
         raise ValueError("NovelAI API key not configured")
 
-    revised_prompt = make_prompt_dynamic(prompt, username, app.static_folder, seed, grid_dynamic_prompt)
+    revised_prompt = make_prompt_dynamic(
+        prompt, username, app.static_folder, seed, grid_dynamic_prompt
+    )
 
     # Process character prompts if provided
     processed_character_prompts = []
@@ -1956,7 +1886,7 @@ def generate_seed_for_provider(provider: str) -> int | None:
     elif provider == "openai":
         # We just use the seed for prompt generation for OpenAI, since the API doesn't allow passing in a seed
         return random.getrandbits(32)
-    return
+    return None
 
 
 def _extract_character_prompts_from_form(request: Request) -> List[Dict[str, str]]:
@@ -2093,7 +2023,7 @@ def generate_image_grid(
 
     if len(dynamic_prompts) == 0:
         raise ValueError("No prompts available in file!")
-    
+
     if not seed or seed <= 0:
         seed = generate_seed_for_provider(provider)
         if not seed:
@@ -2103,14 +2033,13 @@ def generate_image_grid(
     image_data_list: Dict[str, GeneratedImageData] = dict()
     generation_errors: List[str] = []
 
-
     for dynamic_prompt in dynamic_prompts:
         # Create the image request using the unified system
         try:
             image_request = create_request_from_form_data(form_data)
             image_request.grid_dynamic_prompt = GridDynamicPromptInfo(
-                        str_to_replace_with=dynamic_prompt, prompt_file=grid_prompt_file
-                    )
+                str_to_replace_with=dynamic_prompt, prompt_file=grid_prompt_file
+            )
             # Override seed with the locked grid seed
             image_request.seed = seed
             # Generate the image using the unified handler
@@ -2128,8 +2057,6 @@ def generate_image_grid(
                     image_name=response.image_name,
                     metadata=response.metadata,
                 )
-                import logging
-
                 logging.info(
                     f"Grid generation: Image generated for prompt '{dynamic_prompt}'"
                 )
@@ -2138,8 +2065,6 @@ def generate_image_grid(
                 if response.error_type:
                     error_msg += f" ({response.error_type})"
                 generation_errors.append(error_msg)
-                import logging
-
                 logging.warning(
                     f"Grid generation: Failed to generate image - {error_msg}"
                 )
@@ -2148,8 +2073,6 @@ def generate_image_grid(
         except Exception as e:
             error_msg = f"Prompt '{dynamic_prompt}': {str(e)}"
             generation_errors.append(error_msg)
-            import logging
-
             logging.error(
                 f"Grid generation: Exception during image generation - {error_msg}"
             )
@@ -2351,8 +2274,6 @@ def update_conversation_title():
             ), 400
 
     except Exception as e:
-        import logging
-
         logging.error(f"Error updating conversation title: {e}", exc_info=True)
         return jsonify({"success": False, "error": "Internal server error"}), 500
 
@@ -2465,8 +2386,6 @@ def handle_image_request():
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
     except Exception as e:
-        import logging
-
         logging.error(f"Error in image request: {e}", exc_info=True)
         return jsonify({"error": "Internal server error"}), 500
 
@@ -2519,7 +2438,7 @@ def _handle_generation_request(
                 upscale=False,  # Default to False for new endpoint
                 variety=image_request.variety,
                 grid_dynamic_prompt=image_request.grid_dynamic_prompt,
-                character_prompts=character_prompts
+                character_prompts=character_prompts,
             )
         else:
             raise ValueError(f"Unsupported provider: {image_request.provider.value}")
@@ -2631,8 +2550,6 @@ def _handle_inpainting_request(
         )
     except Exception as e:
         # Log unexpected errors for debugging
-        import logging
-
         logging.error(f"Unexpected error in inpainting request: {e}", exc_info=True)
 
         return create_error_response(
@@ -2754,14 +2671,13 @@ def converse():
             )
             if not conversation:
                 return {"error": "Conversation not found"}, 404
-            print(f"Using existing conversation: {conversation_id}")
+
         else:
             # Create new conversation with temporary title
             chat_name = request.json.get("chat_name", "New Chat")
             conversation_id = conversation_manager.create_conversation(
                 username, chat_name
             )
-            print(f"Created new conversation: {conversation_id}")
 
             # Generate title asynchronously for new conversations
             def generate_title_async():
@@ -2778,21 +2694,15 @@ def converse():
                     )
 
                     if success:
-                        import logging
-
                         logging.info(
                             f"Successfully generated title '{generated_title}' for conversation {conversation_id}"
                         )
                     else:
-                        import logging
-
                         logging.warning(
                             f"Failed to update title for conversation {conversation_id}"
                         )
 
                 except Exception as e:
-                    import logging
-
                     logging.error(
                         f"Error generating title for conversation {conversation_id}: {e}",
                         exc_info=True,
@@ -2853,20 +2763,14 @@ def converse():
                 try:
                     reasoning_data = event_processor.get_reasoning_data()
                     if reasoning_data:
-                        import logging
-
                         logging.debug(
                             f"Successfully retrieved reasoning data for response {response_id}"
                         )
                     else:
-                        import logging
-
                         logging.debug(
                             f"No reasoning data available for response {response_id}"
                         )
                 except Exception as e:
-                    import logging
-
                     logging.warning(
                         f"Failed to retrieve reasoning data for response {response_id}: {e}"
                     )
@@ -2886,21 +2790,15 @@ def converse():
 
                         # Log reasoning data status for debugging
                         if reasoning_data:
-                            import logging
-
                             logging.info(
                                 f"Saved assistant response with reasoning data for conversation {conversation_id}"
                             )
                         else:
-                            import logging
-
                             logging.info(
                                 f"Saved assistant response without reasoning data for conversation {conversation_id}"
                             )
 
                     except ConversationStorageError as e:
-                        import logging
-
                         logging.error(f"Failed to save assistant response: {e}")
                         event_queue.put(
                             json.dumps(
@@ -2913,8 +2811,6 @@ def converse():
                             )
                         )
                     except Exception as e:
-                        import logging
-
                         logging.error(
                             f"Unexpected error saving assistant response: {e}",
                             exc_info=True,
@@ -2930,8 +2826,6 @@ def converse():
                             )
                         )
                 elif not final_text:
-                    import logging
-
                     logging.warning(
                         f"Empty response received for conversation {conversation_id}"
                     )
@@ -2947,8 +2841,6 @@ def converse():
                     )
 
             except ConnectionError as e:
-                import logging
-
                 logging.error(f"Connection error in stream thread: {e}")
                 event_queue.put(
                     json.dumps(
@@ -2961,8 +2853,6 @@ def converse():
                     )
                 )
             except TimeoutError as e:
-                import logging
-
                 logging.error(f"Timeout error in stream thread: {e}")
                 event_queue.put(
                     json.dumps(
@@ -2975,8 +2865,6 @@ def converse():
                     )
                 )
             except Exception as e:
-                import logging
-
                 logging.error(
                     f"Unexpected error in responses stream thread: {e}", exc_info=True
                 )
@@ -3114,14 +3002,10 @@ def get_message_reasoning(conversation_id: str, message_index: int):
         )
 
     except ValueError as e:
-        import logging
-
         logging.warning(f"Validation error in get_message_reasoning: {e}")
         return jsonify({"error": "Invalid request", "message": str(e)}), 400
 
     except Exception as e:
-        import logging
-
         logging.error(f"Unexpected error in get_message_reasoning: {e}", exc_info=True)
         return jsonify(
             {
@@ -3151,8 +3035,6 @@ class StreamEventProcessor:
             for event in stream:
                 self._handle_stream_event(event)
         except ConnectionError as e:
-            import logging
-
             logging.error(f"Connection error during stream processing: {e}")
             self.event_queue.put(
                 json.dumps(
@@ -3165,8 +3047,6 @@ class StreamEventProcessor:
                 )
             )
         except TimeoutError as e:
-            import logging
-
             logging.error(f"Timeout error during stream processing: {e}")
             self.event_queue.put(
                 json.dumps(
@@ -3179,8 +3059,6 @@ class StreamEventProcessor:
                 )
             )
         except json.JSONDecodeError as e:
-            import logging
-
             logging.error(f"JSON parsing error during stream processing: {e}")
             self.event_queue.put(
                 json.dumps(
@@ -3193,8 +3071,6 @@ class StreamEventProcessor:
                 )
             )
         except Exception as e:
-            import logging
-
             logging.error(f"Unexpected error processing stream: {e}", exc_info=True)
             self.event_queue.put(
                 json.dumps(
@@ -3243,7 +3119,7 @@ class StreamEventProcessor:
             self._handle_reasoning_summary_part_done(event)
         else:
             # Handle other event types if needed
-            print(f"Unhandled event type: {event_type}")
+            logging.warning(f"Unhandled event type {event_type}")
 
     def _handle_response_created(self, event: Any) -> None:
         """Handle response.created event - response has been created."""
@@ -3371,18 +3247,12 @@ class StreamEventProcessor:
                 self.reasoning_data["summary_parts"].append(part_text)
 
         except AttributeError as e:
-            import logging
-
             logging.debug(f"Reasoning part event missing expected attributes: {e}")
             # Continue processing - reasoning is optional
         except (TypeError, ValueError) as e:
-            import logging
-
             logging.warning(f"Error parsing reasoning summary part: {e}")
             # Continue processing - reasoning is optional
         except Exception as e:
-            import logging
-
             logging.warning(f"Unexpected error processing reasoning summary part: {e}")
             # Continue processing - reasoning failures should not block chat
 
@@ -3405,18 +3275,12 @@ class StreamEventProcessor:
                 self.reasoning_data["complete_summary"] += delta_text
 
         except AttributeError as e:
-            import logging
-
             logging.debug(f"Reasoning delta event missing expected attributes: {e}")
             # Continue processing - reasoning is optional
         except (TypeError, ValueError) as e:
-            import logging
-
             logging.warning(f"Error parsing reasoning summary text delta: {e}")
             # Continue processing - reasoning is optional
         except Exception as e:
-            import logging
-
             logging.warning(
                 f"Unexpected error processing reasoning summary text delta: {e}"
             )
@@ -3441,18 +3305,12 @@ class StreamEventProcessor:
                 self.reasoning_data["response_id"] = self.current_response_id
 
         except AttributeError as e:
-            import logging
-
             logging.debug(f"Reasoning done event missing expected attributes: {e}")
             # Continue processing - reasoning is optional
         except (TypeError, ValueError) as e:
-            import logging
-
             logging.warning(f"Error parsing reasoning summary text done: {e}")
             # Continue processing - reasoning is optional
         except Exception as e:
-            import logging
-
             logging.warning(
                 f"Unexpected error processing reasoning summary text done: {e}"
             )
@@ -3465,13 +3323,9 @@ class StreamEventProcessor:
             # We can use this for validation or cleanup if needed
             pass
         except AttributeError as e:
-            import logging
-
             logging.debug(f"Reasoning part done event missing expected attributes: {e}")
             # Continue processing - reasoning is optional
         except Exception as e:
-            import logging
-
             logging.warning(
                 f"Unexpected error processing reasoning summary part done: {e}"
             )
@@ -3487,28 +3341,20 @@ class StreamEventProcessor:
                 # Validate the reasoning data before returning
                 validated_data = validate_reasoning_data(self.reasoning_data.copy())
                 if validated_data:
-                    import logging
-
                     logging.debug(
                         f"Successfully retrieved reasoning data with {len(validated_data.get('complete_summary', ''))} characters"
                     )
                 return validated_data
             else:
-                import logging
-
                 logging.debug(
                     "No reasoning data available - summary and parts are empty"
                 )
             return None
         except ValueError as e:
-            import logging
-
             logging.warning(f"Reasoning data validation failed: {e}")
             # Return None instead of raising - reasoning is optional
             return None
         except Exception as e:
-            import logging
-
             logging.warning(f"Unexpected error getting reasoning data: {e}")
             # Return None instead of raising - reasoning is optional
             return None
