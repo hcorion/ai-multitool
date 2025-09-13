@@ -31,7 +31,7 @@ import os
 import random
 import re
 from dataclasses import dataclass
-from typing import List, Dict
+from typing import Dict, List
 
 
 @dataclass
@@ -59,30 +59,7 @@ class GridDynamicPromptInfo:
 
 
 def get_prompt_dict(username: str, static_folder: str) -> dict[str, list[str]]:
-    """
-    Load all user-specific prompt files into a dictionary for dynamic prompt processing.
-
-    Scans the user's prompt directory for .txt files and loads each file's lines as
-    a list of prompt options. The filename (without extension) becomes the key that
-    can be referenced in dynamic prompts using __filename__ syntax.
-
-    Directory Structure:
-    static_folder/prompts/{username}/
-    ├── colors.txt      # Referenced as __colors__
-    ├── animals.txt     # Referenced as __animals__
-    └── styles.txt      # Referenced as __styles__
-
-    Args:
-        username: User identifier for locating prompt files
-        static_folder: Base path to static files directory
-
-    Returns:
-        Dictionary mapping filename (without .txt) to list of lines from that file
-
-    Example:
-        If colors.txt contains "red\nblue\ngreen", returns:
-        {"colors": ["red", "blue", "green"]}
-    """
+    """Load user's prompt files into dictionary for dynamic replacement processing."""
     dynamic_prompts_path = os.path.join(static_folder, "prompts", username)
     os.makedirs(dynamic_prompts_path, exist_ok=True)
 
@@ -97,23 +74,7 @@ def get_prompt_dict(username: str, static_folder: str) -> dict[str, list[str]]:
 
 
 def get_prompts_for_name(username: str, static_folder: str, name: str) -> List[str]:
-    """
-    Get the list of prompt options for a specific prompt file name.
-
-    Convenience function to retrieve prompts from a single file without
-    loading the entire prompt dictionary.
-
-    Args:
-        username: User identifier for locating prompt files
-        static_folder: Base path to static files directory
-        name: Prompt file name (without .txt extension)
-
-    Returns:
-        List of prompt options from the specified file
-
-    Raises:
-        KeyError: If the specified prompt file doesn't exist
-    """
+    """Get prompt options from a specific prompt file by name."""
     return get_prompt_dict(username, static_folder)[name]
 
 
@@ -160,19 +121,8 @@ def make_prompt_dynamic(
        - Dynamic prompt files can contain other dynamic syntax
        - Recursively processed to support complex template hierarchies
 
-    Parameters:
-    - prompt: Template string containing dynamic placeholders
-    - username: User identifier for locating user-specific prompt files
-    - static_folder: Base path to static files directory
-    - seed: Random seed for deterministic behavior across calls
-    - grid_prompt: Optional override for specific prompt file during grid generation
-
     Returns:
     - Processed prompt string with all dynamic elements replaced
-
-    Raises:
-    - ValueError: When a referenced prompt file doesn't exist (only if other prompt files exist)
-    - LookupError: When grid_prompt is specified but the target prompt file isn't found in the template
 
     Example Usage:
     ```python
@@ -294,10 +244,7 @@ def make_character_prompts_dynamic(
     seed: int,
     grid_prompt: GridDynamicPromptInfo | None = None,
 ) -> List[Dict[str, str]]:
-    """
-    Process dynamic prompts for character prompts independently.
-    Each character prompt gets its own seed offset to ensure variety.
-    """
+    """Process dynamic prompts for character prompts with unique seeds for variety."""
     processed_character_prompts: List[Dict[str, str]] = []
 
     for i, char_prompt in enumerate(character_prompts):

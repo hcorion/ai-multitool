@@ -12,7 +12,7 @@ import math
 import zipfile
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional, Dict, Any, List
+from typing import Any, Dict, List, Optional
 
 import requests
 from PIL import Image as PILImage
@@ -34,13 +34,13 @@ class NovelAIAction(str, Enum):
 
 
 class NovelAIClientError(Exception):
-    """Base exception for NovelAI client errors."""
+    """Base exception for NovelAI client-side errors and network issues."""
 
     pass
 
 
 class NovelAIAPIError(NovelAIClientError):
-    """API-specific errors from NovelAI."""
+    """API-specific errors returned by NovelAI service."""
 
     def __init__(self, status_code: int, message: str):
         self.status_code = status_code

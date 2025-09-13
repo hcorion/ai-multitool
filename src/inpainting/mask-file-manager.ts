@@ -42,7 +42,7 @@ export class MaskFileManager {
     }
 
     /**
-     * Store a temporary mask file
+     * Store temporary mask file and return unique identifier
      */
     public storeMaskFile(dataUrl: string, metadata?: MaskFile['metadata']): string {
         const id = this.generateFileId();
@@ -61,7 +61,7 @@ export class MaskFileManager {
     }
 
     /**
-     * Retrieve a temporary mask file
+     * Retrieve mask file by ID, checking for expiration
      */
     public getMaskFile(id: string): MaskFile | null {
         const file = this.temporaryFiles.get(id);
@@ -87,7 +87,7 @@ export class MaskFileManager {
     }
 
     /**
-     * Clean up expired temporary files
+     * Remove expired files and return count of cleaned files
      */
     public cleanupExpiredFiles(): number {
         const now = Date.now();
@@ -114,7 +114,7 @@ export class MaskFileManager {
     }
 
     /**
-     * Get statistics about temporary files
+     * Get comprehensive statistics about stored mask files
      */
     public getStatistics(): {
         totalFiles: number;
@@ -203,7 +203,7 @@ export class MaskFileManager {
     }
 
     /**
-     * Generate a unique file ID
+     * Generate unique file identifier using timestamp and random string
      */
     private generateFileId(): string {
         const timestamp = Date.now().toString(36);
@@ -212,14 +212,14 @@ export class MaskFileManager {
     }
 
     /**
-     * Check if a file has expired
+     * Check if mask file has exceeded maximum age
      */
     private isExpired(file: MaskFile, now: number = Date.now()): boolean {
         return (now - file.timestamp) > this.maxAge;
     }
 
     /**
-     * Enforce the maximum number of files by removing oldest files
+     * Remove oldest files when maximum file count is exceeded
      */
     private enforceFileLimit(): void {
         if (this.temporaryFiles.size <= this.maxFiles) {

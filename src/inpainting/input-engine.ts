@@ -86,7 +86,7 @@ export class InputEngine {
     }
 
     /**
-     * Set up pointer event listeners
+     * Attach pointer event listeners to canvas element
      */
     private setupEventListeners(): void {
         // Pointer Events API handlers
@@ -101,7 +101,7 @@ export class InputEngine {
     }
 
     /**
-     * Set up touch-action CSS property to prevent scrolling
+     * Configure touch-action CSS to prevent unwanted scrolling during drawing
      */
     private setupTouchAction(): void {
         if (this.settings.preventScrolling) {
@@ -110,7 +110,7 @@ export class InputEngine {
     }
 
     /**
-     * Handle pointer down events
+     * Process pointer down events and start drawing if enabled
      */
     private handlePointerDown(event: PointerEvent): void {
         if (!this.isEnabled || !this.settings.enableDrawing) return;
@@ -142,7 +142,7 @@ export class InputEngine {
     }
 
     /**
-     * Handle pointer move events
+     * Process pointer move events for drawing and cursor updates
      */
     private handlePointerMove(event: PointerEvent): void {
         if (!this.isEnabled) return;
@@ -308,7 +308,7 @@ export class InputEngine {
     }
 
     /**
-     * Update cursor preview position
+     * Update cursor preview position with coordinate transformation
      */
     private updateCursorPreview(clientX: number, clientY: number): void {
         if (!this.cursorElement) return;
@@ -356,7 +356,7 @@ export class InputEngine {
     }
 
     /**
-     * Create cursor preview element
+     * Create and style the brush cursor preview element
      */
     private createCursorPreview(): void {
         this.cursorElement = document.createElement('div');
@@ -377,7 +377,7 @@ export class InputEngine {
     }
 
     /**
-     * Update cursor preview size
+     * Update cursor preview size based on brush size and scale
      */
     public updateCursorSize(size: number): void {
         if (this.cursorElement) {

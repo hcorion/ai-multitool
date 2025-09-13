@@ -77,11 +77,13 @@ with open(secret_key_filename, "r") as f:
 
 @app.errorhandler(404)
 def resource_not_found(e: Response):
+    """Handle 404 errors with JSON response."""
     return jsonify(error=str(e)), 404
 
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
+    """Handle user login with username storage in session."""
     if request.method == "POST":
         session["username"] = request.form["username"].strip()
         return redirect(url_for("index"))
@@ -90,6 +92,7 @@ def login():
 
 @app.route("/share")
 def share():
+    """Render the share page for viewing shared conversations."""
     if "username" not in session:
         return redirect(url_for("login"))
     return render_template("share.html")
@@ -149,29 +152,38 @@ def save_mask():
 
 @app.route("/logout")
 def logout():
+    """Clear user session and redirect to login page."""
     session.pop("username", None)
     return redirect(url_for("login"))
 
 
 class ModerationException(Exception):
+    """Exception raised when content fails moderation checks."""
+
     def __init__(self, message: str):
         super().__init__(message)
         self.message = message
 
 
 class DownloadError(Exception):
+    """Exception raised when image download fails."""
+
     def __init__(self, message: str):
         super().__init__(message)
         self.message = message
 
 
 class ConversationStorageError(Exception):
+    """Exception raised when conversation storage operations fail."""
+
     def __init__(self, message: str):
         super().__init__(message)
         self.message = message
 
 
 class GeneratedImageData:
+    """Container for generated image data and metadata."""
+
     local_image_path: str
     revised_prompt: str
     prompt: str
@@ -194,6 +206,8 @@ class GeneratedImageData:
 
 
 class SavedImageData:
+    """Container for saved image file information."""
+
     local_image_path: str
     image_name: str
 
@@ -370,18 +384,18 @@ class ConversationManager:
         self._cache_ttl = 300  # 5 minutes cache TTL
 
     def _get_user_lock(self, username: str) -> threading.Lock:
-        """Get or create a thread lock for a specific user."""
+        """Get or create a thread lock for safe concurrent access to user data."""
         with self._locks_lock:
             if username not in self._user_locks:
                 self._user_locks[username] = threading.Lock()
             return self._user_locks[username]
 
     def _get_user_file_path(self, username: str) -> str:
-        """Get the file path for a user's conversation data."""
+        """Get the JSON file path for storing user's conversation data."""
         return os.path.join(self.chats_dir, f"{username}.json")
 
     def _is_cache_valid(self, username: str) -> bool:
-        """Check if cached data is still valid."""
+        """Check if cached conversation data is within TTL window."""
         if username not in self._cache_timestamps:
             return False
         return (time.time() - self._cache_timestamps[username]) < self._cache_ttl
@@ -2210,6 +2224,7 @@ def generate_image_grid(
 
 @app.route("/", methods=["GET"])
 def index():
+    """Render main application interface with user authentication check."""
     if "username" not in session:
         return redirect(url_for("login"))
     return render_template("index.html")
@@ -2635,6 +2650,7 @@ eos_str = "␆␄"
 
 @app.route("/chat", methods=["GET", "POST"])  # type: ignore
 def converse():
+    """Handle chat conversations with streaming responses and conversation management."""
     if "username" not in session:
         return redirect(url_for("login"))
 
@@ -3435,6 +3451,7 @@ def get_images(page: int) -> str:
 
 @app.route("/get-image-metadata/<filename>")
 def get_image_metadata(filename: str):
+    """Retrieve metadata for a specific image file."""
     if "username" not in session:
         abort(404, description="Username not in session")
     if not app.static_folder:

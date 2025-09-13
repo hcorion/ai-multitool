@@ -1,4 +1,7 @@
 import * as utils from "./utils.js";
+/**
+ * Load conversation data for the specified conversation ID
+ */
 export async function onConversationSelected(conversationId) {
     return new Promise((resolve, reject) => {
         $.ajax({
@@ -48,6 +51,9 @@ showdown.extension("highlight", function () {
         },
     ];
 });
+/**
+ * Render chat messages with markdown formatting and reasoning buttons
+ */
 export function refreshChatMessages(messages) {
     const chatHistory = document.getElementById("chat-history");
     chatHistory.innerHTML = "";
@@ -71,6 +77,9 @@ export function refreshChatMessages(messages) {
     });
     chatHistory.scrollTop = chatHistory.scrollHeight; // Scroll to bottom
 }
+/**
+ * Add reasoning inspection button to assistant messages
+ */
 function addReasoningButton(messageElement, messageIndex) {
     try {
         const reasoningButton = document.createElement("button");
@@ -98,6 +107,9 @@ function addReasoningButton(messageElement, messageIndex) {
         // Continue without reasoning button - chat functionality should not be affected
     }
 }
+/**
+ * Display reasoning data modal for the specified message
+ */
 function showReasoningModal(messageIndex) {
     // Get current conversation ID - this should be available globally
     const conversationId = window.currentThreadId;
@@ -197,6 +209,9 @@ function showReasoningModal(messageIndex) {
         console.error("Reasoning modal error:", err);
     });
 }
+/**
+ * Render reasoning data content in the modal with proper formatting
+ */
 function displayReasoningData(reasoningData) {
     const content = document.getElementById("reasoning-content");
     if (!content)
@@ -224,11 +239,17 @@ function displayReasoningData(reasoningData) {
         showReasoningError("Failed to display reasoning data");
     }
 }
+/**
+ * Escape HTML special characters to prevent XSS attacks
+ */
 function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
 }
+/**
+ * Display error message in reasoning modal
+ */
 function showReasoningError(message) {
     console.error(message);
     const error = document.getElementById("reasoning-error");
@@ -237,6 +258,9 @@ function showReasoningError(message) {
     error.textContent = message;
     error.style.display = "block";
 }
+/**
+ * Hide the reasoning inspection modal
+ */
 export function hideReasoningModal() {
     const modal = document.getElementById("reasoning-modal");
     if (modal) {

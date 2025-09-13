@@ -156,6 +156,9 @@ document.addEventListener("DOMContentLoaded", () => {
     providerChanged();
 });
 
+/**
+ * Handle keyboard navigation for grid images
+ */
 function keyDownEvent(evt: KeyboardEvent) {
     if (evt.code == "ArrowRight") {
         nextGridImage();
@@ -166,6 +169,9 @@ function keyDownEvent(evt: KeyboardEvent) {
 
 // Helper functions for new image API
 
+/**
+ * Render successful image generation result with metadata and actions
+ */
 function renderImageResult(response: ImageOperationResponse): void {
     // Extract character prompts from metadata
     let characterPromptsHtml = '';
@@ -231,6 +237,9 @@ function renderImageResult(response: ImageOperationResponse): void {
     }
 }
 
+/**
+ * Render error message for failed image generation
+ */
 function renderImageError(errorMessage: string): void {
     const errorHtml = `
         <div class="error-dialog">
@@ -243,6 +252,9 @@ function renderImageError(errorMessage: string): void {
 }
 
 // Function to add an event listener to an element
+/**
+ * Safely add event listener to element with null checking
+ */
 function addEventListenerToElement(elementId: string, eventType: string, handler: (evt: Event) => void) {
     const element = document.getElementById(elementId);
     if (element) {
@@ -255,6 +267,9 @@ function addEventListenerToElement(elementId: string, eventType: string, handler
 type TabId = "generationTab" | "gridViewTab" | "chatTab" | "promptsTab";
 
 // Event Handlers
+/**
+ * Handle tab navigation clicks and route to appropriate tab handler
+ */
 function handleTabClick(evt: Event) {
     const element = evt.target as HTMLElement;
     const elementId = element.id as TabId;
@@ -271,6 +286,9 @@ function handleTabClick(evt: Event) {
     }
 }
 
+/**
+ * Update UI when image generation provider is changed
+ */
 function providerChanged() {
     const selection = getElementByIdSafe("provider", HTMLSelectElement);
     if (!selection) return;
@@ -302,11 +320,17 @@ function providerChanged() {
     }
 }
 
+/**
+ * Handle model selection changes for current provider
+ */
 function modelButtonChanged() {
     const provider = document.getElementById("provider") as HTMLSelectElement;
     modelChanged(provider.value)
 }
 
+/**
+ * Update UI elements based on selected model and provider
+ */
 function modelChanged(provider: string) {
     if (provider == "stabilityai") {
         const selection = getElementByIdSafe("model", HTMLSelectElement);
@@ -329,6 +353,9 @@ function modelChanged(provider: string) {
 
 }
 
+/**
+ * Update character count display for prompt input field
+ */
 function updateCharacterCount(): void {
     const promptInput = document.getElementById("prompt") as HTMLInputElement;
     const charCount: number = promptInput.value.length;
@@ -336,6 +363,9 @@ function updateCharacterCount(): void {
     charCountDisplay.textContent = `${charCount} / 4000`;
 }
 
+/**
+ * Switch between application tabs and initialize tab-specific functionality
+ */
 function openTab(evt: MouseEvent, tabName: string): void {
     const tabcontent = Array.from(document.getElementsByClassName("tabcontent") as HTMLCollectionOf<HTMLElement>);
     tabcontent.forEach((element) => (element.style.display = "none"));
@@ -367,6 +397,9 @@ function openTab(evt: MouseEvent, tabName: string): void {
 let currentPage: number = 1;
 let totalPages: number = -1;
 
+/**
+ * Initialize grid view tab by loading total pages and current page images
+ */
 function gridTabLoaded(): void {
     $.get("/get-total-pages", (data: string) => {
         totalPages = parseInt(data, 10);
@@ -377,6 +410,9 @@ function gridTabLoaded(): void {
 /* global variable to keep track of the current grid image index */
 let currentGridImageIndex: number = 0;
 
+/**
+ * Load and display images for the specified grid page
+ */
 function loadImages(page: number): void {
     $.getJSON(`/get-images/${page}`, (data: string[]) => {
         const grid = $(".image-grid");
@@ -397,11 +433,17 @@ function loadImages(page: number): void {
     });
 }
 
+/**
+ * Navigate to first page of grid images
+ */
 function firstGrid(): void {
     currentPage = 1;
     loadImages(currentPage);
 }
 
+/**
+ * Navigate to next page of grid images
+ */
 function nextGrid(): void {
     if (currentPage < totalPages) {
         currentPage += 1;
@@ -409,6 +451,9 @@ function nextGrid(): void {
     }
 }
 
+/**
+ * Navigate to previous page of grid images
+ */
 function previousGrid(): void {
     if (currentPage > 1) {
         currentPage -= 1;
@@ -416,11 +461,17 @@ function previousGrid(): void {
     }
 }
 
+/**
+ * Navigate to last page of grid images
+ */
 function lastGrid(): void {
     currentPage = totalPages;
     loadImages(currentPage);
 }
 
+/**
+ * Open modal to display generated image with zoom functionality
+ */
 function openGenModal(evt: Event): void {
     const src = (evt.currentTarget as HTMLImageElement).src;
     const imageModal = getElementByIdSafe("image-modal", HTMLDivElement);
@@ -451,6 +502,9 @@ function openGenModal(evt: Event): void {
     });
 }
 
+/**
+ * Open modal to display grid image with navigation
+ */
 function openGridModal(evt: Event): void {
     // Get the clicked image and determine its index
     const clickedImg = evt.currentTarget as HTMLImageElement;
@@ -594,6 +648,9 @@ function escapeHtml(text: string): string {
     return div.innerHTML;
 }
 
+/**
+ * Update grid modal image and metadata display
+ */
 function updateGridModalImage(): void {
     // Get the list of grid images from the current grid DOM.
     const gridImages = $(".image-grid img");
@@ -864,20 +921,32 @@ function updateGridModalImage(): void {
     });
 }
 
+/**
+ * Navigate to previous image in grid modal
+ */
 function previousGridImage(): void {
     currentGridImageIndex -= 1;
     updateGridModalImage();
 }
 
+/**
+ * Navigate to next image in grid modal
+ */
 function nextGridImage(): void {
     currentGridImageIndex += 1;
     updateGridModalImage();
 }
 
+/**
+ * Close the grid image modal
+ */
 function closeGridModal(): void {
     $("#grid-image-modal").hide();
 }
 
+/**
+ * Close the generated image modal
+ */
 function closeGenModal(): void {
     const imageModal = getElementByIdSafe("image-modal", HTMLDivElement);
     if (imageModal) imageModal.style.display = "none";
@@ -1212,6 +1281,9 @@ function clearInpaintingMode(): void {
 (window as any).openInpaintingMaskCanvas = openInpaintingMaskCanvas;
 (window as any).clearInpaintingMode = clearInpaintingMode;
 
+/**
+ * Toggle visibility of advanced options dropdown
+ */
 function toggleShowAdvanced(event: Event): void {
     const advancedDropdown = document.getElementById("advanced-dropdown") as HTMLElement;
     // Toggle visibility based on current state.
@@ -1231,6 +1303,9 @@ function toggleShowAdvanced(event: Event): void {
     }
 }
 
+/**
+ * Toggle advanced input container visibility based on checkbox
+ */
 function toggleAdvancedInput(event: Event): void {
     const inputToggle = event.target as HTMLInputElement;
     const inputContainer = document.querySelector(".advanced-input-container") as HTMLElement;
@@ -1265,10 +1340,16 @@ type ConversationData = {
 let allConversations: { [key: string]: ConversationData } = {};
 var currentThreadId: string = "";
 
+/**
+ * Initialize chat tab by loading conversation list
+ */
 function chatTabLoaded(): void {
     refreshConversationList();
 }
 
+/**
+ * Load and display user's conversation list from server
+ */
 function refreshConversationList(): void {
     const conversationsList = document.getElementById("conversations-list") as HTMLDivElement;
 
@@ -1464,6 +1545,9 @@ let prettyStatuses: { [key: string]: string } = {
 var cachedMessageList: chat.ChatMessage[];
 var progressNum = 0;
 
+/**
+ * Send chat message and handle streaming response
+ */
 function sendChatMessage(): void {
     var chatName: string = "";
     if (currentThreadId) {
@@ -1559,6 +1643,9 @@ function sendChatMessage(): void {
     );
 }
 
+/**
+ * Update the most recent chat message in the display
+ */
 function updateMostRecentChatMessage(messages: chat.ChatMessage[]): void {
     const chatHistory = document.getElementById("chat-history") as HTMLDivElement;
     var message = messages[messages.length - 1];
@@ -1593,6 +1680,9 @@ function updateMostRecentChatMessage(messages: chat.ChatMessage[]): void {
     chatHistory.scrollTop = chatHistory.scrollHeight; // Scroll to bottom
 }
 
+/**
+ * Add reasoning inspection button to assistant message
+ */
 function addReasoningButtonToMessage(messageElement: HTMLElement, messageIndex: number): void {
     const reasoningButton = document.createElement("button");
     reasoningButton.className = "reasoning-button";
@@ -1768,6 +1858,9 @@ interface CharacterPromptData {
     negative: string;
 }
 
+/**
+ * Show character prompt interface for NovelAI provider
+ */
 function showCharacterPromptInterface(): void {
     const characterSection = document.getElementById("character-prompt-section");
     if (characterSection) {
@@ -1782,6 +1875,9 @@ function showCharacterPromptInterface(): void {
     }
 }
 
+/**
+ * Hide character prompt interface for non-NovelAI providers
+ */
 function hideCharacterPromptInterface(): void {
     const characterSection = document.getElementById("character-prompt-section");
     if (characterSection) {
@@ -1789,6 +1885,9 @@ function hideCharacterPromptInterface(): void {
     }
 }
 
+/**
+ * Add new character prompt input fields to the interface
+ */
 function addCharacterPrompt(): void {
     const container = document.getElementById("character-prompts-container");
     if (!container) return;
@@ -1866,12 +1965,18 @@ function addCharacterPrompt(): void {
     updateCharacterPromptCount();
 }
 
+/**
+ * Remove character prompt input fields from interface
+ */
 function removeCharacterPrompt(characterDiv: HTMLElement): void {
     characterDiv.remove();
     updateCharacterPromptCount();
     reindexCharacterPrompts();
 }
 
+/**
+ * Update character prompt counter display
+ */
 function updateCharacterPromptCount(): void {
     const container = document.getElementById("character-prompts-container");
     const countElement = document.getElementById("character-count");

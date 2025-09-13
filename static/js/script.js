@@ -124,6 +124,9 @@ document.addEventListener("DOMContentLoaded", () => {
     // Just refresh the image gen provider
     providerChanged();
 });
+/**
+ * Handle keyboard navigation for grid images
+ */
 function keyDownEvent(evt) {
     if (evt.code == "ArrowRight") {
         nextGridImage();
@@ -133,6 +136,9 @@ function keyDownEvent(evt) {
     }
 }
 // Helper functions for new image API
+/**
+ * Render successful image generation result with metadata and actions
+ */
 function renderImageResult(response) {
     // Extract character prompts from metadata
     let characterPromptsHtml = '';
@@ -191,6 +197,9 @@ function renderImageResult(response) {
         });
     }
 }
+/**
+ * Render error message for failed image generation
+ */
 function renderImageError(errorMessage) {
     const errorHtml = `
         <div class="error-dialog">
@@ -201,6 +210,9 @@ function renderImageError(errorMessage) {
     $("#result-section").html(errorHtml);
 }
 // Function to add an event listener to an element
+/**
+ * Safely add event listener to element with null checking
+ */
 function addEventListenerToElement(elementId, eventType, handler) {
     const element = document.getElementById(elementId);
     if (element) {
@@ -211,6 +223,9 @@ function addEventListenerToElement(elementId, eventType, handler) {
     }
 }
 // Event Handlers
+/**
+ * Handle tab navigation clicks and route to appropriate tab handler
+ */
 function handleTabClick(evt) {
     const element = evt.target;
     const elementId = element.id;
@@ -224,6 +239,9 @@ function handleTabClick(evt) {
         openTab(evt, tabMap[elementId]);
     }
 }
+/**
+ * Update UI when image generation provider is changed
+ */
 function providerChanged() {
     const selection = getElementByIdSafe("provider", HTMLSelectElement);
     if (!selection)
@@ -259,10 +277,16 @@ function providerChanged() {
         throw new Error(`Tried to switch to unsupported provider ${selection.value}`);
     }
 }
+/**
+ * Handle model selection changes for current provider
+ */
 function modelButtonChanged() {
     const provider = document.getElementById("provider");
     modelChanged(provider.value);
 }
+/**
+ * Update UI elements based on selected model and provider
+ */
 function modelChanged(provider) {
     if (provider == "stabilityai") {
         const selection = getElementByIdSafe("model", HTMLSelectElement);
@@ -288,12 +312,18 @@ function modelChanged(provider) {
         throw new Error(`modelChanged called with unsupported provider ${provider}`);
     }
 }
+/**
+ * Update character count display for prompt input field
+ */
 function updateCharacterCount() {
     const promptInput = document.getElementById("prompt");
     const charCount = promptInput.value.length;
     const charCountDisplay = document.getElementById("charCount");
     charCountDisplay.textContent = `${charCount} / 4000`;
 }
+/**
+ * Switch between application tabs and initialize tab-specific functionality
+ */
 function openTab(evt, tabName) {
     const tabcontent = Array.from(document.getElementsByClassName("tabcontent"));
     tabcontent.forEach((element) => (element.style.display = "none"));
@@ -320,6 +350,9 @@ function openTab(evt, tabName) {
 }
 let currentPage = 1;
 let totalPages = -1;
+/**
+ * Initialize grid view tab by loading total pages and current page images
+ */
 function gridTabLoaded() {
     $.get("/get-total-pages", (data) => {
         totalPages = parseInt(data, 10);
@@ -328,6 +361,9 @@ function gridTabLoaded() {
 }
 /* global variable to keep track of the current grid image index */
 let currentGridImageIndex = 0;
+/**
+ * Load and display images for the specified grid page
+ */
 function loadImages(page) {
     $.getJSON(`/get-images/${page}`, (data) => {
         const grid = $(".image-grid");
@@ -346,26 +382,41 @@ function loadImages(page) {
         $("#gridPageNum").text(`Page ${page}/${totalPages}`);
     });
 }
+/**
+ * Navigate to first page of grid images
+ */
 function firstGrid() {
     currentPage = 1;
     loadImages(currentPage);
 }
+/**
+ * Navigate to next page of grid images
+ */
 function nextGrid() {
     if (currentPage < totalPages) {
         currentPage += 1;
         loadImages(currentPage);
     }
 }
+/**
+ * Navigate to previous page of grid images
+ */
 function previousGrid() {
     if (currentPage > 1) {
         currentPage -= 1;
         loadImages(currentPage);
     }
 }
+/**
+ * Navigate to last page of grid images
+ */
 function lastGrid() {
     currentPage = totalPages;
     loadImages(currentPage);
 }
+/**
+ * Open modal to display generated image with zoom functionality
+ */
 function openGenModal(evt) {
     const src = evt.currentTarget.src;
     const imageModal = getElementByIdSafe("image-modal", HTMLDivElement);
@@ -392,6 +443,9 @@ function openGenModal(evt) {
         img.style.transform = `scale(${scale})`;
     });
 }
+/**
+ * Open modal to display grid image with navigation
+ */
 function openGridModal(evt) {
     // Get the clicked image and determine its index
     const clickedImg = evt.currentTarget;
@@ -529,6 +583,9 @@ function escapeHtml(text) {
     div.textContent = text;
     return div.innerHTML;
 }
+/**
+ * Update grid modal image and metadata display
+ */
 function updateGridModalImage() {
     // Get the list of grid images from the current grid DOM.
     const gridImages = $(".image-grid img");
@@ -777,17 +834,29 @@ function updateGridModalImage() {
         };
     });
 }
+/**
+ * Navigate to previous image in grid modal
+ */
 function previousGridImage() {
     currentGridImageIndex -= 1;
     updateGridModalImage();
 }
+/**
+ * Navigate to next image in grid modal
+ */
 function nextGridImage() {
     currentGridImageIndex += 1;
     updateGridModalImage();
 }
+/**
+ * Close the grid image modal
+ */
 function closeGridModal() {
     $("#grid-image-modal").hide();
 }
+/**
+ * Close the generated image modal
+ */
 function closeGenModal() {
     const imageModal = getElementByIdSafe("image-modal", HTMLDivElement);
     if (imageModal)
@@ -1069,6 +1138,9 @@ function clearInpaintingMode() {
 // Make the functions globally available
 window.openInpaintingMaskCanvas = openInpaintingMaskCanvas;
 window.clearInpaintingMode = clearInpaintingMode;
+/**
+ * Toggle visibility of advanced options dropdown
+ */
 function toggleShowAdvanced(event) {
     const advancedDropdown = document.getElementById("advanced-dropdown");
     // Toggle visibility based on current state.
@@ -1088,6 +1160,9 @@ function toggleShowAdvanced(event) {
         }
     }
 }
+/**
+ * Toggle advanced input container visibility based on checkbox
+ */
 function toggleAdvancedInput(event) {
     const inputToggle = event.target;
     const inputContainer = document.querySelector(".advanced-input-container");
@@ -1103,9 +1178,15 @@ function toggleAdvancedInput(event) {
 }
 let allConversations = {};
 var currentThreadId = "";
+/**
+ * Initialize chat tab by loading conversation list
+ */
 function chatTabLoaded() {
     refreshConversationList();
 }
+/**
+ * Load and display user's conversation list from server
+ */
 function refreshConversationList() {
     const conversationsList = document.getElementById("conversations-list");
     $.get("/get-all-conversations", (response) => {
@@ -1282,6 +1363,9 @@ let prettyStatuses = {
 };
 var cachedMessageList;
 var progressNum = 0;
+/**
+ * Send chat message and handle streaming response
+ */
 function sendChatMessage() {
     var chatName = "";
     if (currentThreadId) {
@@ -1373,6 +1457,9 @@ function sendChatMessage() {
         // TODO: Hook up the tool-based outputs
     });
 }
+/**
+ * Update the most recent chat message in the display
+ */
 function updateMostRecentChatMessage(messages) {
     const chatHistory = document.getElementById("chat-history");
     var message = messages[messages.length - 1];
@@ -1402,6 +1489,9 @@ function updateMostRecentChatMessage(messages) {
     }
     chatHistory.scrollTop = chatHistory.scrollHeight; // Scroll to bottom
 }
+/**
+ * Add reasoning inspection button to assistant message
+ */
 function addReasoningButtonToMessage(messageElement, messageIndex) {
     const reasoningButton = document.createElement("button");
     reasoningButton.className = "reasoning-button";
@@ -1554,6 +1644,9 @@ function hideReasoningModalFromScript() {
         modal.style.display = "none";
     }
 }
+/**
+ * Show character prompt interface for NovelAI provider
+ */
 function showCharacterPromptInterface() {
     const characterSection = document.getElementById("character-prompt-section");
     if (characterSection) {
@@ -1566,12 +1659,18 @@ function showCharacterPromptInterface() {
         }
     }
 }
+/**
+ * Hide character prompt interface for non-NovelAI providers
+ */
 function hideCharacterPromptInterface() {
     const characterSection = document.getElementById("character-prompt-section");
     if (characterSection) {
         characterSection.style.display = "none";
     }
 }
+/**
+ * Add new character prompt input fields to the interface
+ */
 function addCharacterPrompt() {
     const container = document.getElementById("character-prompts-container");
     if (!container)
@@ -1643,11 +1742,17 @@ function addCharacterPrompt() {
     container.appendChild(characterDiv);
     updateCharacterPromptCount();
 }
+/**
+ * Remove character prompt input fields from interface
+ */
 function removeCharacterPrompt(characterDiv) {
     characterDiv.remove();
     updateCharacterPromptCount();
     reindexCharacterPrompts();
 }
+/**
+ * Update character prompt counter display
+ */
 function updateCharacterPromptCount() {
     const container = document.getElementById("character-prompts-container");
     const countElement = document.getElementById("character-count");

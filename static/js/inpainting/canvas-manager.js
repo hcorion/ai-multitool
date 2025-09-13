@@ -64,7 +64,7 @@ export class CanvasManager {
         });
     }
     /**
-     * Process the loaded image and set up canvas state
+     * Process loaded image and initialize canvas state with proper scaling
      */
     processLoadedImage(img) {
         if (!img.complete || img.naturalWidth === 0) {
@@ -106,11 +106,14 @@ export class CanvasManager {
         // Initialize the mask overlay (empty initially)
         this.updateMaskOverlay();
     }
+    /**
+     * Get the base scale factor for coordinate transformations
+     */
     getBaseScale() {
         return this.state?.scale ?? 1; // CSS px per image px when interactive scale=1
     }
     /**
-     * Calculate "contain" scaling with letterboxing to maintain aspect ratio
+     * Calculate contain scaling to fit image within container while preserving aspect ratio
      */
     calculateContainScaling(imageWidth, imageHeight, containerWidth, containerHeight) {
         const imageAspect = imageWidth / imageHeight;
@@ -133,7 +136,7 @@ export class CanvasManager {
         return { displayWidth, displayHeight, scale };
     }
     /**
-     * Update canvas sizes to match image dimensions
+     * Set canvas internal dimensions and configure rendering contexts
      */
     updateCanvasSizes(width, height) {
         // Set canvas internal dimensions to match image
@@ -162,7 +165,7 @@ export class CanvasManager {
         overlayCtx.globalAlpha = 0.5;
     }
     /**
-     * Render the image to the image canvas
+     * Draw the loaded image to the canvas and update display
      */
     renderImage(img) {
         const ctx = this.imageCanvas.getContext('2d');

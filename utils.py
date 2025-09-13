@@ -1,4 +1,5 @@
 def remove_stop_words(input_string: str) -> str:
+    """Remove common stop words from input string for cleaner image filenames."""
     # List of stop words
     stop_words = set(
         [
@@ -180,7 +181,7 @@ def remove_stop_words(input_string: str) -> str:
             "pose",
             "ai",
             "generated",
-            "assisted"
+            "assisted",
         ]
     )
 

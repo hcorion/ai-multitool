@@ -40,7 +40,7 @@ export class InputEngine {
         this.setupTouchAction();
     }
     /**
-     * Set up pointer event listeners
+     * Attach pointer event listeners to canvas element
      */
     setupEventListeners() {
         // Pointer Events API handlers
@@ -54,7 +54,7 @@ export class InputEngine {
         this.canvas.addEventListener('mouseleave', this.bound.mouseLeave);
     }
     /**
-     * Set up touch-action CSS property to prevent scrolling
+     * Configure touch-action CSS to prevent unwanted scrolling during drawing
      */
     setupTouchAction() {
         if (this.settings.preventScrolling) {
@@ -62,7 +62,7 @@ export class InputEngine {
         }
     }
     /**
-     * Handle pointer down events
+     * Process pointer down events and start drawing if enabled
      */
     handlePointerDown(event) {
         if (!this.isEnabled || !this.settings.enableDrawing)
@@ -94,7 +94,7 @@ export class InputEngine {
         });
     }
     /**
-     * Handle pointer move events
+     * Process pointer move events for drawing and cursor updates
      */
     handlePointerMove(event) {
         if (!this.isEnabled)
@@ -248,7 +248,7 @@ export class InputEngine {
         });
     }
     /**
-     * Update cursor preview position
+     * Update cursor preview position with coordinate transformation
      */
     updateCursorPreview(clientX, clientY) {
         if (!this.cursorElement)
@@ -292,7 +292,7 @@ export class InputEngine {
         }
     }
     /**
-     * Create cursor preview element
+     * Create and style the brush cursor preview element
      */
     createCursorPreview() {
         this.cursorElement = document.createElement('div');
@@ -311,7 +311,7 @@ export class InputEngine {
         this.updateCursorSize(20); // Default size
     }
     /**
-     * Update cursor preview size
+     * Update cursor preview size based on brush size and scale
      */
     updateCursorSize(size) {
         if (this.cursorElement) {

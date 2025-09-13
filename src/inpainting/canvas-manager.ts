@@ -96,7 +96,7 @@ export class CanvasManager implements CoordinateTransform {
     }
 
     /**
-     * Process the loaded image and set up canvas state
+     * Process loaded image and initialize canvas state with proper scaling
      */
     private processLoadedImage(img: HTMLImageElement): void {
         if (!img.complete || img.naturalWidth === 0) {
@@ -154,12 +154,15 @@ export class CanvasManager implements CoordinateTransform {
         this.updateMaskOverlay();
     }
 
+    /**
+     * Get the base scale factor for coordinate transformations
+     */
     public getBaseScale(): number {
         return this.state?.scale ?? 1; // CSS px per image px when interactive scale=1
     }
 
     /**
-     * Calculate "contain" scaling with letterboxing to maintain aspect ratio
+     * Calculate contain scaling to fit image within container while preserving aspect ratio
      */
     private calculateContainScaling(
         imageWidth: number,
@@ -190,7 +193,7 @@ export class CanvasManager implements CoordinateTransform {
     }
 
     /**
-     * Update canvas sizes to match image dimensions
+     * Set canvas internal dimensions and configure rendering contexts
      */
     private updateCanvasSizes(width: number, height: number): void {
         // Set canvas internal dimensions to match image
@@ -225,7 +228,7 @@ export class CanvasManager implements CoordinateTransform {
     }
 
     /**
-     * Render the image to the image canvas
+     * Draw the loaded image to the canvas and update display
      */
     private renderImage(img: HTMLImageElement): void {
         const ctx = this.imageCanvas.getContext('2d');

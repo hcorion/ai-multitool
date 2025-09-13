@@ -1,7 +1,13 @@
+/**
+ * Unescape HTML entities for display purposes
+ */
 export function unescapeHTML(escapedHTML: string): string {
     return escapedHTML.replace(/&lt;/g, "&lt").replace(/&gt;/g, "&gt").replace(/&amp;/g, "&");
 }
 
+/**
+ * Copy text to clipboard with fallback for non-secure contexts
+ */
 export async function copyToClipboard(textToCopy: string) {
     // Navigator clipboard api needs a secure context (https)
     if (navigator.clipboard && window.isSecureContext) {
