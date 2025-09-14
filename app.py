@@ -3581,6 +3581,44 @@ def get_image_metadata(filename: str):
     return json.dumps(metadata_dict)
 
 
+def detect_followup_file(content_lines: list[str]) -> tuple[bool, int]:
+    """
+    Detect if a prompt file is a follow-up options file and return column count.
+    
+    Returns:
+        tuple: (is_followup, total_columns)
+    """
+    if not content_lines:
+        return False, 0
+    
+    # Look for header line
+    header_line = None
+    for line in content_lines:
+        stripped = line.strip()
+        if stripped.startswith('# columns:'):
+            header_line = stripped
+            break
+    
+    if not header_line:
+        return False, 0
+    
+    # Find data lines to determine actual column count
+    data_lines = [line.strip() for line in content_lines 
+                  if line.strip() and not line.strip().startswith('#')]
+    
+    if not data_lines:
+        return True, 0  # Header found but no data
+    
+    # Count columns from first data line
+    first_line_columns = len(data_lines[0].split('||'))
+    
+    # Verify it's actually a follow-up file (has || separators)
+    if first_line_columns < 2:
+        return False, 0
+    
+    return True, first_line_columns
+
+
 @app.route("/prompt-files", methods=["GET"])
 def get_prompt_files():
     """Get all prompt files for the current user."""
@@ -3606,13 +3644,19 @@ def get_prompt_files():
                         content_lines = f.read().splitlines()
 
                     file_stats = os.stat(file_path)
-                    files.append(
-                        {
-                            "name": os.path.splitext(filename)[0],
-                            "content": content_lines,
-                            "size": file_stats.st_size,
-                        }
-                    )
+                    is_followup, total_columns = detect_followup_file(content_lines)
+                    
+                    file_data = {
+                        "name": os.path.splitext(filename)[0],
+                        "content": content_lines,
+                        "size": file_stats.st_size,
+                        "isFollowUp": is_followup,
+                    }
+                    
+                    if is_followup:
+                        file_data["totalColumns"] = total_columns
+                    
+                    files.append(file_data)
                 except Exception as e:
                     # Skip files that can't be read
                     print(f"Warning: Could not read file {filename}: {e}")
@@ -3691,12 +3735,22 @@ def get_prompt_file(filename: str):
             return jsonify({"error": "File not found"}), 404
 
         with open(file_path, "r", encoding="utf-8") as f:
-            content = f.read().strip()
+            content_lines = f.read().splitlines()
 
-        # Split content into lines and filter out empty lines
-        lines = [line.strip() for line in content.split("\n") if line.strip()]
-
-        return jsonify({"name": filename, "content": lines, "line_count": len(lines)})
+        file_stats = os.stat(file_path)
+        is_followup, total_columns = detect_followup_file(content_lines)
+        
+        file_data = {
+            "name": filename,
+            "content": content_lines,
+            "size": file_stats.st_size,
+            "isFollowUp": is_followup,
+        }
+        
+        if is_followup:
+            file_data["totalColumns"] = total_columns
+        
+        return jsonify(file_data)
 
     except Exception as e:
         return jsonify({"error": f"Failed to read file: {str(e)}"}), 500

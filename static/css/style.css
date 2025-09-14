@@ -1282,6 +1282,14 @@ button#send-chat:hover {
   border-color: rgba(10, 132, 255, 0.5);
   box-shadow: 0 2px 8px rgba(10, 132, 255, 0.1);
 }
+.prompt-file-item.followup-file {
+  border-left: 4px solid #4CAF50;
+  background-color: rgba(76, 175, 80, 0.05);
+}
+.prompt-file-item.followup-file:hover {
+  border-color: rgba(76, 175, 80, 0.7);
+  box-shadow: 0 2px 8px rgba(76, 175, 80, 0.15);
+}
 .prompt-file-item .prompt-file-header {
   display: flex;
   justify-content: space-between;
@@ -1294,6 +1302,9 @@ button#send-chat:hover {
   font-family: "Inter", monospace;
   font-size: 1.2rem;
   font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 .prompt-file-item .prompt-file-header .prompt-file-meta {
   color: rgba(255, 255, 255, 0.6);
@@ -1347,6 +1358,19 @@ button#send-chat:hover {
 }
 .prompt-file-item .prompt-file-actions .action-button.delete-button:hover {
   background-color: #ff4444;
+}
+
+.followup-badge {
+  background-color: #4CAF50;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .prompt-file-modal {
@@ -1440,6 +1464,33 @@ button#send-chat:hover {
   color: rgba(255, 255, 255, 0.6);
   font-size: 0.85rem;
   margin-top: 5px;
+}
+.prompt-file-modal .modal-body .form-group .form-help .followup-help {
+  background-color: rgba(76, 175, 80, 0.1);
+  border: 1px solid rgba(76, 175, 80, 0.3);
+  border-radius: 4px;
+  padding: 10px;
+  margin-top: 10px;
+}
+.prompt-file-modal .modal-body .form-group .form-help .followup-help strong {
+  color: #4CAF50;
+}
+.prompt-file-modal .modal-body .form-group .form-help .followup-help code {
+  background-color: rgba(18, 18, 18, 0.5);
+  padding: 2px 4px;
+  border-radius: 2px;
+  font-family: "Inter", monospace;
+}
+.prompt-file-modal .modal-body .form-group .form-help .template-help pre {
+  background-color: rgba(18, 18, 18, 0.5);
+  border: 1px solid rgba(102, 102, 102, 0.5);
+  border-radius: 4px;
+  padding: 10px;
+  margin: 10px 0;
+  font-family: "Inter", monospace;
+  font-size: 0.8rem;
+  overflow-x: auto;
+  white-space: pre-wrap;
 }
 .prompt-file-modal .modal-footer {
   display: flex;

@@ -2,6 +2,7 @@ import * as utils from "./utils.js";
 import * as chat from "./chat.js";
 import { InpaintingMaskCanvas } from "./inpainting/inpainting-mask-canvas.js";
 import { getElementByIdSafe } from './dom_utils.js';
+import showdown from "showdown";
 
 // TypeScript interfaces for the new image API
 interface ImageOperationResponse {
@@ -151,6 +152,14 @@ document.addEventListener("DOMContentLoaded", () => {
     addEventListenerToElement("prompt-modal-close", "click", hidePromptFileModal);
     addEventListenerToElement("prompt-file-cancel", "click", hidePromptFileModal);
     addEventListenerToElement("prompt-file-save", "click", savePromptFile);
+    
+    // Add input listener for real-time validation and help updates
+    const contentTextarea = document.getElementById("prompt-file-content") as HTMLTextAreaElement;
+    if (contentTextarea) {
+        contentTextarea.addEventListener("input", () => {
+            updateTemplateHelp(contentTextarea.value);
+        });
+    }
 
     // Just refresh the image gen provider
     providerChanged();
@@ -2086,6 +2095,8 @@ interface PromptFile {
     name: string;
     content: string[];
     size: number;
+    isFollowUp: boolean;
+    totalColumns?: number;
 }
 
 let promptFiles: PromptFile[] = [];
@@ -2132,12 +2143,20 @@ function renderPromptFiles(): void {
 
     noFilesElement.style.display = "none";
 
-    const filesHtml = promptFiles.map(file => `
-        <div class="prompt-file-item" data-file-name="${escapeHtml(file.name)}">
+    const filesHtml = promptFiles.map(file => {
+        const followUpBadge = file.isFollowUp 
+            ? `<span class="followup-badge" title="Follow-up Options File">🔄 ${file.totalColumns || 0} columns</span>`
+            : '';
+        
+        const fileItemClass = file.isFollowUp ? 'prompt-file-item followup-file' : 'prompt-file-item';
+        
+        return `
+        <div class="${fileItemClass}" data-file-name="${escapeHtml(file.name)}">
             <div class="prompt-file-header">
-                <h4 class="prompt-file-name">__${escapeHtml(file.name)}__</h4>
+                <h4 class="prompt-file-name">__${escapeHtml(file.name)}__ ${followUpBadge}</h4>
                 <div class="prompt-file-meta">
                     ${file.content.length} line${file.content.length !== 1 ? 's' : ''} • ${file.size} bytes
+                    ${file.isFollowUp ? ` • Follow-up Options` : ''}
                 </div>
             </div>
             <div class="prompt-file-preview">
@@ -2149,7 +2168,8 @@ function renderPromptFiles(): void {
                 <button class="action-button delete-button" onclick="deletePromptFile('${escapeHtml(file.name)}')">Delete</button>
             </div>
         </div>
-    `).join('');
+        `;
+    }).join('');
 
     contentElement.innerHTML = filesHtml;
 }
@@ -2166,6 +2186,9 @@ function showPromptFileModal(mode: "create" | "edit", fileName?: string): void {
         contentTextarea.value = "";
         nameInput.disabled = false;
         currentEditingFile = null;
+        
+        // Add template suggestions for follow-up files
+        updateTemplateHelp();
     } else if (mode === "edit" && fileName) {
         title.textContent = "Edit Prompt File";
         nameInput.value = fileName;
@@ -2174,10 +2197,86 @@ function showPromptFileModal(mode: "create" | "edit", fileName?: string): void {
 
         const file = promptFiles.find(f => f.name === fileName);
         contentTextarea.value = file ? file.content.join('\n') : "";
+        
+        // Update help text based on current file content
+        updateTemplateHelp(file?.content.join('\n'));
     }
 
     modal.style.display = "flex";
     nameInput.focus();
+}
+
+function updateTemplateHelp(content?: string): void {
+    const helpElement = document.getElementById("prompt-file-help") as HTMLElement;
+    if (!helpElement) return;
+
+    const isFollowUpFile = content ? detectFollowUpFile(content) : false;
+    
+    if (isFollowUpFile) {
+        helpElement.innerHTML = `
+            <div class="followup-help">
+                <strong>Follow-up Options File Detected</strong>
+                <p>This file uses the follow-up options format with multiple columns.</p>
+                <p><strong>Format:</strong> <code># columns: primary, secondary, tertiary</code></p>
+                <p><strong>Rows:</strong> <code>option1||option2||option3</code></p>
+            </div>
+        `;
+    } else {
+        helpElement.innerHTML = `
+            <div class="template-help">
+                <p><strong>Regular Prompt File:</strong> Enter one option per line</p>
+                <p><strong>Follow-up Options File:</strong> Use this format:</p>
+                <pre># columns: primary, secondary, tertiary
+warm red||cool red||deep red
+bright blue||sky blue||navy blue
+forest green||lime green||dark green</pre>
+                <p><em>Column names after "columns:" are decorative. Functionality is determined by || separators.</em></p>
+            </div>
+        `;
+    }
+}
+
+function detectFollowUpFile(content: string): boolean {
+    const lines = content.split('\n');
+    return lines.some(line => line.trim().startsWith('# columns:'));
+}
+
+function validateFollowUpFile(content: string): { isValid: boolean; errors: string[] } {
+    const lines = content.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+    const errors: string[] = [];
+    
+    if (lines.length === 0) {
+        return { isValid: true, errors: [] }; // Empty file is valid
+    }
+    
+    // Check if it's a follow-up file
+    const headerLine = lines.find(line => line.startsWith('# columns:'));
+    if (!headerLine) {
+        return { isValid: true, errors: [] }; // Regular file is valid
+    }
+    
+    // Validate follow-up file format
+    const dataLines = lines.filter(line => !line.startsWith('#') && line.length > 0);
+    
+    if (dataLines.length === 0) {
+        errors.push("Follow-up file must have at least one data row");
+        return { isValid: false, errors };
+    }
+    
+    // Check column consistency
+    const columnCounts = dataLines.map(line => line.split('||').length);
+    const firstColumnCount = columnCounts[0];
+    
+    if (firstColumnCount < 2) {
+        errors.push("Follow-up file rows must have at least 2 columns separated by ||");
+    }
+    
+    const inconsistentRows = columnCounts.some(count => count !== firstColumnCount);
+    if (inconsistentRows) {
+        errors.push("All rows must have the same number of columns");
+    }
+    
+    return { isValid: errors.length === 0, errors };
 }
 
 function hidePromptFileModal(): void {
@@ -2200,6 +2299,13 @@ async function savePromptFile(): Promise<void> {
 
     if (!/^[a-zA-Z0-9_-]+$/.test(fileName)) {
         alert("File name can only contain letters, numbers, underscores, and hyphens");
+        return;
+    }
+
+    // Validate follow-up file format if applicable
+    const validation = validateFollowUpFile(content);
+    if (!validation.isValid) {
+        alert(`Follow-up file validation errors:\n${validation.errors.join('\n')}`);
         return;
     }
 

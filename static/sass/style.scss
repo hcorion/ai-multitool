@@ -1107,6 +1107,16 @@ button#send-chat {
         box-shadow: 0 2px 8px rgba($color: $submit-btn-color, $alpha: 0.1);
     }
 
+    &.followup-file {
+        border-left: 4px solid #4CAF50;
+        background-color: rgba($color: #4CAF50, $alpha: 0.05);
+
+        &:hover {
+            border-color: rgba($color: #4CAF50, $alpha: 0.7);
+            box-shadow: 0 2px 8px rgba($color: #4CAF50, $alpha: 0.15);
+        }
+    }
+
     .prompt-file-header {
         display: flex;
         justify-content: space-between;
@@ -1119,6 +1129,9 @@ button#send-chat {
             font-family: 'Inter', monospace;
             font-size: 1.2rem;
             font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
 
         .prompt-file-meta {
@@ -1185,6 +1198,20 @@ button#send-chat {
             }
         }
     }
+}
+
+// Follow-up file badge styling
+.followup-badge {
+    background-color: #4CAF50;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
 }
 
 // Prompt File Modal Styling
@@ -1287,6 +1314,39 @@ button#send-chat {
                 color: rgba($color: $text-color, $alpha: 0.6);
                 font-size: 0.85rem;
                 margin-top: 5px;
+
+                .followup-help {
+                    background-color: rgba($color: #4CAF50, $alpha: 0.1);
+                    border: 1px solid rgba($color: #4CAF50, $alpha: 0.3);
+                    border-radius: 4px;
+                    padding: 10px;
+                    margin-top: 10px;
+
+                    strong {
+                        color: #4CAF50;
+                    }
+
+                    code {
+                        background-color: rgba($color: $background-color, $alpha: 0.5);
+                        padding: 2px 4px;
+                        border-radius: 2px;
+                        font-family: 'Inter', monospace;
+                    }
+                }
+
+                .template-help {
+                    pre {
+                        background-color: rgba($color: $background-color, $alpha: 0.5);
+                        border: 1px solid rgba($color: $border-color, $alpha: 0.5);
+                        border-radius: 4px;
+                        padding: 10px;
+                        margin: 10px 0;
+                        font-family: 'Inter', monospace;
+                        font-size: 0.8rem;
+                        overflow-x: auto;
+                        white-space: pre-wrap;
+                    }
+                }
             }
         }
     }
