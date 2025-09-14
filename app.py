@@ -44,6 +44,8 @@ from dynamic_prompts import (
     get_prompts_for_name,
     make_character_prompts_dynamic,
     make_prompt_dynamic,
+    init_followup_state,
+    FollowUpState,
 )
 from image_models import (
     ImageGenerationRequest,
@@ -73,6 +75,9 @@ if not os.path.isfile(secret_key_filename):
         f.write(secrets.token_urlsafe(16))
 with open(secret_key_filename, "r") as f:
     app.secret_key = f.read()
+
+
+
 
 
 @app.errorhandler(404)
@@ -1214,6 +1219,7 @@ def generate_novelai_image(
     variety: bool = False,
     grid_dynamic_prompt: GridDynamicPromptInfo | None = None,
     character_prompts: Optional[List[Dict[str, str]]] = None,
+    followup_state: Optional[dict[str, FollowUpState]] = None,
 ) -> GeneratedImageData:
     if not app.static_folder:
         raise ValueError("Flask static folder not defined")
@@ -1221,8 +1227,12 @@ def generate_novelai_image(
     if not novelai_api_key:
         raise ValueError("NovelAI API key not configured")
 
+    # Use provided follow-up state or initialize new state for this generation
+    if followup_state is None:
+        followup_state = init_followup_state()
+
     revised_prompt = make_prompt_dynamic(
-        prompt, username, app.static_folder, seed, grid_dynamic_prompt
+        prompt, username, app.static_folder, seed, grid_dynamic_prompt, followup_state
     )
 
     # Process character prompts if provided
@@ -1235,6 +1245,7 @@ def generate_novelai_image(
                 app.static_folder,
                 seed,
                 grid_dynamic_prompt,
+                followup_state,  # Pass the same follow-up state used by base prompt
             )
         except (ValueError, LookupError) as e:
             raise ValueError(f"Error processing character prompts: {str(e)}")
@@ -1328,6 +1339,7 @@ def generate_novelai_inpaint_image(
     variety: bool = False,
     grid_dynamic_prompt: GridDynamicPromptInfo | None = None,
     character_prompts: Optional[List[Dict[str, str]]] = None,
+    followup_state: Optional[dict[str, FollowUpState]] = None,
 ) -> GeneratedImageData:
     """Generate an inpainted image using NovelAI and return processed data."""
     if not app.static_folder:
@@ -1336,8 +1348,12 @@ def generate_novelai_inpaint_image(
     if not novelai_api_key:
         raise ValueError("NovelAI API key not configured")
 
+    # Use provided follow-up state or initialize new state for this generation
+    if followup_state is None:
+        followup_state = init_followup_state()
+
     revised_prompt = make_prompt_dynamic(
-        prompt, username, app.static_folder, seed, grid_dynamic_prompt
+        prompt, username, app.static_folder, seed, grid_dynamic_prompt, followup_state
     )
 
     # Process character prompts if provided
@@ -1350,6 +1366,7 @@ def generate_novelai_inpaint_image(
                 app.static_folder,
                 seed,
                 grid_dynamic_prompt,
+                followup_state,  # Pass the same follow-up state used by base prompt
             )
         except (ValueError, LookupError) as e:
             raise ValueError(f"Error processing character prompts: {str(e)}")
@@ -1441,6 +1458,7 @@ def generate_novelai_img2img_image(
     seed: int = 0,
     strength: float = 0.7,
     variety: bool = False,
+    followup_state: Optional[dict[str, FollowUpState]] = None,
 ) -> GeneratedImageData:
     """Generate an img2img image using NovelAI and return processed data."""
     if not app.static_folder:
@@ -1449,7 +1467,14 @@ def generate_novelai_img2img_image(
     if not novelai_api_key:
         raise ValueError("NovelAI API key not configured")
 
-    revised_prompt = make_prompt_dynamic(prompt, username, app.static_folder, seed)
+    # Use provided follow-up state or initialize new state for this generation
+    if followup_state is None:
+        followup_state = init_followup_state()
+
+    revised_prompt = make_prompt_dynamic(
+        prompt, username, app.static_folder, seed, None, followup_state
+    )
+
     width, height = size
 
     # Create NovelAI client
@@ -1508,11 +1533,18 @@ def generate_stability_image(
     aspect_ratio: str = "1:1",
     seed: int = 0,
     upscale: bool = False,
+    followup_state: Optional[dict[str, FollowUpState]] = None,
 ) -> GeneratedImageData:
     if not app.static_folder:
         raise ValueError("Flask static folder not defined")
 
-    revised_prompt = make_prompt_dynamic(prompt, username, app.static_folder, seed)
+    # Use provided follow-up state or initialize new state for this generation
+    if followup_state is None:
+        followup_state = init_followup_state()
+
+    revised_prompt = make_prompt_dynamic(
+        prompt, username, app.static_folder, seed, None, followup_state
+    )
 
     data = {  # type: ignore
         "prompt": revised_prompt,
@@ -1570,7 +1602,11 @@ def generate_stability_image(
 
 
 def _process_openai_prompt(
-    prompt: str, username: str, seed: int = 0, strict_follow_prompt: bool = False
+    prompt: str,
+    username: str,
+    seed: int = 0,
+    strict_follow_prompt: bool = False,
+    followup_state: Optional[dict[str, FollowUpState]] = None,
 ) -> tuple[str, str]:
     """
     Process and moderate a prompt for OpenAI API calls.
@@ -1591,7 +1627,14 @@ def _process_openai_prompt(
     if not app.static_folder:
         raise ValueError("Flask static folder not defined")
 
-    revised_prompt = make_prompt_dynamic(prompt, username, app.static_folder, seed)
+    # Use provided follow-up state or initialize new state for this generation
+    if followup_state is None:
+        followup_state = init_followup_state()
+
+    revised_prompt = make_prompt_dynamic(
+        prompt, username, app.static_folder, seed, None, followup_state
+    )
+
     before_prompt = revised_prompt
 
     if strict_follow_prompt:
@@ -1655,6 +1698,7 @@ def generate_openai_image(
     quality: str = "standard",
     strict_follow_prompt: bool = False,
     seed: int = 0,
+    followup_state: Optional[dict[str, FollowUpState]] = None,
 ) -> GeneratedImageData:
     """
     Generate an image using OpenAI's text-to-image model.
@@ -1676,7 +1720,7 @@ def generate_openai_image(
         Exception: If OpenAI API call fails
     """
     before_prompt, revised_prompt = _process_openai_prompt(
-        prompt, username, seed, strict_follow_prompt
+        prompt, username, seed, strict_follow_prompt, followup_state
     )
 
     try:
@@ -2051,9 +2095,34 @@ def generate_image_grid(
         # Create the image request using the unified system
         try:
             image_request = create_request_from_form_data(form_data)
-            image_request.grid_dynamic_prompt = GridDynamicPromptInfo(
-                str_to_replace_with=dynamic_prompt, prompt_file=grid_prompt_file
-            )
+            
+            # Check if this is a follow-up row identifier
+            if dynamic_prompt.startswith("__FOLLOWUP_ROW_") and dynamic_prompt.endswith("__"):
+                # Extract row index from the identifier (format: __FOLLOWUP_ROW_0:display_name__)
+                identifier_content = dynamic_prompt[len("__FOLLOWUP_ROW_"):-2]
+                try:
+                    if ":" in identifier_content:
+                        row_index_str, display_name = identifier_content.split(":", 1)
+                    else:
+                        row_index_str = identifier_content
+                        display_name = f"Row_{identifier_content}"
+                    
+                    row_index = int(row_index_str)
+                    image_request.grid_dynamic_prompt = GridDynamicPromptInfo(
+                        str_to_replace_with="",  # Not used for follow-up files
+                        prompt_file=grid_prompt_file,
+                        followup_row_index=row_index
+                    )
+                except ValueError:
+                    # Fallback to regular handling if parsing fails
+                    image_request.grid_dynamic_prompt = GridDynamicPromptInfo(
+                        str_to_replace_with=dynamic_prompt, prompt_file=grid_prompt_file
+                    )
+            else:
+                # Regular prompt file handling
+                image_request.grid_dynamic_prompt = GridDynamicPromptInfo(
+                    str_to_replace_with=dynamic_prompt, prompt_file=grid_prompt_file
+                )
             # Override seed with the locked grid seed
             image_request.seed = seed
             # Generate the image using the unified handler
@@ -2064,7 +2133,15 @@ def generate_image_grid(
 
             if response.success:
                 # Convert the response to GeneratedImageData format
-                image_data_list[dynamic_prompt] = GeneratedImageData(
+                # Use display name for follow-up rows, otherwise use the original prompt
+                result_key = dynamic_prompt
+                if dynamic_prompt.startswith("__FOLLOWUP_ROW_") and dynamic_prompt.endswith("__"):
+                    identifier_content = dynamic_prompt[len("__FOLLOWUP_ROW_"):-2]
+                    if ":" in identifier_content:
+                        _, display_name = identifier_content.split(":", 1)
+                        result_key = display_name
+                
+                image_data_list[result_key] = GeneratedImageData(
                     local_image_path=response.image_path,
                     revised_prompt=response.revised_prompt or image_request.prompt,
                     prompt=image_request.prompt,
@@ -2075,7 +2152,15 @@ def generate_image_grid(
                     f"Grid generation: Image generated for prompt '{dynamic_prompt}'"
                 )
             else:
-                error_msg = f"Prompt '{dynamic_prompt}': {response.error_message or 'Unknown error'}"
+                # Use display name for error messages too
+                display_prompt = dynamic_prompt
+                if dynamic_prompt.startswith("__FOLLOWUP_ROW_") and dynamic_prompt.endswith("__"):
+                    identifier_content = dynamic_prompt[len("__FOLLOWUP_ROW_"):-2]
+                    if ":" in identifier_content:
+                        _, display_name = identifier_content.split(":", 1)
+                        display_prompt = display_name
+                
+                error_msg = f"Prompt '{display_prompt}': {response.error_message or 'Unknown error'}"
                 if response.error_type:
                     error_msg += f" ({response.error_type})"
                 generation_errors.append(error_msg)
@@ -2085,7 +2170,15 @@ def generate_image_grid(
                 continue
 
         except Exception as e:
-            error_msg = f"Prompt '{dynamic_prompt}': {str(e)}"
+            # Use display name for error messages too
+            display_prompt = dynamic_prompt
+            if dynamic_prompt.startswith("__FOLLOWUP_ROW_") and dynamic_prompt.endswith("__"):
+                identifier_content = dynamic_prompt[len("__FOLLOWUP_ROW_"):-2]
+                if ":" in identifier_content:
+                    _, display_name = identifier_content.split(":", 1)
+                    display_prompt = display_name
+            
+            error_msg = f"Prompt '{display_prompt}': {str(e)}"
             generation_errors.append(error_msg)
             logging.error(
                 f"Grid generation: Exception during image generation - {error_msg}"
@@ -2417,6 +2510,9 @@ def _handle_generation_request(
             if not seed:
                 raise ValueError("Unable to generate seed for provider")
 
+        # Initialize follow-up state for this generation
+        followup_state = init_followup_state()
+
         # Route directly to the appropriate generation function based on provider
         if image_request.provider == Provider.OPENAI:
             generated_data = generate_openai_image(
@@ -2426,6 +2522,7 @@ def _handle_generation_request(
                 quality=image_request.quality.value,
                 strict_follow_prompt=False,  # Default to False for new endpoint
                 seed=seed,
+                followup_state=followup_state,
             )
         elif image_request.provider == Provider.STABILITY:
             generated_data = generate_stability_image(
@@ -2437,6 +2534,7 @@ def _handle_generation_request(
                 ),
                 seed=seed,
                 upscale=False,  # Default to False for new endpoint
+                followup_state=followup_state,
             )
         elif image_request.provider == Provider.NOVELAI:
             # Convert character prompts to the format expected by generate_novelai_image
@@ -2454,6 +2552,7 @@ def _handle_generation_request(
                 variety=image_request.variety,
                 grid_dynamic_prompt=image_request.grid_dynamic_prompt,
                 character_prompts=character_prompts,
+                followup_state=followup_state,
             )
         else:
             raise ValueError(f"Unsupported provider: {image_request.provider.value}")
@@ -2499,6 +2598,9 @@ def _handle_inpainting_request(
 
         # Use seed from request, or generate one if not provided (0 means random)
         seed = image_request.seed
+
+        # Initialize follow-up state for this generation
+        followup_state = init_followup_state()
         if not seed or seed <= 0:
             seed = generate_seed_for_provider(image_request.provider.value)
             if not seed:
@@ -2536,6 +2638,7 @@ def _handle_inpainting_request(
                 variety=image_request.variety,
                 character_prompts=image_request.character_prompts,
                 grid_dynamic_prompt=image_request.grid_dynamic_prompt,
+                followup_state=followup_state,
             )
         else:
             raise ValueError(
@@ -2595,6 +2698,9 @@ def _handle_img2img_request(image_request: Img2ImgRequest) -> ImageOperationResp
             if not seed:
                 raise ValueError("Unable to generate seed for provider")
 
+        # Initialize follow-up state for this generation
+        followup_state = init_followup_state()
+
         generated_data = generate_novelai_img2img_image(
             base_image=base_image_data,
             prompt=image_request.prompt,
@@ -2604,6 +2710,7 @@ def _handle_img2img_request(image_request: Img2ImgRequest) -> ImageOperationResp
             size=(image_request.width, image_request.height),
             seed=seed,
             variety=image_request.variety,
+            followup_state=followup_state,
         )
 
         revised_prompt = getattr(generated_data, "revised_prompt", None)
