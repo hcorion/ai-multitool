@@ -5,7 +5,7 @@ This module implements a template-based prompt system that allows users to creat
 reusable, randomizable prompts for AI image generation. The system supports:
 
 - User-specific prompt files with random selection
-- Emphasis control through bracket notation
+- Emphasis control through decimal range notation
 - Nested dynamic prompts for complex templates
 - Deterministic randomization for reproducible results
 - Grid generation with controlled variation
@@ -13,7 +13,7 @@ reusable, randomizable prompts for AI image generation. The system supports:
 The system is designed to enhance prompt engineering workflows by enabling:
 1. Reusable prompt components stored in text files
 2. Consistent randomization across multiple generations
-3. Fine-grained control over AI model attention through emphasis
+3. Fine-grained control over AI model attention through decimal emphasis ranges
 4. Systematic variation for comparative image generation
 
 File Structure:
@@ -23,8 +23,8 @@ static/prompts/{username}/
 └── subjects.txt    # Subject matter: "cat\ndog\nbird"
 
 Usage Example:
-Template: "A __colors__ __subjects__ in {__styles__:2} style"
-Result:  "A red cat in {{anime}} style"
+Template: "A __colors__ __subjects__ in 1.5-2.0::__styles__:: style"
+Result:  "A red cat in 1.73::anime:: style"
 """
 
 import os
@@ -104,18 +104,15 @@ def make_prompt_dynamic(
        - Replaced with random line from static/prompts/{username}/{filename}.txt
        - Example: "__colors__" → "red" (from colors.txt containing "red\nblue\ngreen")
 
-    2. Positive Emphasis Brackets: {content:count} or {content:min-max}
-       - Adds emphasis brackets around content for AI model attention
-       - Example: "{beautiful:2}" → "{{beautiful}}" (double emphasis)
-       - Example: "{style:1-3}" → "{style}" or "{{style}}" or "{{{style}}}" (random 1-3 brackets)
+    2. Emphasis Ranges: min-max::content:: or value::content::
+       - Generates random decimal value between min and max (2 decimal places)
+       - Example: "1.5-2.0::emphasized text::" → "1.73::emphasized text::"
+       - Example: "2.0::bold text::" → "2.00::bold text::" (single value)
 
-    3. Negative Emphasis Brackets: [content:count] or [content:min-max]
-       - Similar to positive but uses square brackets (typically for negative prompts)
-       - Example: "[ugly:2]" → "[[ugly]]"
-
-    4. Choice Options: content|option1|option2
-       - Within any replacement, "|" separates random choices
-       - Example: "red|blue|green" → randomly selects one option
+    3. Choice Options: {option1|option2|option3}
+       - Randomly selects one option from pipe-separated choices
+       - Example: "{red|blue|green}" → "red" (randomly selected)
+       - Supports any number of options and preserves spacing
 
     5. Nested Replacements:
        - Dynamic prompt files can contain other dynamic syntax
@@ -126,10 +123,10 @@ def make_prompt_dynamic(
 
     Example Usage:
     ```python
-    # Template: "A __colors__ __animals__ in {artistic:2} style"
+    # Template: "A __colors__ __animals__ in 1.5-2.0::artistic:: style with {modern|classic|vintage} elements"
     # With colors.txt: "red\nblue\ngreen"
     # With animals.txt: "cat\ndog\nbird"
-    # Result: "A red cat in {{artistic}} style"
+    # Result: "A red cat in 1.73::artistic:: style with modern elements"
     ```
 
     Grid Generation:
@@ -146,40 +143,69 @@ def make_prompt_dynamic(
     # Track whether grid prompt override was actually used (for validation)
     used_grid_prompt = False
 
-    # Helper functions for different bracket types
-    def replace_brackets_section_positive(match: re.Match[str]) -> str:
-        """Handle positive emphasis brackets: {content:count}"""
-        return replace_brackets_section(match, "{", "}")
+    # Helper functions for new syntax
+    def replace_emphasis_range_section(match: re.Match[str]) -> str:
+        """Handle emphasis range processing: min-max::content:: or value::content::"""
+        try:
+            full_match = match.group(0)
+            min_val_str = match.group(1)  # First number (min value or single value)
+            max_val_str = match.group(2)  # Second number (max value, may be None)
+            content = match.group(3)      # The content inside emphasis markers
 
-    def replace_brackets_section_negative(match: re.Match[str]) -> str:
-        """Handle negative emphasis brackets: [content:count]"""
-        return replace_brackets_section(match, "[", "]")
+            # Validate that min_val_str is a valid number
+            if not min_val_str:
+                return content
+                
+            # Convert to float values
+            min_val = float(min_val_str)
+            
+            if max_val_str and max_val_str.strip():
+                # Range format: min-max::content::
+                max_val = float(max_val_str)
+                if min_val > max_val:
+                    # Swap if min > max for graceful handling
+                    min_val, max_val = max_val, min_val
+                # Generate random decimal between min and max
+                emphasis_value = dynamicRandom.uniform(min_val, max_val)
+            else:
+                # Single value format: value::content::
+                emphasis_value = min_val
+            
+            # Round to exactly 2 decimal places
+            emphasis_value = round(emphasis_value, 2)
+            
+            # Format with exactly 2 decimal places
+            return f"{emphasis_value:.2f}::{content}::"
+            
+        except (ValueError, TypeError):
+            # Graceful degradation: return content without emphasis on invalid syntax
+            return content if len(match.groups()) >= 3 and match.group(3) else match.group(0)
 
-    def replace_brackets_section(
-        match: re.Match[str], bracket_left: str, bracket_right: str
-    ) -> str:
-        """Handle emphasis bracket replacement with support for ranges and choices."""
-        content = match.group(1)  # The content inside brackets
-        bracket_count = match.group(2)  # The count or range specification
-
-        # Handle range notation (e.g., "1-3" becomes random number between 1 and 3)
-        if "-" in bracket_count:
-            range_parts = bracket_count.split("-")
-            bracket_count = dynamicRandom.randrange(
-                int(range_parts[0]), int(range_parts[1]) + 1
-            )
-
-        # Generate the appropriate number of brackets
-        left_brackets = bracket_left * int(bracket_count)
-        right_brackets = bracket_right * int(bracket_count)
-
-        # Handle choice options within the content (e.g., "red|blue|green")
-        if "|" in content:
-            rand_options = content.split("|")
-            content = dynamicRandom.choice(rand_options)
-
-        replaced_section = f"{left_brackets}{content}{right_brackets}"
-        return replaced_section
+    def replace_choice_options(match: re.Match[str]) -> str:
+        """Handle choice option processing: {option1|option2|option3}"""
+        try:
+            choices_str = match.group(1)  # The content inside curly braces
+            
+            # Check if there's actually a pipe character (required for choice syntax)
+            if "|" not in choices_str:
+                # Not a choice option, return original text
+                return match.group(0)
+            
+            # Split by pipe character to get individual options
+            options = choices_str.split("|")
+            
+            # Keep all options, including empty ones for graceful handling
+            if not options:
+                # Return empty string for completely empty choices
+                return ""
+            
+            # Randomly select one option (may be empty string)
+            selected_option = dynamicRandom.choice(options)
+            return selected_option
+            
+        except (AttributeError, IndexError):
+            # Graceful degradation: return original text on error
+            return match.group(0)
 
     def replace_dynamic_prompt_section(match: re.Match[str]) -> str:
         """Handle dynamic prompt file replacement with support for nested processing."""
@@ -211,27 +237,30 @@ def make_prompt_dynamic(
         replaced_section = re.sub(
             r"__(.+?)__", replace_dynamic_prompt_section, prompt_text
         )
+        # Process choice options first
         replaced_section = re.sub(
-            r"{(.+?):(\d+-?\d*)}", replace_brackets_section_positive, replaced_section
+            r"\{([^}]+\|[^}]+)\}", replace_choice_options, replaced_section
         )
+        # Process emphasis ranges
         replaced_section = re.sub(
-            r"\[(.+?):(\d+-?\d*)\]", replace_brackets_section_negative, replaced_section
+            r"(\d+(?:\.\d+)?)-?(\d+(?:\.\d+)?)?::(.+?)::", replace_emphasis_range_section, replaced_section
         )
         return replaced_section
 
     # Process the prompt through multiple passes to handle all dynamic elements
+    # Processing order: dynamic files → choice options → emphasis ranges → recursive processing
 
     # Pass 1: Replace dynamic prompt files (__filename__)
     revised_prompt = re.sub(r"__(.+?)__", replace_dynamic_prompt_section, prompt)
 
-    # Pass 2: Replace positive emphasis brackets {content:count}
+    # Pass 2: Replace choice options {option1|option2|option3}
     revised_prompt = re.sub(
-        r"{(.+?):(\d+-?\d*)}", replace_brackets_section_positive, revised_prompt
+        r"\{([^}]+\|[^}]+)\}", replace_choice_options, revised_prompt
     )
 
-    # Pass 3: Replace negative emphasis brackets [content:count]
+    # Pass 3: Replace emphasis ranges min-max::content:: or value::content::
     revised_prompt = re.sub(
-        r"\[(.+?):(\d+-?\d*)\]", replace_brackets_section_negative, revised_prompt
+        r"(\d+(?:\.\d+)?)-?(\d+(?:\.\d+)?)?::(.+?)::", replace_emphasis_range_section, revised_prompt
     )
 
     return revised_prompt
