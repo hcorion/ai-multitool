@@ -2,7 +2,6 @@ import * as utils from "./utils.js";
 import * as chat from "./chat.js";
 import { InpaintingMaskCanvas } from "./inpainting/inpainting-mask-canvas.js";
 import { getElementByIdSafe } from './dom_utils.js';
-import showdown from "showdown";
 
 // TypeScript interfaces for the new image API
 interface ImageOperationResponse {
@@ -152,7 +151,7 @@ document.addEventListener("DOMContentLoaded", () => {
     addEventListenerToElement("prompt-modal-close", "click", hidePromptFileModal);
     addEventListenerToElement("prompt-file-cancel", "click", hidePromptFileModal);
     addEventListenerToElement("prompt-file-save", "click", savePromptFile);
-    
+
     // Add input listener for real-time validation and help updates
     const contentTextarea = document.getElementById("prompt-file-content") as HTMLTextAreaElement;
     if (contentTextarea) {
@@ -301,7 +300,7 @@ function handleTabClick(evt: Event) {
 function providerChanged() {
     const selection = getElementByIdSafe("provider", HTMLSelectElement);
     if (!selection) return;
-    
+
     if (selection.value == "openai") {
         $(".stabilityai").hide();
         $(".novelai").hide();
@@ -673,15 +672,28 @@ function updateGridModalImage(): void {
             currentGridImageIndex = 0;
             return;
         }
-        previousGrid()
-        currentGridImageIndex = gridImages.length - 1;
+        previousGrid();
+        // After loading the previous page, we need to wait for the images to load
+        // and then go to the last image of that page
+        setTimeout(() => {
+            const newGridImages = $(".image-grid img");
+            currentGridImageIndex = newGridImages.length - 1;
+            updateGridModalImage();
+        }, 100);
+        return;
     } else if (currentGridImageIndex >= gridImages.length) {
         if (currentPage >= totalPages) {
             currentGridImageIndex = gridImages.length - 1;
             return;
         }
-        nextGrid()
-        currentGridImageIndex = 0;
+        nextGrid();
+        // After loading the next page, we need to wait for the images to load
+        // and then continue with the first image of the new page
+        setTimeout(() => {
+            currentGridImageIndex = 0;
+            updateGridModalImage();
+        }, 100);
+        return;
     }
     const newImgElement = gridImages.get(currentGridImageIndex) as HTMLImageElement;
     const filePath = newImgElement.src;
@@ -1496,10 +1508,10 @@ function onConversationSelected(this: HTMLDivElement, ev: MouseEvent) {
         .then((chatData: chat.MessageHistory) => {
             chatInput.value = ""; // Clear input field
             chat.refreshChatMessages(chatData.messages);
-        currentThreadId = chatData.threadId;
-        // Expose currentThreadId to window for reasoning modal access
-        (window as any).currentThreadId = currentThreadId;
-    })
+            currentThreadId = chatData.threadId;
+            // Expose currentThreadId to window for reasoning modal access
+            (window as any).currentThreadId = currentThreadId;
+        })
 }
 
 async function fetchWithStreaming(url: string, data: any, processChunk: (chunkData: any) => void) {
@@ -2144,12 +2156,12 @@ function renderPromptFiles(): void {
     noFilesElement.style.display = "none";
 
     const filesHtml = promptFiles.map(file => {
-        const followUpBadge = file.isFollowUp 
+        const followUpBadge = file.isFollowUp
             ? `<span class="followup-badge" title="Follow-up Options File">🔄 ${file.totalColumns || 0} columns</span>`
             : '';
-        
+
         const fileItemClass = file.isFollowUp ? 'prompt-file-item followup-file' : 'prompt-file-item';
-        
+
         return `
         <div class="${fileItemClass}" data-file-name="${escapeHtml(file.name)}">
             <div class="prompt-file-header">
@@ -2186,7 +2198,7 @@ function showPromptFileModal(mode: "create" | "edit", fileName?: string): void {
         contentTextarea.value = "";
         nameInput.disabled = false;
         currentEditingFile = null;
-        
+
         // Add template suggestions for follow-up files
         updateTemplateHelp();
     } else if (mode === "edit" && fileName) {
@@ -2197,7 +2209,7 @@ function showPromptFileModal(mode: "create" | "edit", fileName?: string): void {
 
         const file = promptFiles.find(f => f.name === fileName);
         contentTextarea.value = file ? file.content.join('\n') : "";
-        
+
         // Update help text based on current file content
         updateTemplateHelp(file?.content.join('\n'));
     }
@@ -2211,7 +2223,7 @@ function updateTemplateHelp(content?: string): void {
     if (!helpElement) return;
 
     const isFollowUpFile = content ? detectFollowUpFile(content) : false;
-    
+
     if (isFollowUpFile) {
         helpElement.innerHTML = `
             <div class="followup-help">
@@ -2244,38 +2256,38 @@ function detectFollowUpFile(content: string): boolean {
 function validateFollowUpFile(content: string): { isValid: boolean; errors: string[] } {
     const lines = content.split('\n').map(line => line.trim()).filter(line => line.length > 0);
     const errors: string[] = [];
-    
+
     if (lines.length === 0) {
         return { isValid: true, errors: [] }; // Empty file is valid
     }
-    
+
     // Check if it's a follow-up file
     const headerLine = lines.find(line => line.startsWith('# columns:'));
     if (!headerLine) {
         return { isValid: true, errors: [] }; // Regular file is valid
     }
-    
+
     // Validate follow-up file format
     const dataLines = lines.filter(line => !line.startsWith('#') && line.length > 0);
-    
+
     if (dataLines.length === 0) {
         errors.push("Follow-up file must have at least one data row");
         return { isValid: false, errors };
     }
-    
+
     // Check column consistency
     const columnCounts = dataLines.map(line => line.split('||').length);
     const firstColumnCount = columnCounts[0];
-    
+
     if (firstColumnCount < 2) {
         errors.push("Follow-up file rows must have at least 2 columns separated by ||");
     }
-    
+
     const inconsistentRows = columnCounts.some(count => count !== firstColumnCount);
     if (inconsistentRows) {
         errors.push("All rows must have the same number of columns");
     }
-    
+
     return { isValid: errors.length === 0, errors };
 }
 

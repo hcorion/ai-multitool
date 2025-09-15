@@ -2,7 +2,6 @@ import * as utils from "./utils.js";
 import * as chat from "./chat.js";
 import { InpaintingMaskCanvas } from "./inpainting/inpainting-mask-canvas.js";
 import { getElementByIdSafe } from './dom_utils.js';
-import showdown from "showdown";
 document.addEventListener("DOMContentLoaded", () => {
     $("#loading-spinner").hide();
     $("#prompt-form").on("submit", (event) => {
@@ -608,7 +607,14 @@ function updateGridModalImage() {
             return;
         }
         previousGrid();
-        currentGridImageIndex = gridImages.length - 1;
+        // After loading the previous page, we need to wait for the images to load
+        // and then go to the last image of that page
+        setTimeout(() => {
+            const newGridImages = $(".image-grid img");
+            currentGridImageIndex = newGridImages.length - 1;
+            updateGridModalImage();
+        }, 100);
+        return;
     }
     else if (currentGridImageIndex >= gridImages.length) {
         if (currentPage >= totalPages) {
@@ -616,7 +622,13 @@ function updateGridModalImage() {
             return;
         }
         nextGrid();
-        currentGridImageIndex = 0;
+        // After loading the next page, we need to wait for the images to load
+        // and then continue with the first image of the new page
+        setTimeout(() => {
+            currentGridImageIndex = 0;
+            updateGridModalImage();
+        }, 100);
+        return;
     }
     const newImgElement = gridImages.get(currentGridImageIndex);
     const filePath = newImgElement.src;
