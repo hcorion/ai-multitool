@@ -52,10 +52,25 @@ showdown.extension("highlight", function () {
     ];
 });
 /**
+ * Check if the chat container is scrolled to or near the bottom
+ */
+function isScrolledToBottom(element, threshold = 50) {
+    return element.scrollTop + element.clientHeight >= element.scrollHeight - threshold;
+}
+/**
+ * Conditionally scroll to bottom only if user is already at the bottom
+ */
+function smartScrollToBottom(element) {
+    if (isScrolledToBottom(element)) {
+        element.scrollTop = element.scrollHeight;
+    }
+}
+/**
  * Render chat messages with markdown formatting and reasoning buttons
  */
 export function refreshChatMessages(messages) {
     const chatHistory = document.getElementById("chat-history");
+    const wasAtBottom = isScrolledToBottom(chatHistory);
     chatHistory.innerHTML = "";
     // Display AI response in chat history
     messages.forEach((message, index) => {
@@ -75,7 +90,10 @@ export function refreshChatMessages(messages) {
         }
         chatHistory.appendChild(messageDiv);
     });
-    chatHistory.scrollTop = chatHistory.scrollHeight; // Scroll to bottom
+    // Only scroll to bottom if user was already at the bottom
+    if (wasAtBottom) {
+        chatHistory.scrollTop = chatHistory.scrollHeight;
+    }
 }
 /**
  * Add reasoning inspection button to assistant messages

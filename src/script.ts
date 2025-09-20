@@ -1665,10 +1665,19 @@ function sendChatMessage(): void {
 }
 
 /**
+ * Check if the chat container is scrolled to or near the bottom
+ */
+function isScrolledToBottom(element: HTMLElement, threshold: number = 50): boolean {
+    return element.scrollTop + element.clientHeight >= element.scrollHeight - threshold;
+}
+
+/**
  * Update the most recent chat message in the display
  */
 function updateMostRecentChatMessage(messages: chat.ChatMessage[]): void {
     const chatHistory = document.getElementById("chat-history") as HTMLDivElement;
+    const wasAtBottom = isScrolledToBottom(chatHistory);
+    
     var message = messages[messages.length - 1];
     var converter = new showdown.Converter({
         strikethrough: true,
@@ -1698,7 +1707,11 @@ function updateMostRecentChatMessage(messages: chat.ChatMessage[]): void {
             addReasoningButtonToMessage(lastChildDiv, messages.length - 1);
         }
     }
-    chatHistory.scrollTop = chatHistory.scrollHeight; // Scroll to bottom
+    
+    // Only scroll to bottom if user was already at the bottom
+    if (wasAtBottom) {
+        chatHistory.scrollTop = chatHistory.scrollHeight;
+    }
 }
 
 /**

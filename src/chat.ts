@@ -69,10 +69,28 @@ showdown.extension("highlight", function () {
 });
 
 /**
+ * Check if the chat container is scrolled to or near the bottom
+ */
+function isScrolledToBottom(element: HTMLElement, threshold: number = 50): boolean {
+    return element.scrollTop + element.clientHeight >= element.scrollHeight - threshold;
+}
+
+/**
+ * Conditionally scroll to bottom only if user is already at the bottom
+ */
+function smartScrollToBottom(element: HTMLElement): void {
+    if (isScrolledToBottom(element)) {
+        element.scrollTop = element.scrollHeight;
+    }
+}
+
+/**
  * Render chat messages with markdown formatting and reasoning buttons
  */
 export function refreshChatMessages(messages: ChatMessage[]): void {
     const chatHistory = document.getElementById("chat-history") as HTMLDivElement;
+    const wasAtBottom = isScrolledToBottom(chatHistory);
+    
     chatHistory.innerHTML = "";
     // Display AI response in chat history
     messages.forEach((message, index) => {
@@ -97,7 +115,11 @@ export function refreshChatMessages(messages: ChatMessage[]): void {
         
         chatHistory.appendChild(messageDiv);
     });
-    chatHistory.scrollTop = chatHistory.scrollHeight; // Scroll to bottom
+    
+    // Only scroll to bottom if user was already at the bottom
+    if (wasAtBottom) {
+        chatHistory.scrollTop = chatHistory.scrollHeight;
+    }
 }
 
 /**

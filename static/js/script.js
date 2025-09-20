@@ -1478,10 +1478,17 @@ function sendChatMessage() {
     });
 }
 /**
+ * Check if the chat container is scrolled to or near the bottom
+ */
+function isScrolledToBottom(element, threshold = 50) {
+    return element.scrollTop + element.clientHeight >= element.scrollHeight - threshold;
+}
+/**
  * Update the most recent chat message in the display
  */
 function updateMostRecentChatMessage(messages) {
     const chatHistory = document.getElementById("chat-history");
+    const wasAtBottom = isScrolledToBottom(chatHistory);
     var message = messages[messages.length - 1];
     var converter = new showdown.Converter({
         strikethrough: true,
@@ -1507,7 +1514,10 @@ function updateMostRecentChatMessage(messages) {
             addReasoningButtonToMessage(lastChildDiv, messages.length - 1);
         }
     }
-    chatHistory.scrollTop = chatHistory.scrollHeight; // Scroll to bottom
+    // Only scroll to bottom if user was already at the bottom
+    if (wasAtBottom) {
+        chatHistory.scrollTop = chatHistory.scrollHeight;
+    }
 }
 /**
  * Add reasoning inspection button to assistant message
