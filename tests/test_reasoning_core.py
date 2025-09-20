@@ -83,6 +83,8 @@ class TestStreamEventProcessor:
             "complete_summary": "",
             "timestamp": 0,
             "response_id": "",
+            "web_searches": [],
+            "message_data": None,
         }
 
     def test_handle_response_created_resets_reasoning(self):
@@ -108,6 +110,8 @@ class TestStreamEventProcessor:
             "complete_summary": "",
             "timestamp": 0,
             "response_id": "",
+            "web_searches": [],
+            "message_data": None,
         }
         assert processor.current_response_id == "resp_123"
 

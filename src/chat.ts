@@ -14,6 +14,20 @@ export type MessageHistory = {
     messages: ChatMessage[];
 };
 
+export interface WebSearchStatus {
+    type: 'search_started' | 'search_in_progress' | 'search_completed';
+    item_id: string;
+    output_index: number;
+    sequence_number: number;
+    status?: string;
+}
+
+export interface ReasoningStatus {
+    type: 'reasoning_started' | 'reasoning_in_progress' | 'reasoning_completed';
+    part_id?: string;
+    status?: string;
+}
+
 /**
  * Load conversation data for the specified conversation ID
  */
@@ -90,7 +104,7 @@ function smartScrollToBottom(element: HTMLElement): void {
 export function refreshChatMessages(messages: ChatMessage[]): void {
     const chatHistory = document.getElementById("chat-history") as HTMLDivElement;
     const wasAtBottom = isScrolledToBottom(chatHistory);
-    
+
     chatHistory.innerHTML = "";
     // Display AI response in chat history
     messages.forEach((message, index) => {
@@ -103,19 +117,19 @@ export function refreshChatMessages(messages: ChatMessage[]): void {
         }),
             text = message.text,
             html = converter.makeHtml(text);
-        
+
         const messageDiv = document.createElement("div");
         messageDiv.className = "ai-message";
         messageDiv.innerHTML = utils.unescapeHTML(html);
-        
+
         // Add reasoning button for assistant messages
         if (message.role === "assistant") {
             addReasoningButton(messageDiv, index);
         }
-        
+
         chatHistory.appendChild(messageDiv);
     });
-    
+
     // Only scroll to bottom if user was already at the bottom
     if (wasAtBottom) {
         chatHistory.scrollTop = chatHistory.scrollHeight;
@@ -132,24 +146,24 @@ function addReasoningButton(messageElement: HTMLElement, messageIndex: number): 
         reasoningButton.innerHTML = "i";
         reasoningButton.title = "View reasoning";
         reasoningButton.setAttribute("data-message-index", messageIndex.toString());
-        
+
         reasoningButton.addEventListener("click", (e) => {
             e.preventDefault();
             e.stopPropagation();
-            
+
             // Disable button during request to prevent multiple clicks
             reasoningButton.disabled = true;
             reasoningButton.style.opacity = "0.6";
-            
+
             showReasoningModal(messageIndex);
-            
+
             // Re-enable button after a short delay
             setTimeout(() => {
                 reasoningButton.disabled = false;
                 reasoningButton.style.opacity = "1";
             }, 1000);
         });
-        
+
         messageElement.appendChild(reasoningButton);
     } catch (error) {
         console.warn("Failed to add reasoning button:", error);
@@ -167,31 +181,31 @@ function showReasoningModal(messageIndex: number): void {
         showReasoningError("No conversation selected");
         return;
     }
-    
+
     // Show modal with loading state
     const modal = document.getElementById("reasoning-modal");
     const content = document.getElementById("reasoning-content");
     const loading = document.getElementById("reasoning-loading");
     const error = document.getElementById("reasoning-error");
-    
+
     if (!modal || !content || !loading || !error) {
         console.error("Reasoning modal elements not found");
         showReasoningError("Modal interface not available");
         return;
     }
-    
+
     // Reset modal state
     content.style.display = "none";
     error.style.display = "none";
     loading.style.display = "block";
     modal.style.display = "block";
-    
+
     // Set up timeout for the request
     const controller = new AbortController();
     const timeoutId = setTimeout(() => {
         controller.abort();
     }, 10000); // 10 second timeout
-    
+
     // Fetch reasoning data with comprehensive error handling
     fetch(`/chat/reasoning/${conversationId}/${messageIndex}`, {
         signal: controller.signal,
@@ -202,7 +216,7 @@ function showReasoningModal(messageIndex: number): void {
     })
         .then(response => {
             clearTimeout(timeoutId);
-            
+
             if (!response.ok) {
                 // Handle specific HTTP error codes
                 if (response.status === 404) {
@@ -221,16 +235,16 @@ function showReasoningModal(messageIndex: number): void {
         })
         .then(data => {
             loading.style.display = "none";
-            
+
             // Validate response structure
             if (!data) {
                 throw new Error("Empty response received");
             }
-            
+
             if (data.error) {
                 throw new Error(data.message || data.error);
             }
-            
+
             if (data.reasoning && data.reasoning.complete_summary) {
                 displayReasoningData(data.reasoning);
                 content.style.display = "block";
@@ -249,7 +263,7 @@ function showReasoningModal(messageIndex: number): void {
         .catch(err => {
             clearTimeout(timeoutId);
             loading.style.display = "none";
-            
+
             // Handle different types of errors
             if (err.name === 'AbortError') {
                 showReasoningError("Request timed out - please try again");
@@ -258,7 +272,7 @@ function showReasoningModal(messageIndex: number): void {
             } else {
                 showReasoningError(`Failed to load reasoning data: ${err.message}`);
             }
-            
+
             console.error("Reasoning modal error:", err);
         });
 }
@@ -269,20 +283,20 @@ function showReasoningModal(messageIndex: number): void {
 function displayReasoningData(reasoningData: any): void {
     const content = document.getElementById("reasoning-content");
     if (!content) return;
-    
+
     try {
         // Validate and sanitize the reasoning data
         const summary = reasoningData.complete_summary || "";
         if (!summary) {
             throw new Error("No reasoning summary available");
         }
-        
+
         // Escape HTML to prevent XSS
         const escapedSummary = escapeHtml(summary);
-        
+
         // Format the content with proper line breaks
         const formattedSummary = escapedSummary.replace(/\n/g, '<br>');
-        
+
         content.innerHTML = `
             <div class="reasoning-summary">
                 <h3>AI Reasoning Process</h3>
@@ -312,7 +326,7 @@ function showReasoningError(message: string): void {
     console.error(message);
     const error = document.getElementById("reasoning-error");
     if (!error) return;
-    
+
     error.textContent = message;
     error.style.display = "block";
 }
@@ -324,5 +338,142 @@ export function hideReasoningModal(): void {
     const modal = document.getElementById("reasoning-modal");
     if (modal) {
         modal.style.display = "none";
+    }
+}
+
+/**
+ * Handle web search status updates
+ */
+export function handleWebSearchStatus(status: WebSearchStatus): void {
+    try {
+        let message = "";
+        let isActive = false;
+
+        switch (status.type) {
+            case 'search_started':
+                message = "Searching...";
+                isActive = true;
+                break;
+            case 'search_in_progress':
+                message = "Searching...";
+                isActive = true;
+                break;
+            case 'search_completed':
+                message = "Search done";
+                isActive = false;
+                break;
+        }
+
+        updateStatusDisplay(message, isActive, 'search');
+
+        // Auto-hide completed status after a brief delay
+        if (status.type === 'search_completed') {
+            setTimeout(() => {
+                clearStatusDisplay('search');
+            }, 1500);
+        }
+
+    } catch (error) {
+        console.warn("Error handling web search status:", error);
+        // Continue without status display - don't block chat functionality
+    }
+}
+
+/**
+ * Handle reasoning status updates
+ */
+export function handleReasoningStatus(status: ReasoningStatus): void {
+    try {
+        let message = "";
+        let isActive = false;
+
+        switch (status.type) {
+            case 'reasoning_started':
+                message = "Thinking...";
+                isActive = true;
+                break;
+            case 'reasoning_in_progress':
+                message = "Thinking...";
+                isActive = true;
+                break;
+            case 'reasoning_completed':
+                message = "Thinking done";
+                isActive = false;
+                break;
+        }
+
+        updateStatusDisplay(message, isActive, 'reasoning');
+
+        // Auto-hide completed status after a brief delay
+        if (status.type === 'reasoning_completed') {
+            setTimeout(() => {
+                clearStatusDisplay('reasoning');
+            }, 1500);
+        }
+
+    } catch (error) {
+        console.warn("Error handling reasoning status:", error);
+        // Continue without status display - don't block chat functionality
+    }
+}
+
+/**
+ * Update the status display in the chat interface
+ */
+function updateStatusDisplay(message: string, isActive: boolean, statusType: 'search' | 'reasoning'): void {
+    try {
+        // Get or create status container
+        let statusContainer = document.getElementById('chat-status-container');
+        if (!statusContainer) {
+            statusContainer = document.createElement('div');
+            statusContainer.id = 'chat-status-container';
+            statusContainer.className = 'chat-status-container';
+
+            // Insert before chat input
+            const chatInput = document.getElementById('chat-input');
+            if (chatInput && chatInput.parentNode) {
+                chatInput.parentNode.insertBefore(statusContainer, chatInput);
+            }
+        }
+
+        // Get or create status element for this type
+        let statusElement = document.getElementById(`chat-status-${statusType}`);
+        if (!statusElement) {
+            statusElement = document.createElement('div');
+            statusElement.id = `chat-status-${statusType}`;
+            statusElement.className = `chat-status-item chat-status-${statusType}`;
+            statusContainer.appendChild(statusElement);
+        }
+
+        // Update status content
+        statusElement.textContent = message;
+        statusElement.style.display = 'block';
+
+        // Add/remove active class for styling
+        if (isActive) {
+            statusElement.classList.add('active');
+        } else {
+            statusElement.classList.remove('active');
+        }
+
+    } catch (error) {
+        console.warn("Error updating status display:", error);
+        // Continue without status display - don't block chat functionality
+    }
+}
+
+/**
+ * Clear status display for a specific type
+ */
+function clearStatusDisplay(statusType: 'search' | 'reasoning'): void {
+    try {
+        const statusElement = document.getElementById(`chat-status-${statusType}`);
+        if (statusElement) {
+            statusElement.style.display = 'none';
+            statusElement.classList.remove('active');
+        }
+    } catch (error) {
+        console.warn("Error clearing status display:", error);
+        // Continue silently - don't block chat functionality
     }
 }

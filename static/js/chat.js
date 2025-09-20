@@ -285,3 +285,128 @@ export function hideReasoningModal() {
         modal.style.display = "none";
     }
 }
+/**
+ * Handle web search status updates
+ */
+export function handleWebSearchStatus(status) {
+    try {
+        let message = "";
+        let isActive = false;
+        switch (status.type) {
+            case 'search_started':
+                message = "Searching...";
+                isActive = true;
+                break;
+            case 'search_in_progress':
+                message = "Searching...";
+                isActive = true;
+                break;
+            case 'search_completed':
+                message = "Search done";
+                isActive = false;
+                break;
+        }
+        updateStatusDisplay(message, isActive, 'search');
+        // Auto-hide completed status after a brief delay
+        if (status.type === 'search_completed') {
+            setTimeout(() => {
+                clearStatusDisplay('search');
+            }, 1500);
+        }
+    }
+    catch (error) {
+        console.warn("Error handling web search status:", error);
+        // Continue without status display - don't block chat functionality
+    }
+}
+/**
+ * Handle reasoning status updates
+ */
+export function handleReasoningStatus(status) {
+    try {
+        let message = "";
+        let isActive = false;
+        switch (status.type) {
+            case 'reasoning_started':
+                message = "Thinking...";
+                isActive = true;
+                break;
+            case 'reasoning_in_progress':
+                message = "Thinking...";
+                isActive = true;
+                break;
+            case 'reasoning_completed':
+                message = "Thinking done";
+                isActive = false;
+                break;
+        }
+        updateStatusDisplay(message, isActive, 'reasoning');
+        // Auto-hide completed status after a brief delay
+        if (status.type === 'reasoning_completed') {
+            setTimeout(() => {
+                clearStatusDisplay('reasoning');
+            }, 1500);
+        }
+    }
+    catch (error) {
+        console.warn("Error handling reasoning status:", error);
+        // Continue without status display - don't block chat functionality
+    }
+}
+/**
+ * Update the status display in the chat interface
+ */
+function updateStatusDisplay(message, isActive, statusType) {
+    try {
+        // Get or create status container
+        let statusContainer = document.getElementById('chat-status-container');
+        if (!statusContainer) {
+            statusContainer = document.createElement('div');
+            statusContainer.id = 'chat-status-container';
+            statusContainer.className = 'chat-status-container';
+            // Insert before chat input
+            const chatInput = document.getElementById('chat-input');
+            if (chatInput && chatInput.parentNode) {
+                chatInput.parentNode.insertBefore(statusContainer, chatInput);
+            }
+        }
+        // Get or create status element for this type
+        let statusElement = document.getElementById(`chat-status-${statusType}`);
+        if (!statusElement) {
+            statusElement = document.createElement('div');
+            statusElement.id = `chat-status-${statusType}`;
+            statusElement.className = `chat-status-item chat-status-${statusType}`;
+            statusContainer.appendChild(statusElement);
+        }
+        // Update status content
+        statusElement.textContent = message;
+        statusElement.style.display = 'block';
+        // Add/remove active class for styling
+        if (isActive) {
+            statusElement.classList.add('active');
+        }
+        else {
+            statusElement.classList.remove('active');
+        }
+    }
+    catch (error) {
+        console.warn("Error updating status display:", error);
+        // Continue without status display - don't block chat functionality
+    }
+}
+/**
+ * Clear status display for a specific type
+ */
+function clearStatusDisplay(statusType) {
+    try {
+        const statusElement = document.getElementById(`chat-status-${statusType}`);
+        if (statusElement) {
+            statusElement.style.display = 'none';
+            statusElement.classList.remove('active');
+        }
+    }
+    catch (error) {
+        console.warn("Error clearing status display:", error);
+        // Continue silently - don't block chat functionality
+    }
+}

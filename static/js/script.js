@@ -1474,6 +1474,14 @@ function sendChatMessage() {
             chatStatusText.textContent = "Awaiting Input...";
             progressNum = 0;
         }
+        else if (chatData.type == "search_started" || chatData.type == "search_in_progress" || chatData.type == "search_completed") {
+            // Handle web search status updates
+            chat.handleWebSearchStatus(chatData);
+        }
+        else if (chatData.type == "reasoning_started" || chatData.type == "reasoning_in_progress" || chatData.type == "reasoning_completed") {
+            // Handle reasoning status updates
+            chat.handleReasoningStatus(chatData);
+        }
         // TODO: Hook up the tool-based outputs
     });
 }

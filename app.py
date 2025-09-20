@@ -324,6 +324,37 @@ def validate_reasoning_data(
             if not isinstance(part, str):
                 raise ValueError("All items in summary_parts must be strings")
 
+    # Validate web_searches field if present
+    if "web_searches" in reasoning_data:
+        web_searches = reasoning_data["web_searches"]
+        if not isinstance(web_searches, list):
+            raise ValueError("web_searches must be a list")
+
+        for search in web_searches:
+            if not isinstance(search, dict):
+                raise ValueError("Each web search must be a dictionary")
+
+            # Validate required web search fields
+            if "item_id" in search and not isinstance(search["item_id"], str):
+                raise ValueError("Web search item_id must be a string")
+
+    # Validate message_data field if present
+    if "message_data" in reasoning_data:
+        message_data = reasoning_data["message_data"]
+        if message_data is not None and not isinstance(message_data, dict):
+            raise ValueError("message_data must be a dictionary or None")
+
+        if isinstance(message_data, dict):
+            # Validate required message data fields
+            if "item_id" in message_data and not isinstance(
+                message_data["item_id"], str
+            ):
+                raise ValueError("Message data item_id must be a string")
+            if "content_items" in message_data and not isinstance(
+                message_data["content_items"], list
+            ):
+                raise ValueError("Message data content_items must be a list")
+
     return reasoning_data
 
 
@@ -3214,7 +3245,13 @@ class StreamEventProcessor:
             "complete_summary": "",
             "timestamp": 0,
             "response_id": "",
+            "web_searches": [],
+            "message_data": None,
         }
+        # Track web search events and output items for correlation
+        self.web_search_events: Dict[str, Dict[str, Any]] = {}
+        self.web_search_output_items: Dict[str, Dict[str, Any]] = {}
+        self.message_output_items: Dict[str, Dict[str, Any]] = {}
 
     def process_stream(self, stream: Any) -> None:
         """Process the entire stream of ResponseStreamEvent objects with comprehensive error handling."""
@@ -3304,6 +3341,12 @@ class StreamEventProcessor:
             self._handle_reasoning_summary_text_done(event)
         elif event_type == "response.reasoning_summary_part.done":
             self._handle_reasoning_summary_part_done(event)
+        elif event_type == "response.web_search_call.in_progress":
+            self._handle_web_search_call_in_progress(event)
+        elif event_type == "response.web_search_call.searching":
+            self._handle_web_search_call_searching(event)
+        elif event_type == "response.web_search_call.completed":
+            self._handle_web_search_call_completed(event)
         else:
             # Handle other event types if needed
             logging.warning(f"Unhandled event type {event_type}")
@@ -3317,7 +3360,14 @@ class StreamEventProcessor:
             "complete_summary": "",
             "timestamp": 0,
             "response_id": "",
+            "web_searches": [],
+            "message_data": None,
         }
+
+        # Reset web search tracking data
+        self.web_search_events.clear()
+        self.web_search_output_items.clear()
+        self.message_output_items.clear()
 
         # Extract response ID if available
         if hasattr(event, "response") and hasattr(event.response, "id"):
@@ -3334,8 +3384,25 @@ class StreamEventProcessor:
 
     def _handle_output_item_added(self, event: Any) -> None:
         """Handle response.output_item.added event - new output item added."""
-        # This event indicates a new output item (like text) has been added
-        pass
+        try:
+            # Extract output item from event
+            if hasattr(event, "output_item") and event.output_item is not None:
+                output_item = event.output_item
+
+                # Process web search output items
+                if (
+                    hasattr(output_item, "type")
+                    and output_item.type == "web_search_call"
+                ):
+                    self._process_web_search_output_item(output_item)
+
+                # Process message output items
+                elif hasattr(output_item, "type") and output_item.type == "message":
+                    self._process_message_output_item(output_item)
+
+        except Exception as e:
+            logging.warning(f"Error processing output item added event: {e}")
+            # Continue processing - don't block chat functionality
 
     def _handle_content_part_added(self, event: Any) -> None:
         """Handle response.content_part.added event - new content part added."""
@@ -3392,8 +3459,25 @@ class StreamEventProcessor:
 
     def _handle_output_item_done(self, event: Any) -> None:
         """Handle response.output_item.done event - output item is complete."""
-        # This event indicates an output item is complete
-        pass
+        try:
+            # Extract output item from event
+            if hasattr(event, "output_item") and event.output_item is not None:
+                output_item = event.output_item
+
+                # Process completed web search output items
+                if (
+                    hasattr(output_item, "type")
+                    and output_item.type == "web_search_call"
+                ):
+                    self._process_web_search_output_item(output_item, is_done=True)
+
+                # Process completed message output items
+                elif hasattr(output_item, "type") and output_item.type == "message":
+                    self._process_message_output_item(output_item, is_done=True)
+
+        except Exception as e:
+            logging.warning(f"Error processing output item done event: {e}")
+            # Continue processing - don't block chat functionality
 
     def _handle_response_completed(self, event: Any) -> None:
         """Handle response.completed event - final event with complete response information."""
@@ -3420,6 +3504,8 @@ class StreamEventProcessor:
         try:
             # Extract reasoning part from the event
             part_text = ""
+            part_id = None
+
             if hasattr(event, "part") and event.part is not None:
                 if isinstance(event.part, str):
                     part_text = event.part
@@ -3430,8 +3516,31 @@ class StreamEventProcessor:
             elif hasattr(event, "text") and event.text is not None:
                 part_text = str(event.text)
 
+            # Extract part ID if available
+            if hasattr(event, "part_id"):
+                part_id = str(event.part_id)
+            elif hasattr(event, "id"):
+                part_id = str(event.id)
+
             if part_text and part_text != "None":
                 self.reasoning_data["summary_parts"].append(part_text)
+
+                # Send reasoning started status event for the first part
+                if len(self.reasoning_data["summary_parts"]) == 1:
+                    self.event_queue.put(
+                        json.dumps({"type": "reasoning_started", "part_id": part_id})
+                    )
+                else:
+                    # Send reasoning in progress for subsequent parts
+                    self.event_queue.put(
+                        json.dumps(
+                            {
+                                "type": "reasoning_in_progress",
+                                "part_id": part_id,
+                                "status": "thinking",
+                            }
+                        )
+                    )
 
         except AttributeError as e:
             logging.debug(f"Reasoning part event missing expected attributes: {e}")
@@ -3460,6 +3569,12 @@ class StreamEventProcessor:
 
             if delta_text and delta_text != "None":
                 self.reasoning_data["complete_summary"] += delta_text
+
+                # Send reasoning in progress event during text generation
+                # This provides continuous feedback that reasoning is happening
+                self.event_queue.put(
+                    json.dumps({"type": "reasoning_in_progress", "status": "thinking"})
+                )
 
         except AttributeError as e:
             logging.debug(f"Reasoning delta event missing expected attributes: {e}")
@@ -3491,6 +3606,8 @@ class StreamEventProcessor:
             if self.current_response_id:
                 self.reasoning_data["response_id"] = self.current_response_id
 
+            # Don't send additional completion event here since individual parts already send them
+
         except AttributeError as e:
             logging.debug(f"Reasoning done event missing expected attributes: {e}")
             # Continue processing - reasoning is optional
@@ -3506,9 +3623,18 @@ class StreamEventProcessor:
     def _handle_reasoning_summary_part_done(self, event: Any) -> None:
         """Handle response.reasoning_summary_part.done event - reasoning part complete."""
         try:
-            # This event indicates a reasoning part is complete
-            # We can use this for validation or cleanup if needed
-            pass
+            # Extract part ID if available
+            part_id = None
+            if hasattr(event, "part_id"):
+                part_id = str(event.part_id)
+            elif hasattr(event, "id"):
+                part_id = str(event.id)
+
+            # Send reasoning completed status event for each part completion
+            self.event_queue.put(
+                json.dumps({"type": "reasoning_completed", "part_id": part_id})
+            )
+
         except AttributeError as e:
             logging.debug(f"Reasoning part done event missing expected attributes: {e}")
             # Continue processing - reasoning is optional
@@ -3518,23 +3644,292 @@ class StreamEventProcessor:
             )
             # Continue processing - reasoning failures should not block chat
 
+    def _handle_web_search_call_in_progress(self, event: Any) -> None:
+        """Handle response.web_search_call.in_progress event - web search started."""
+        try:
+            # Extract event metadata
+            item_id = getattr(event, "item_id", None)
+            output_index = getattr(event, "output_index", None)
+            sequence_number = getattr(event, "sequence_number", None)
+
+            # Only process if we have a valid item_id
+            if item_id and isinstance(item_id, str):
+                # Store web search event data
+                self.web_search_events[item_id] = {
+                    "item_id": item_id,
+                    "status": "in_progress",
+                    "output_index": output_index,
+                    "sequence_number": sequence_number,
+                    "timestamp": int(time.time()),
+                }
+
+                # Send status update to frontend
+                self.event_queue.put(
+                    json.dumps(
+                        {
+                            "type": "search_started",
+                            "item_id": item_id,
+                            "output_index": output_index,
+                            "sequence_number": sequence_number,
+                        }
+                    )
+                )
+
+        except Exception as e:
+            logging.warning(f"Error processing web search in_progress event: {e}")
+            # Continue processing - don't block chat functionality
+
+    def _handle_web_search_call_searching(self, event: Any) -> None:
+        """Handle response.web_search_call.searching event - web search actively searching."""
+        try:
+            # Extract event metadata
+            item_id = getattr(event, "item_id", None)
+            output_index = getattr(event, "output_index", None)
+            sequence_number = getattr(event, "sequence_number", None)
+
+            # Only process if we have a valid item_id
+            if item_id and isinstance(item_id, str):
+                # Update web search event data
+                if item_id in self.web_search_events:
+                    self.web_search_events[item_id].update(
+                        {
+                            "status": "searching",
+                            "output_index": output_index,
+                            "sequence_number": sequence_number,
+                        }
+                    )
+                else:
+                    # Create new entry if not exists
+                    self.web_search_events[item_id] = {
+                        "item_id": item_id,
+                        "status": "searching",
+                        "output_index": output_index,
+                        "sequence_number": sequence_number,
+                        "timestamp": int(time.time()),
+                    }
+
+                # Send status update to frontend
+                self.event_queue.put(
+                    json.dumps(
+                        {
+                            "type": "search_in_progress",
+                            "status": "searching",
+                            "item_id": item_id,
+                            "output_index": output_index,
+                            "sequence_number": sequence_number,
+                        }
+                    )
+                )
+
+        except Exception as e:
+            logging.warning(f"Error processing web search searching event: {e}")
+            # Continue processing - don't block chat functionality
+
+    def _handle_web_search_call_completed(self, event: Any) -> None:
+        """Handle response.web_search_call.completed event - web search completed."""
+        try:
+            # Extract event metadata
+            item_id = getattr(event, "item_id", None)
+            output_index = getattr(event, "output_index", None)
+            sequence_number = getattr(event, "sequence_number", None)
+
+            # Only process if we have a valid item_id
+            if item_id and isinstance(item_id, str):
+                # Update web search event data
+                if item_id in self.web_search_events:
+                    self.web_search_events[item_id].update(
+                        {
+                            "status": "completed",
+                            "output_index": output_index,
+                            "sequence_number": sequence_number,
+                        }
+                    )
+                else:
+                    # Create new entry if not exists
+                    self.web_search_events[item_id] = {
+                        "item_id": item_id,
+                        "status": "completed",
+                        "output_index": output_index,
+                        "sequence_number": sequence_number,
+                        "timestamp": int(time.time()),
+                    }
+
+                # Send status update to frontend
+                self.event_queue.put(
+                    json.dumps(
+                        {
+                            "type": "search_completed",
+                            "item_id": item_id,
+                            "output_index": output_index,
+                            "sequence_number": sequence_number,
+                        }
+                    )
+                )
+
+        except Exception as e:
+            logging.warning(f"Error processing web search completed event: {e}")
+            # Continue processing - don't block chat functionality
+
+    def _process_web_search_output_item(
+        self, output_item: Any, is_done: bool = False
+    ) -> None:
+        """Process web search output items from response.output_item.added/done events."""
+        try:
+            # Extract web search data from ResponseFunctionWebSearch object
+            item_id = getattr(output_item, "id", None)
+            status = getattr(output_item, "status", None)
+            action = getattr(output_item, "action", None)
+
+            # Only process if we have a valid item_id
+            if item_id and isinstance(item_id, str):
+                # Store or update web search output item data
+                search_data = {
+                    "item_id": item_id,
+                    "status": status,
+                    "timestamp": int(time.time()),
+                    "is_done": is_done,
+                }
+
+                # Extract action details if available
+                if action:
+                    action_type = getattr(action, "type", None)
+                    search_data["action_type"] = action_type
+
+                    if action_type == "search":
+                        query = getattr(action, "query", None)
+                        sources = getattr(action, "sources", None)
+                        search_data["query"] = query
+                        search_data["sources"] = sources
+                    elif action_type == "open_page":
+                        url = getattr(action, "url", None)
+                        search_data["url"] = url
+                    elif action_type == "find":
+                        pattern = getattr(action, "pattern", None)
+                        url = getattr(action, "url", None)
+                        search_data["pattern"] = pattern
+                        search_data["url"] = url
+
+                self.web_search_output_items[item_id] = search_data
+
+                # Correlate with web search events and store in reasoning data
+                self._correlate_web_search_data()
+
+        except Exception as e:
+            logging.warning(f"Error processing web search output item: {e}")
+            # Continue processing - don't block chat functionality
+
+    def _process_message_output_item(
+        self, output_item: Any, is_done: bool = False
+    ) -> None:
+        """Process message output items from response.output_item.added/done events."""
+        try:
+            # Extract message data from ResponseOutputMessage object
+            item_id = getattr(output_item, "id", None)
+            role = getattr(output_item, "role", None)
+            status = getattr(output_item, "status", None)
+            content = getattr(output_item, "content", None)
+
+            # Only process if we have a valid item_id
+            if item_id and isinstance(item_id, str):
+                # Store or update message output item data
+                message_data = {
+                    "item_id": item_id,
+                    "role": role,
+                    "status": status,
+                    "timestamp": int(time.time()),
+                    "is_done": is_done,
+                    "content_items": [],
+                    "annotations": [],
+                }
+
+                # Extract content items if available
+                if content and hasattr(content, "__iter__"):
+                    for content_item in content:
+                        if (
+                            hasattr(content_item, "type")
+                            and content_item.type == "output_text"
+                        ):
+                            text = getattr(content_item, "text", "")
+                            annotations = getattr(content_item, "annotations", [])
+                            message_data["content_items"].append(
+                                {
+                                    "type": "output_text",
+                                    "text": text,
+                                    "annotations": annotations,
+                                }
+                            )
+                            # Collect all annotations
+                            if annotations:
+                                message_data["annotations"].extend(annotations)
+
+                self.message_output_items[item_id] = message_data
+
+                # Store in reasoning data
+                self.reasoning_data["message_data"] = message_data
+
+        except Exception as e:
+            logging.warning(f"Error processing message output item: {e}")
+            # Continue processing - don't block chat functionality
+
+    def _correlate_web_search_data(self) -> None:
+        """Correlate web search events with output items and store in reasoning data."""
+        try:
+            correlated_searches = []
+
+            # Correlate events with output items using item_id
+            for item_id, output_item in self.web_search_output_items.items():
+                # Get corresponding event data
+                event_data = self.web_search_events.get(item_id, {})
+
+                # Combine event and output item data
+                search_data = {
+                    "item_id": item_id,
+                    "status": output_item.get("status", event_data.get("status")),
+                    "output_index": event_data.get("output_index"),
+                    "sequence_number": event_data.get("sequence_number"),
+                    "timestamp": output_item.get(
+                        "timestamp", event_data.get("timestamp")
+                    ),
+                    "query": output_item.get("query"),
+                    "action_type": output_item.get("action_type"),
+                    "sources": output_item.get("sources"),
+                    "url": output_item.get("url"),
+                    "pattern": output_item.get("pattern"),
+                }
+
+                # Remove None values
+                search_data = {k: v for k, v in search_data.items() if v is not None}
+                correlated_searches.append(search_data)
+
+            # Store correlated web search data in reasoning data
+            if correlated_searches:
+                self.reasoning_data["web_searches"] = correlated_searches
+
+        except Exception as e:
+            logging.warning(f"Error correlating web search data: {e}")
+            # Continue processing - don't block chat functionality
+
     def get_reasoning_data(self) -> Dict[str, Any] | None:
         """Get the reasoning data from the processed stream with comprehensive error handling."""
         try:
             # Only return reasoning data if we have meaningful content
-            if self.reasoning_data.get("complete_summary") or self.reasoning_data.get(
-                "summary_parts"
+            if (
+                self.reasoning_data.get("complete_summary")
+                or self.reasoning_data.get("summary_parts")
+                or self.reasoning_data.get("web_searches")
+                or self.reasoning_data.get("message_data")
             ):
                 # Validate the reasoning data before returning
                 validated_data = validate_reasoning_data(self.reasoning_data.copy())
                 if validated_data:
                     logging.debug(
-                        f"Successfully retrieved reasoning data with {len(validated_data.get('complete_summary', ''))} characters"
+                        f"Successfully retrieved reasoning data with {len(validated_data.get('complete_summary', ''))} characters, "
+                        f"{len(validated_data.get('web_searches', []))} web searches"
                     )
                 return validated_data
             else:
                 logging.debug(
-                    "No reasoning data available - summary and parts are empty"
+                    "No reasoning data available - summary, parts, and web searches are empty"
                 )
             return None
         except ValueError as e:
