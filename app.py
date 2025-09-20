@@ -2,6 +2,7 @@ import base64
 import io
 import json
 import logging
+import logging.handlers
 import os
 import random
 import re
@@ -40,12 +41,12 @@ from wand.image import Image as WandImage
 
 import utils
 from dynamic_prompts import (
+    FollowUpState,
     GridDynamicPromptInfo,
     get_prompts_for_name,
+    init_followup_state,
     make_character_prompts_dynamic,
     make_prompt_dynamic,
-    init_followup_state,
-    FollowUpState,
 )
 from image_models import (
     ImageGenerationRequest,
@@ -59,6 +60,53 @@ from image_models import (
     create_success_response,
 )
 from novelai_client import NovelAIAPIError, NovelAIClient, NovelAIClientError
+
+# Configure logging to file with dated session logs
+os.makedirs("logs", exist_ok=True)
+
+
+# Optional: Clean up old log files (keep last 30 days)
+def cleanup_old_logs(days_to_keep=30):
+    """Remove log files older than specified days."""
+    try:
+        import glob
+
+        cutoff_time = time.time() - (days_to_keep * 24 * 60 * 60)
+        log_files = glob.glob("logs/app_*.log")
+
+        for log_file in log_files:
+            if os.path.getmtime(log_file) < cutoff_time:
+                os.remove(log_file)
+                print(f"Removed old log file: {log_file}")
+    except Exception as e:
+        print(f"Error cleaning up old logs: {e}")
+
+
+# Clean up old logs on startup
+cleanup_old_logs()
+
+# Generate dated log filename for this session
+session_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+log_filename = f"logs/app_{session_timestamp}.log"
+
+# Create a file handler for this session
+file_handler = logging.FileHandler(log_filename)
+file_handler.setLevel(logging.INFO)
+
+# Create console handler
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.INFO)
+
+# Create formatter
+formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+file_handler.setFormatter(formatter)
+console_handler.setFormatter(formatter)
+
+# Configure root logger
+logging.basicConfig(level=logging.INFO, handlers=[file_handler, console_handler])
+
+# Log session start
+logging.info(f"=== New session started - Log file: {log_filename} ===")
 
 app = Flask(__name__)
 
@@ -75,9 +123,6 @@ if not os.path.isfile(secret_key_filename):
         f.write(secrets.token_urlsafe(16))
 with open(secret_key_filename, "r") as f:
     app.secret_key = f.read()
-
-
-
 
 
 @app.errorhandler(404)
@@ -2095,23 +2140,25 @@ def generate_image_grid(
         # Create the image request using the unified system
         try:
             image_request = create_request_from_form_data(form_data)
-            
+
             # Check if this is a follow-up row identifier
-            if dynamic_prompt.startswith("__FOLLOWUP_ROW_") and dynamic_prompt.endswith("__"):
+            if dynamic_prompt.startswith("__FOLLOWUP_ROW_") and dynamic_prompt.endswith(
+                "__"
+            ):
                 # Extract row index from the identifier (format: __FOLLOWUP_ROW_0:display_name__)
-                identifier_content = dynamic_prompt[len("__FOLLOWUP_ROW_"):-2]
+                identifier_content = dynamic_prompt[len("__FOLLOWUP_ROW_") : -2]
                 try:
                     if ":" in identifier_content:
                         row_index_str, display_name = identifier_content.split(":", 1)
                     else:
                         row_index_str = identifier_content
                         display_name = f"Row_{identifier_content}"
-                    
+
                     row_index = int(row_index_str)
                     image_request.grid_dynamic_prompt = GridDynamicPromptInfo(
                         str_to_replace_with="",  # Not used for follow-up files
                         prompt_file=grid_prompt_file,
-                        followup_row_index=row_index
+                        followup_row_index=row_index,
                     )
                 except ValueError:
                     # Fallback to regular handling if parsing fails
@@ -2135,12 +2182,14 @@ def generate_image_grid(
                 # Convert the response to GeneratedImageData format
                 # Use display name for follow-up rows, otherwise use the original prompt
                 result_key = dynamic_prompt
-                if dynamic_prompt.startswith("__FOLLOWUP_ROW_") and dynamic_prompt.endswith("__"):
-                    identifier_content = dynamic_prompt[len("__FOLLOWUP_ROW_"):-2]
+                if dynamic_prompt.startswith(
+                    "__FOLLOWUP_ROW_"
+                ) and dynamic_prompt.endswith("__"):
+                    identifier_content = dynamic_prompt[len("__FOLLOWUP_ROW_") : -2]
                     if ":" in identifier_content:
                         _, display_name = identifier_content.split(":", 1)
                         result_key = display_name
-                
+
                 image_data_list[result_key] = GeneratedImageData(
                     local_image_path=response.image_path,
                     revised_prompt=response.revised_prompt or image_request.prompt,
@@ -2154,12 +2203,14 @@ def generate_image_grid(
             else:
                 # Use display name for error messages too
                 display_prompt = dynamic_prompt
-                if dynamic_prompt.startswith("__FOLLOWUP_ROW_") and dynamic_prompt.endswith("__"):
-                    identifier_content = dynamic_prompt[len("__FOLLOWUP_ROW_"):-2]
+                if dynamic_prompt.startswith(
+                    "__FOLLOWUP_ROW_"
+                ) and dynamic_prompt.endswith("__"):
+                    identifier_content = dynamic_prompt[len("__FOLLOWUP_ROW_") : -2]
                     if ":" in identifier_content:
                         _, display_name = identifier_content.split(":", 1)
                         display_prompt = display_name
-                
+
                 error_msg = f"Prompt '{display_prompt}': {response.error_message or 'Unknown error'}"
                 if response.error_type:
                     error_msg += f" ({response.error_type})"
@@ -2172,12 +2223,14 @@ def generate_image_grid(
         except Exception as e:
             # Use display name for error messages too
             display_prompt = dynamic_prompt
-            if dynamic_prompt.startswith("__FOLLOWUP_ROW_") and dynamic_prompt.endswith("__"):
-                identifier_content = dynamic_prompt[len("__FOLLOWUP_ROW_"):-2]
+            if dynamic_prompt.startswith("__FOLLOWUP_ROW_") and dynamic_prompt.endswith(
+                "__"
+            ):
+                identifier_content = dynamic_prompt[len("__FOLLOWUP_ROW_") : -2]
                 if ":" in identifier_content:
                     _, display_name = identifier_content.split(":", 1)
                     display_prompt = display_name
-            
+
             error_msg = f"Prompt '{display_prompt}': {str(e)}"
             generation_errors.append(error_msg)
             logging.error(
@@ -3584,38 +3637,41 @@ def get_image_metadata(filename: str):
 def detect_followup_file(content_lines: list[str]) -> tuple[bool, int]:
     """
     Detect if a prompt file is a follow-up options file and return column count.
-    
+
     Returns:
         tuple: (is_followup, total_columns)
     """
     if not content_lines:
         return False, 0
-    
+
     # Look for header line
     header_line = None
     for line in content_lines:
         stripped = line.strip()
-        if stripped.startswith('# columns:'):
+        if stripped.startswith("# columns:"):
             header_line = stripped
             break
-    
+
     if not header_line:
         return False, 0
-    
+
     # Find data lines to determine actual column count
-    data_lines = [line.strip() for line in content_lines 
-                  if line.strip() and not line.strip().startswith('#')]
-    
+    data_lines = [
+        line.strip()
+        for line in content_lines
+        if line.strip() and not line.strip().startswith("#")
+    ]
+
     if not data_lines:
         return True, 0  # Header found but no data
-    
+
     # Count columns from first data line
-    first_line_columns = len(data_lines[0].split('||'))
-    
+    first_line_columns = len(data_lines[0].split("||"))
+
     # Verify it's actually a follow-up file (has || separators)
     if first_line_columns < 2:
         return False, 0
-    
+
     return True, first_line_columns
 
 
@@ -3645,17 +3701,17 @@ def get_prompt_files():
 
                     file_stats = os.stat(file_path)
                     is_followup, total_columns = detect_followup_file(content_lines)
-                    
+
                     file_data = {
                         "name": os.path.splitext(filename)[0],
                         "content": content_lines,
                         "size": file_stats.st_size,
                         "isFollowUp": is_followup,
                     }
-                    
+
                     if is_followup:
                         file_data["totalColumns"] = total_columns
-                    
+
                     files.append(file_data)
                 except Exception as e:
                     # Skip files that can't be read
@@ -3739,17 +3795,17 @@ def get_prompt_file(filename: str):
 
         file_stats = os.stat(file_path)
         is_followup, total_columns = detect_followup_file(content_lines)
-        
+
         file_data = {
             "name": filename,
             "content": content_lines,
             "size": file_stats.st_size,
             "isFollowUp": is_followup,
         }
-        
+
         if is_followup:
             file_data["totalColumns"] = total_columns
-        
+
         return jsonify(file_data)
 
     except Exception as e:
