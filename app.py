@@ -3201,23 +3201,33 @@ def get_message_reasoning(conversation_id: str, message_index: int):
                 }
             ), 404
 
-        # Return structured reasoning data
-        return jsonify(
-            {
-                "success": True,
-                "conversation_id": conversation_id,
-                "message_index": message_index,
-                "message_role": message.role,
-                "message_text": message.text,
-                "response_id": message.response_id,
-                "reasoning": {
-                    "summary_parts": reasoning_data.get("summary_parts", []),
-                    "complete_summary": reasoning_data.get("complete_summary", ""),
-                    "timestamp": reasoning_data.get("timestamp", 0),
-                    "response_id": reasoning_data.get("response_id", ""),
-                },
-            }
-        )
+        # Return structured reasoning data with web search information
+        response_data = {
+            "success": True,
+            "conversation_id": conversation_id,
+            "message_index": message_index,
+            "message_role": message.role,
+            "message_text": message.text,
+            "response_id": message.response_id,
+            "reasoning": {
+                "summary_parts": reasoning_data.get("summary_parts", []),
+                "complete_summary": reasoning_data.get("complete_summary", ""),
+                "timestamp": reasoning_data.get("timestamp", 0),
+                "response_id": reasoning_data.get("response_id", ""),
+            },
+        }
+
+        # Include web search data if available and valid
+        web_searches = reasoning_data.get("web_searches", [])
+        if web_searches and isinstance(web_searches, list) and len(web_searches) > 0:
+            response_data["web_searches"] = web_searches
+
+        # Include message data if available (for citations)
+        message_data = reasoning_data.get("message_data")
+        if message_data:
+            response_data["message_data"] = message_data
+
+        return jsonify(response_data)
 
     except ValueError as e:
         logging.warning(f"Validation error in get_message_reasoning: {e}")
@@ -3314,6 +3324,9 @@ class StreamEventProcessor:
 
         event_type = event.type
 
+        # Debug: Log all event types to see what we're receiving
+        logging.debug(f"Received event type: {event_type}")
+
         # Handle actual Responses API event types
         if event_type == "response.created":
             self._handle_response_created(event)
@@ -3350,6 +3363,11 @@ class StreamEventProcessor:
         else:
             # Handle other event types if needed
             logging.warning(f"Unhandled event type {event_type}")
+            # Debug: Log event attributes for unknown types
+            if hasattr(event, "__dict__"):
+                logging.debug(f"Event attributes: {event.__dict__}")
+            else:
+                logging.debug(f"Event dir: {dir(event)}")
 
     def _handle_response_created(self, event: Any) -> None:
         """Handle response.created event - response has been created."""
@@ -3389,16 +3407,27 @@ class StreamEventProcessor:
             if hasattr(event, "output_item") and event.output_item is not None:
                 output_item = event.output_item
 
+                # Debug: Log output item details
+                item_type = getattr(output_item, "type", "unknown")
+                item_id = getattr(output_item, "id", "unknown")
+                logging.debug(
+                    f"Processing output item added: type={item_type}, id={item_id}"
+                )
+
                 # Process web search output items
                 if (
                     hasattr(output_item, "type")
                     and output_item.type == "web_search_call"
                 ):
+                    logging.debug(f"Found web search output item: {item_id}")
                     self._process_web_search_output_item(output_item)
 
                 # Process message output items
                 elif hasattr(output_item, "type") and output_item.type == "message":
+                    logging.debug(f"Found message output item: {item_id}")
                     self._process_message_output_item(output_item)
+                else:
+                    logging.debug(f"Unhandled output item type: {item_type}")
 
         except Exception as e:
             logging.warning(f"Error processing output item added event: {e}")
@@ -3464,16 +3493,27 @@ class StreamEventProcessor:
             if hasattr(event, "output_item") and event.output_item is not None:
                 output_item = event.output_item
 
+                # Debug: Log output item details
+                item_type = getattr(output_item, "type", "unknown")
+                item_id = getattr(output_item, "id", "unknown")
+                logging.debug(
+                    f"Processing output item done: type={item_type}, id={item_id}"
+                )
+
                 # Process completed web search output items
                 if (
                     hasattr(output_item, "type")
                     and output_item.type == "web_search_call"
                 ):
+                    logging.debug(f"Found completed web search output item: {item_id}")
                     self._process_web_search_output_item(output_item, is_done=True)
 
                 # Process completed message output items
                 elif hasattr(output_item, "type") and output_item.type == "message":
+                    logging.debug(f"Found completed message output item: {item_id}")
                     self._process_message_output_item(output_item, is_done=True)
+                else:
+                    logging.debug(f"Unhandled completed output item type: {item_type}")
 
         except Exception as e:
             logging.warning(f"Error processing output item done event: {e}")
@@ -3733,6 +3773,9 @@ class StreamEventProcessor:
             output_index = getattr(event, "output_index", None)
             sequence_number = getattr(event, "sequence_number", None)
 
+            # Debug: Log web search completion
+            logging.debug(f"Web search completed: {item_id}")
+
             # Only process if we have a valid item_id
             if item_id and isinstance(item_id, str):
                 # Update web search event data
@@ -3780,6 +3823,12 @@ class StreamEventProcessor:
             status = getattr(output_item, "status", None)
             action = getattr(output_item, "action", None)
 
+            logging.debug(
+                f"Processing web search output item: id={item_id}, status={status}"
+            )
+            if not action:
+                logging.warning(f"No action found in web search output item {item_id}")
+
             # Only process if we have a valid item_id
             if item_id and isinstance(item_id, str):
                 # Store or update web search output item data
@@ -3797,19 +3846,43 @@ class StreamEventProcessor:
 
                     if action_type == "search":
                         query = getattr(action, "query", None)
-                        sources = getattr(action, "sources", None)
+                        sources_raw = getattr(action, "sources", None)
                         search_data["query"] = query
-                        search_data["sources"] = sources
+
+                        # Extract URLs from ActionSearchSource objects
+                        if sources_raw and isinstance(sources_raw, list):
+                            sources = []
+                            for source in sources_raw:
+                                if hasattr(source, "url"):
+                                    sources.append(source.url)
+                                elif isinstance(source, dict) and "url" in source:
+                                    sources.append(source["url"])
+                                elif isinstance(source, str):
+                                    sources.append(source)
+                            search_data["sources"] = sources
+                        else:
+                            search_data["sources"] = sources_raw
+
+                        logging.debug(
+                            f"Extracted search query: {query}, sources: {search_data.get('sources')}"
+                        )
                     elif action_type == "open_page":
                         url = getattr(action, "url", None)
                         search_data["url"] = url
+                        logging.debug(f"Extracted open_page url: {url}")
                     elif action_type == "find":
                         pattern = getattr(action, "pattern", None)
                         url = getattr(action, "url", None)
                         search_data["pattern"] = pattern
                         search_data["url"] = url
+                        logging.debug(f"Extracted find pattern: {pattern}, url: {url}")
+                else:
+                    logging.warning(
+                        f"No action data found for web search item {item_id}"
+                    )
 
                 self.web_search_output_items[item_id] = search_data
+                logging.debug(f"Stored web search output item: {search_data}")
 
                 # Correlate with web search events and store in reasoning data
                 self._correlate_web_search_data()
@@ -3876,6 +3949,10 @@ class StreamEventProcessor:
         try:
             correlated_searches = []
 
+            logging.debug(
+                f"Correlating web search data: {len(self.web_search_output_items)} output items, {len(self.web_search_events)} events"
+            )
+
             # Correlate events with output items using item_id
             for item_id, output_item in self.web_search_output_items.items():
                 # Get corresponding event data
@@ -3901,9 +3978,34 @@ class StreamEventProcessor:
                 search_data = {k: v for k, v in search_data.items() if v is not None}
                 correlated_searches.append(search_data)
 
+            # Also include events that don't have corresponding output items
+            # This handles cases where web search events are sent but output items are not
+            for item_id, event_data in self.web_search_events.items():
+                if item_id not in self.web_search_output_items:
+                    search_data = {
+                        "item_id": item_id,
+                        "status": event_data.get("status"),
+                        "output_index": event_data.get("output_index"),
+                        "sequence_number": event_data.get("sequence_number"),
+                        "timestamp": event_data.get("timestamp"),
+                        # Add placeholder query information since we don't have output items
+                        "query": f"Web search performed (sequence {event_data.get('sequence_number', 'unknown')})",
+                        "action_type": "search",
+                    }
+                    # Remove None values
+                    search_data = {
+                        k: v for k, v in search_data.items() if v is not None
+                    }
+                    correlated_searches.append(search_data)
+
             # Store correlated web search data in reasoning data
             if correlated_searches:
                 self.reasoning_data["web_searches"] = correlated_searches
+                logging.debug(
+                    f"Stored {len(correlated_searches)} correlated web search entries"
+                )
+            else:
+                logging.debug("No web search data to correlate")
 
         except Exception as e:
             logging.warning(f"Error correlating web search data: {e}")
@@ -3912,6 +4014,9 @@ class StreamEventProcessor:
     def get_reasoning_data(self) -> Dict[str, Any] | None:
         """Get the reasoning data from the processed stream with comprehensive error handling."""
         try:
+            # Ensure web search data is correlated before returning
+            self._correlate_web_search_data()
+
             # Only return reasoning data if we have meaningful content
             if (
                 self.reasoning_data.get("complete_summary")

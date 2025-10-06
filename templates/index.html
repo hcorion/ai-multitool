@@ -261,18 +261,25 @@
     <div id="reasoning-modal" class="modal reasoning-modal" style="display: none;">
         <div class="modal-content reasoning-modal-content">
             <div class="modal-header">
-                <h3>AI Reasoning</h3>
+                <h3>AI Process Details</h3>
                 <span class="close" id="reasoning-modal-close">&times;</span>
             </div>
             <div class="modal-body">
+                <div class="modal-tabs">
+                    <button class="tab-button active" data-tab="reasoning">Reasoning</button>
+                    <button class="tab-button" data-tab="search">Web Searches</button>
+                </div>
                 <div id="reasoning-loading" class="loading-message">
-                    Loading reasoning data...
+                    Loading process data...
                 </div>
                 <div id="reasoning-error" class="error-message" style="display: none;">
                     <!-- Error message will be populated here -->
                 </div>
-                <div id="reasoning-content" style="display: none;">
+                <div id="reasoning-content" class="tab-content" data-tab="reasoning" style="display: none;">
                     <!-- Reasoning content will be populated here -->
+                </div>
+                <div id="search-content" class="tab-content" data-tab="search" style="display: none;">
+                    <!-- Web search content will be populated here -->
                 </div>
             </div>
         </div>

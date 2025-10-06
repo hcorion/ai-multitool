@@ -184,21 +184,26 @@ function showReasoningModal(messageIndex: number): void {
 
     // Show modal with loading state
     const modal = document.getElementById("reasoning-modal");
-    const content = document.getElementById("reasoning-content");
+    const reasoningContent = document.getElementById("reasoning-content");
+    const searchContent = document.getElementById("search-content");
     const loading = document.getElementById("reasoning-loading");
     const error = document.getElementById("reasoning-error");
 
-    if (!modal || !content || !loading || !error) {
+    if (!modal || !reasoningContent || !searchContent || !loading || !error) {
         console.error("Reasoning modal elements not found");
         showReasoningError("Modal interface not available");
         return;
     }
 
     // Reset modal state
-    content.style.display = "none";
+    reasoningContent.style.display = "none";
+    searchContent.style.display = "none";
     error.style.display = "none";
     loading.style.display = "block";
     modal.style.display = "block";
+    
+    // Initialize tab functionality
+    initializeModalTabs();
 
     // Set up timeout for the request
     const controller = new AbortController();
@@ -247,7 +252,18 @@ function showReasoningModal(messageIndex: number): void {
 
             if (data.reasoning && data.reasoning.complete_summary) {
                 displayReasoningData(data.reasoning);
-                content.style.display = "block";
+                reasoningContent.style.display = "block";
+                
+                // Display web search data if available
+                if (data.web_searches && data.web_searches.length > 0) {
+                    displayWebSearchData(data.web_searches);
+                    enableSearchTab();
+                } else {
+                    disableSearchTab();
+                }
+                
+                // Show reasoning tab by default
+                switchModalTab('reasoning');
             } else if (data.reasoning && data.reasoning.summary_parts && data.reasoning.summary_parts.length > 0) {
                 // Fallback to summary parts if complete summary is not available
                 const fallbackData = {
@@ -255,7 +271,18 @@ function showReasoningModal(messageIndex: number): void {
                     complete_summary: data.reasoning.summary_parts.join('\n\n')
                 };
                 displayReasoningData(fallbackData);
-                content.style.display = "block";
+                reasoningContent.style.display = "block";
+                
+                // Display web search data if available
+                if (data.web_searches && data.web_searches.length > 0) {
+                    displayWebSearchData(data.web_searches);
+                    enableSearchTab();
+                } else {
+                    disableSearchTab();
+                }
+                
+                // Show reasoning tab by default
+                switchModalTab('reasoning');
             } else {
                 showReasoningError("No reasoning data available for this message");
             }
@@ -338,6 +365,142 @@ export function hideReasoningModal(): void {
     const modal = document.getElementById("reasoning-modal");
     if (modal) {
         modal.style.display = "none";
+    }
+}
+
+/**
+ * Initialize modal tab functionality
+ */
+function initializeModalTabs(): void {
+    const tabButtons = document.querySelectorAll('.tab-button');
+    tabButtons.forEach(button => {
+        button.addEventListener('click', (e) => {
+            const target = e.target as HTMLButtonElement;
+            const tabName = target.getAttribute('data-tab');
+            if (tabName && !target.disabled) {
+                switchModalTab(tabName as 'reasoning' | 'search');
+            }
+        });
+    });
+}
+
+/**
+ * Switch between modal tabs
+ */
+function switchModalTab(tabName: 'reasoning' | 'search'): void {
+    // Update tab buttons
+    const tabButtons = document.querySelectorAll('.tab-button');
+    tabButtons.forEach(button => {
+        const buttonTab = button.getAttribute('data-tab');
+        if (buttonTab === tabName) {
+            button.classList.add('active');
+        } else {
+            button.classList.remove('active');
+        }
+    });
+    
+    // Update tab content
+    const tabContents = document.querySelectorAll('.tab-content');
+    tabContents.forEach(content => {
+        const contentTab = content.getAttribute('data-tab');
+        if (contentTab === tabName) {
+            (content as HTMLElement).style.display = 'block';
+        } else {
+            (content as HTMLElement).style.display = 'none';
+        }
+    });
+}
+
+/**
+ * Enable the search tab
+ */
+function enableSearchTab(): void {
+    const searchTabButton = document.querySelector('.tab-button[data-tab="search"]') as HTMLButtonElement;
+    if (searchTabButton) {
+        searchTabButton.disabled = false;
+        searchTabButton.style.opacity = '1';
+    }
+}
+
+/**
+ * Disable the search tab
+ */
+function disableSearchTab(): void {
+    const searchTabButton = document.querySelector('.tab-button[data-tab="search"]') as HTMLButtonElement;
+    if (searchTabButton) {
+        searchTabButton.disabled = true;
+        searchTabButton.style.opacity = '0.5';
+    }
+}
+
+/**
+ * Display web search data in the search tab
+ */
+function displayWebSearchData(searchData: any[]): void {
+    const searchContent = document.getElementById("search-content");
+    if (!searchContent) return;
+
+    try {
+        if (!searchData || searchData.length === 0) {
+            searchContent.innerHTML = `
+                <div class="no-search-data">
+                    No web search data available for this message.
+                </div>
+            `;
+            return;
+        }
+
+        let searchHtml = `
+            <div class="search-summary">
+                <h3>Web Search Activity</h3>
+            </div>
+        `;
+
+        searchData.forEach((search, index) => {
+            const query = escapeHtml(search.query || 'Unknown query');
+            const status = search.status || 'unknown';
+            const timestamp = search.timestamp ? new Date(search.timestamp * 1000).toLocaleString() : 'Unknown time';
+            const actionType = search.action_type || 'search';
+
+            searchHtml += `
+                <div class="search-item">
+                    <div class="search-query">${query}</div>
+                    <div class="search-status ${status}">${formatSearchStatus(status)}</div>
+                    <div class="search-details">
+                        <div>Action: ${escapeHtml(actionType)}</div>
+                        ${search.sources ? `<div>Sources: ${escapeHtml(search.sources.join(', '))}</div>` : ''}
+                    </div>
+                    <div class="search-timestamp">${timestamp}</div>
+                </div>
+            `;
+        });
+
+        searchContent.innerHTML = searchHtml;
+    } catch (error) {
+        console.error("Error displaying web search data:", error);
+        searchContent.innerHTML = `
+            <div class="error-message">
+                Failed to display web search data
+            </div>
+        `;
+    }
+}
+
+/**
+ * Format search status for display
+ */
+function formatSearchStatus(status: string): string {
+    switch (status) {
+        case 'completed':
+            return 'Completed';
+        case 'in_progress':
+            return 'In Progress';
+        case 'searching':
+            return 'Searching';
+        case 'failed':
+            return 'Failed';
+        default:
+            return 'Unknown';
     }
 }
 

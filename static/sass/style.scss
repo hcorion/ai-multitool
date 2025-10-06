@@ -855,6 +855,124 @@ button#send-chat {
     }
 }
 
+// Tabbed interface for reasoning modal
+.modal-tabs {
+    display: flex;
+    border-bottom: 1px solid $border-color;
+    margin-bottom: 20px;
+    background-color: $tab-bg-color;
+    border-radius: 4px 4px 0 0;
+}
+
+.tab-button {
+    flex: 1;
+    padding: 12px 20px;
+    background-color: transparent;
+    border: none;
+    color: $text-color;
+    cursor: pointer;
+    font-size: 0.95em;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    border-radius: 4px 4px 0 0;
+    
+    &:hover {
+        background-color: rgba(255, 255, 255, 0.05);
+    }
+    
+    &.active {
+        background-color: $background-color;
+        color: $text-color;
+        border-bottom: 2px solid #2196f3;
+        font-weight: 600;
+    }
+    
+    &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        
+        &:hover {
+            background-color: transparent;
+        }
+    }
+}
+
+.tab-content {
+    display: none;
+    
+    &.active {
+        display: block;
+    }
+}
+
+// Web search content styling
+.search-summary {
+    h3 {
+        margin: 0 0 15px 0;
+        color: $text-color;
+        font-size: 1.1em;
+        border-bottom: 1px solid $border-color;
+        padding-bottom: 10px;
+    }
+}
+
+.search-item {
+    margin-bottom: 20px;
+    padding: 15px;
+    background-color: rgba(255, 255, 255, 0.02);
+    border: 1px solid $border-color;
+    border-radius: 6px;
+    
+    .search-query {
+        font-weight: 600;
+        color: $text-color;
+        margin-bottom: 8px;
+        font-size: 0.95em;
+    }
+    
+    .search-status {
+        display: inline-block;
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 0.8em;
+        font-weight: 500;
+        margin-bottom: 8px;
+        
+        &.completed {
+            background-color: rgba(76, 175, 80, 0.2);
+            color: #4caf50;
+        }
+        
+        &.in-progress {
+            background-color: rgba(255, 193, 7, 0.2);
+            color: #ffc107;
+        }
+        
+        &.searching {
+            background-color: rgba(33, 150, 243, 0.2);
+            color: #2196f3;
+        }
+        
+        &.failed {
+            background-color: rgba(244, 67, 54, 0.2);
+            color: #f44336;
+        }
+    }
+    
+    .search-timestamp {
+        font-size: 0.85em;
+        color: rgba(255, 255, 255, 0.6);
+        margin-top: 8px;
+    }
+}
+
+.no-search-data {
+    text-align: center;
+    padding: 40px 20px;
+    color: rgba(255, 255, 255, 0.6);
+    font-style: italic;
+}
+
 .edit-mask-btn {
     background-color: #28a745;
     color: $text-color;
