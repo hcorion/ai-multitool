@@ -2,6 +2,8 @@ import * as utils from "./utils.js";
 import * as chat from "./chat.js";
 import { InpaintingMaskCanvas } from "./inpainting/inpainting-mask-canvas.js";
 import { getElementByIdSafe } from './dom_utils.js';
+import * as agentPresetUI from './agent-preset-ui.js';
+
 
 // TypeScript interfaces for the new image API
 interface ImageOperationResponse {
@@ -1362,10 +1364,15 @@ let allConversations: { [key: string]: ConversationData } = {};
 var currentThreadId: string = "";
 
 /**
- * Initialize chat tab by loading conversation list
+ * Initialize chat tab by loading conversation list and agent presets
  */
 function chatTabLoaded(): void {
     refreshConversationList();
+
+    // Initialize agent preset UI
+    agentPresetUI.initializeAgentPresetUI().catch(error => {
+        console.error('Failed to initialize agent preset UI:', error);
+    });
 }
 
 /**
@@ -1593,12 +1600,17 @@ function sendChatMessage(): void {
 
     // Send the message to the server
     sendChatButton.disabled = true;
+
+    // Get agent preset and reasoning level data
+    const agentPresetData = agentPresetUI.getChatRequestData();
+
     fetchWithStreaming(
         "/chat",
         {
             user_input: userMessage,
             chat_name: chatName,
             thread_id: currentThreadId,
+            ...agentPresetData,
         },
         (chunkData) => {
             var parsedData = JSON.parse(chunkData);
@@ -1683,7 +1695,7 @@ function isScrolledToBottom(element: HTMLElement, threshold: number = 50): boole
 function updateMostRecentChatMessage(messages: chat.ChatMessage[]): void {
     const chatHistory = document.getElementById("chat-history") as HTMLDivElement;
     const wasAtBottom = isScrolledToBottom(chatHistory);
-    
+
     var message = messages[messages.length - 1];
     var converter = new showdown.Converter({
         strikethrough: true,
@@ -1713,7 +1725,7 @@ function updateMostRecentChatMessage(messages: chat.ChatMessage[]): void {
             addReasoningButtonToMessage(lastChildDiv, messages.length - 1);
         }
     }
-    
+
     // Only scroll to bottom if user was already at the bottom
     if (wasAtBottom) {
         chatHistory.scrollTop = chatHistory.scrollHeight;

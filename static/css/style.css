@@ -765,6 +765,7 @@ img {
   display: flex;
   height: calc(100vh - 110px);
   background-color: #121212;
+  position: relative;
 }
 
 .sidebar {
@@ -806,6 +807,7 @@ img {
   flex-grow: 1;
   display: flex;
   flex-direction: column;
+  position: relative;
 }
 .chat-content li p {
   margin-top: 0;
@@ -841,6 +843,545 @@ button#send-chat {
 }
 button#send-chat:hover {
   background-color: #006edc;
+}
+
+.floating-agent-controls {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  z-index: 100;
+  min-width: 260px;
+  max-width: 320px;
+  background: rgba(18, 18, 18, 0.85);
+  backdrop-filter: blur(12px);
+  border-radius: 10px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  transition: all 0.3s ease;
+}
+.tabcontent:not(#Chat) ~ .floating-agent-controls {
+  display: none;
+}
+.floating-agent-controls:hover {
+  background: rgba(18, 18, 18, 0.92);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.floating-agent-controls .preset-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-radius: 10px;
+}
+.floating-agent-controls .preset-header:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.floating-agent-controls .preset-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+.floating-agent-controls .preset-summary .current-agent {
+  font-weight: 600;
+  color: #fff;
+  font-size: 13px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+.floating-agent-controls .preset-summary .current-reasoning {
+  font-size: 10px;
+  font-weight: 600;
+  color: #fff;
+  padding: 3px 7px;
+  background: rgba(10, 132, 255, 0.2);
+  border-radius: 10px;
+  border: 1px solid rgba(10, 132, 255, 0.4);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.floating-agent-controls .preset-summary .current-reasoning.reasoning-override {
+  background: rgba(255, 152, 0, 0.25);
+  border-color: rgba(255, 152, 0, 0.5);
+  color: #ffb74d;
+}
+
+.floating-agent-controls .preset-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.floating-agent-controls .manage-presets-btn,
+.floating-agent-controls .toggle-preset-btn {
+  padding: 5px 7px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  color: #fff;
+  cursor: pointer;
+  font-size: 11px;
+  transition: all 0.2s ease;
+  min-width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(5px);
+}
+.floating-agent-controls .manage-presets-btn:hover,
+.floating-agent-controls .toggle-preset-btn:hover {
+  background: rgba(10, 132, 255, 0.8);
+  border-color: rgba(10, 132, 255, 0.6);
+  color: white;
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(10, 132, 255, 0.4);
+}
+
+.floating-agent-controls .toggle-preset-btn {
+  font-size: 10px;
+  transition: all 0.2s ease;
+}
+.floating-agent-controls .toggle-preset-btn.expanded {
+  transform: rotate(180deg) scale(1.05);
+  background: rgba(52, 152, 219, 0.2);
+}
+.floating-agent-controls .toggle-preset-btn.expanded:hover {
+  transform: rotate(180deg) scale(1.1);
+}
+
+.floating-agent-controls .preset-controls-expanded {
+  padding: 14px;
+  background: rgba(18, 18, 18, 0.95);
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 0 0 10px 10px;
+  display: none;
+  backdrop-filter: blur(8px);
+}
+.floating-agent-controls .preset-controls-expanded.show {
+  display: block;
+}
+
+.floating-agent-controls .preset-selector-group,
+.floating-agent-controls .reasoning-selector-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 10px;
+}
+.floating-agent-controls .preset-selector-group:last-child,
+.floating-agent-controls .reasoning-selector-group:last-child {
+  margin-bottom: 0;
+}
+.floating-agent-controls .preset-selector-group label,
+.floating-agent-controls .reasoning-selector-group label {
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.floating-agent-controls .preset-selector,
+.floating-agent-controls .reasoning-selector {
+  padding: 7px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  background: rgba(18, 18, 18, 0.8);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 500;
+  backdrop-filter: blur(5px);
+  transition: all 0.2s ease;
+}
+.floating-agent-controls .preset-selector:focus,
+.floating-agent-controls .reasoning-selector:focus {
+  outline: none;
+  border-color: rgba(10, 132, 255, 0.6);
+  box-shadow: 0 0 0 2px rgba(10, 132, 255, 0.2);
+  background: rgba(18, 18, 18, 0.95);
+}
+.floating-agent-controls .preset-selector:hover,
+.floating-agent-controls .reasoning-selector:hover {
+  border-color: rgba(10, 132, 255, 0.4);
+  background: rgba(18, 18, 18, 0.9);
+}
+
+.floating-success-message,
+.floating-error-message {
+  position: absolute;
+  top: 70px;
+  right: 15px;
+  z-index: 101;
+  max-width: 320px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  animation: slideInRight 0.3s ease;
+}
+.tabcontent:not(#Chat) ~ .floating-success-message,
+.tabcontent:not(#Chat) ~ .floating-error-message {
+  display: none !important;
+}
+
+.floating-success-message {
+  background: rgba(46, 204, 113, 0.9);
+  color: white;
+  border: 1px solid rgba(46, 204, 113, 0.5);
+}
+
+.floating-error-message {
+  background: rgba(231, 76, 60, 0.9);
+  color: white;
+  border: 1px solid rgba(231, 76, 60, 0.5);
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+@media (max-width: 768px) {
+  .floating-agent-controls {
+    top: 10px;
+    right: 10px;
+    left: 10px;
+    min-width: auto;
+    max-width: none;
+  }
+  .floating-agent-controls .preset-summary {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  .floating-success-message,
+  .floating-error-message {
+    top: 60px;
+    right: 10px;
+    left: 10px;
+    max-width: none;
+  }
+}
+.tabcontent:not(#Chat) ~ .floating-agent-controls, .tabcontent:not(#Chat) ~ .floating-success-message, .tabcontent:not(#Chat) ~ .floating-error-message {
+  display: none !important;
+}
+
+.agent-preset-modal .modal-content {
+  max-width: 600px;
+  width: 90%;
+}
+
+.agent-preset-modal-content .modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 25px 15px;
+  border-bottom: 1px solid #666666;
+}
+.agent-preset-modal-content .modal-header h3 {
+  margin: 0;
+  color: #fff;
+  font-size: 18px;
+}
+.agent-preset-modal-content .modal-header .close {
+  font-size: 24px;
+  cursor: pointer;
+  color: #fff;
+}
+.agent-preset-modal-content .modal-header .close:hover {
+  color: #006edc;
+}
+.agent-preset-modal-content .modal-body {
+  padding: 25px;
+}
+.agent-preset-modal-content .modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 15px 25px 20px;
+  border-top: 1px solid #666666;
+}
+
+.agent-preset-form .form-group {
+  margin-bottom: 20px;
+}
+.agent-preset-form .form-group label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: 500;
+  color: #fff;
+}
+.agent-preset-form .form-group .form-input,
+.agent-preset-form .form-group .form-textarea,
+.agent-preset-form .form-group .form-select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #666666;
+  border-radius: 4px;
+  background-color: #333;
+  color: #fff;
+  font-size: 14px;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+.agent-preset-form .form-group .form-input:focus,
+.agent-preset-form .form-group .form-textarea:focus,
+.agent-preset-form .form-group .form-select:focus {
+  outline: none;
+  border-color: #0a84ff;
+  box-shadow: 0 0 0 2px rgba(10, 132, 255, 0.2);
+}
+.agent-preset-form .form-group .form-input.error,
+.agent-preset-form .form-group .form-textarea.error,
+.agent-preset-form .form-group .form-select.error {
+  border-color: #e74c3c;
+  box-shadow: 0 0 0 2px rgba(231, 76, 60, 0.2);
+}
+.agent-preset-form .form-group .form-textarea {
+  resize: vertical;
+  min-height: 120px;
+}
+.agent-preset-form .form-group .form-help {
+  display: block;
+  margin-top: 5px;
+  font-size: 12px;
+  color: white;
+}
+.agent-preset-form .form-row {
+  display: flex;
+  gap: 15px;
+}
+.agent-preset-form .form-row .form-group {
+  flex: 1;
+}
+@media (max-width: 600px) {
+  .agent-preset-form .form-row {
+    flex-direction: column;
+    gap: 0;
+  }
+}
+
+.primary-button {
+  padding: 10px 20px;
+  background-color: #0a84ff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background-color 0.2s ease;
+}
+.primary-button:hover:not(:disabled) {
+  background-color: #006edc;
+}
+.primary-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.secondary-button {
+  padding: 10px 20px;
+  background-color: transparent;
+  color: #fff;
+  border: 1px solid #666666;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+.secondary-button:hover {
+  background-color: rgb(26.5, 27.9722222222, 53);
+  border-color: #fff;
+}
+
+.danger-button {
+  padding: 10px 20px;
+  background-color: #e74c3c;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background-color 0.2s ease;
+}
+.danger-button:hover:not(:disabled) {
+  background-color: #c0392b;
+}
+.danger-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.success-message {
+  padding: 10px 15px;
+  background-color: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+  border-radius: 4px;
+  margin-bottom: 15px;
+  font-size: 14px;
+}
+
+.error-message {
+  padding: 10px 15px;
+  background-color: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+  border-radius: 4px;
+  margin-bottom: 15px;
+  font-size: 14px;
+}
+.error-message ul {
+  margin: 0;
+  padding-left: 20px;
+}
+.error-message li {
+  margin-bottom: 5px;
+}
+
+.reasoning-override {
+  font-weight: bold;
+  color: #0a84ff;
+}
+
+.reasoning-default {
+  color: #fff;
+}
+
+.preset-management-actions {
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.preset-list {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.preset-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px;
+  margin-bottom: 10px;
+  border: 1px solid #666666;
+  border-radius: 6px;
+  background-color: rgb(21.4, 22.5888888889, 42.8);
+  transition: background-color 0.2s ease;
+}
+.preset-item:hover {
+  background-color: rgb(26.5, 27.9722222222, 53);
+}
+.preset-item.active-preset {
+  border-color: #0a84ff;
+  background-color: rgba(10, 132, 255, 0.1);
+}
+
+.preset-info {
+  flex: 1;
+  margin-right: 15px;
+}
+.preset-info .preset-name {
+  font-weight: 600;
+  font-size: 16px;
+  color: #fff;
+  margin-bottom: 5px;
+}
+.preset-info .preset-details {
+  font-size: 14px;
+  color: white;
+  margin-bottom: 5px;
+}
+.preset-info .preset-details .preset-model {
+  font-weight: 500;
+}
+.preset-info .preset-details .preset-reasoning {
+  margin-left: 10px;
+}
+.preset-info .preset-instructions {
+  font-size: 13px;
+  color: white;
+  max-width: 400px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.preset-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.preset-actions .preset-action-btn {
+  padding: 6px 12px;
+  border: 1px solid #666666;
+  border-radius: 4px;
+  background-color: transparent;
+  color: #fff;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s ease;
+}
+.preset-actions .preset-action-btn:hover {
+  background-color: #0a84ff;
+  border-color: #0a84ff;
+  color: white;
+}
+.preset-actions .preset-action-btn.edit-btn:hover {
+  background-color: #007bff;
+  border-color: #007bff;
+}
+.preset-actions .preset-action-btn.delete-btn:hover {
+  background-color: #e74c3c;
+  border-color: #e74c3c;
+}
+.preset-actions .preset-action-btn.select-btn:hover {
+  background-color: #28a745;
+  border-color: #28a745;
+}
+
+.preset-status {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-weight: 500;
+}
+.preset-status.active {
+  background-color: rgba(10, 132, 255, 0.2);
+  color: #0a84ff;
+}
+.preset-status.default {
+  background-color: rgba(108, 117, 125, 0.2);
+  color: #6c757d;
+}
+
+.empty-message {
+  text-align: center;
+  padding: 40px 20px;
+  color: white;
+  font-style: italic;
+}
+
+.loading-message {
+  text-align: center;
+  padding: 20px;
+  color: white;
 }
 
 /* Example CSS for grid navigation buttons inside the modal */

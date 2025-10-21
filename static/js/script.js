@@ -2,6 +2,7 @@ import * as utils from "./utils.js";
 import * as chat from "./chat.js";
 import { InpaintingMaskCanvas } from "./inpainting/inpainting-mask-canvas.js";
 import { getElementByIdSafe } from './dom_utils.js';
+import * as agentPresetUI from './agent-preset-ui.js';
 document.addEventListener("DOMContentLoaded", () => {
     $("#loading-spinner").hide();
     $("#prompt-form").on("submit", (event) => {
@@ -1199,10 +1200,14 @@ function toggleAdvancedInput(event) {
 let allConversations = {};
 var currentThreadId = "";
 /**
- * Initialize chat tab by loading conversation list
+ * Initialize chat tab by loading conversation list and agent presets
  */
 function chatTabLoaded() {
     refreshConversationList();
+    // Initialize agent preset UI
+    agentPresetUI.initializeAgentPresetUI().catch(error => {
+        console.error('Failed to initialize agent preset UI:', error);
+    });
 }
 /**
  * Load and display user's conversation list from server
@@ -1410,10 +1415,13 @@ function sendChatMessage() {
     }
     // Send the message to the server
     sendChatButton.disabled = true;
+    // Get agent preset and reasoning level data
+    const agentPresetData = agentPresetUI.getChatRequestData();
     fetchWithStreaming("/chat", {
         user_input: userMessage,
         chat_name: chatName,
         thread_id: currentThreadId,
+        ...agentPresetData,
     }, (chunkData) => {
         var parsedData = JSON.parse(chunkData);
         // Weird hack to prevent "too stringified" json blobs getting converted to just strings.

@@ -197,6 +197,41 @@
                 <div id="conversations-list"><!-- Populated in TypeScript at runtime --></div>
             </div>
             <div class="chat-content">
+                <!-- Floating Agent Preset Controls -->
+                <div class="floating-agent-controls" id="floating-agent-controls">
+                    <!-- Compact Header -->
+                    <div class="preset-header" id="preset-header">
+                        <div class="preset-summary">
+                            <span class="current-agent" id="current-agent-display">Default Assistant</span>
+                            <span class="current-reasoning" id="current-reasoning-display">Medium</span>
+                        </div>
+                        <div class="preset-header-actions">
+                            <button id="manage-presets-btn" class="manage-presets-btn" title="Manage Agent Presets">⚙️</button>
+                            <button id="toggle-preset-controls" class="toggle-preset-btn" title="Expand Agent Controls">⮟</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Expandable Controls -->
+                    <div class="preset-controls-expanded" id="preset-controls-expanded" style="display: none;">
+                        <div class="preset-selector-group">
+                            <label for="agent-preset-selector">Agent:</label>
+                            <select id="agent-preset-selector" class="preset-selector">
+                                <option value="">Default Assistant</option>
+                            </select>
+                        </div>
+                        <div class="reasoning-selector-group">
+                            <label for="reasoning-level-selector">Reasoning:</label>
+                            <select id="reasoning-level-selector" class="reasoning-selector">
+                                <option value="">Use Preset Default</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Floating Status Messages for Agent Presets -->
+                <div id="agent-preset-success" class="floating-success-message" style="display: none;"></div>
+                <div id="agent-preset-error" class="floating-error-message" style="display: none;"></div>
+                
                 <div id="chat-history"><!-- Populated in TypeScript at runtime --></div>
                 <div id="chat-current-status">Awaiting Input...</div>
                 <div class="input-area">
@@ -205,6 +240,7 @@
                 </div>
             </div>
         </div>
+
     </div>
     <div id="PromptFiles" class="tabcontent">
         <div class="prompt-files-container">
@@ -281,6 +317,89 @@
                 <div id="search-content" class="tab-content" data-tab="search" style="display: none;">
                     <!-- Web search content will be populated here -->
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Agent Preset Management Modal -->
+    <div id="agent-preset-management-modal" class="modal agent-preset-modal" style="display: none;">
+        <div class="modal-content agent-preset-modal-content">
+            <div class="modal-header">
+                <h3>Manage Agent Presets</h3>
+                <span class="close" id="preset-management-modal-close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="preset-management-actions">
+                    <button id="create-new-preset-btn" class="primary-button">Create New Preset</button>
+                </div>
+                
+                <div id="preset-list-container">
+                    <div id="preset-list-loading" class="loading-message" style="display: none;">
+                        Loading presets...
+                    </div>
+                    <div id="preset-list" class="preset-list">
+                        <!-- Preset list will be populated here -->
+                    </div>
+                    <div id="no-presets-message" class="empty-message" style="display: none;">
+                        No custom presets found. Create your first preset to get started!
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Agent Preset Form Modal -->
+    <div id="agent-preset-modal" class="modal agent-preset-modal" style="display: none;">
+        <div class="modal-content agent-preset-modal-content">
+            <div class="modal-header">
+                <h3 id="preset-modal-title">Create New Agent Preset</h3>
+                <span class="close" id="preset-modal-close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div id="preset-form-errors" class="error-message" style="display: none;">
+                    <!-- Form validation errors will be displayed here -->
+                </div>
+                
+                <form id="agent-preset-form" class="agent-preset-form">
+                    <div class="form-group">
+                        <label for="preset-name">Name:</label>
+                        <input type="text" id="preset-name" class="form-input" placeholder="My Custom Assistant" maxlength="100" required>
+                        <small class="form-help">A descriptive name for your agent preset</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="preset-instructions">Instructions:</label>
+                        <textarea id="preset-instructions" class="form-textarea" rows="8" placeholder="You are a helpful assistant that..." maxlength="5000" required></textarea>
+                        <small class="form-help">System instructions that define the agent's behavior and personality</small>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="preset-model">Model:</label>
+                            <select id="preset-model" class="form-select" required>
+                                <option value="gpt-5">GPT-5 (Standard)</option>
+                                <option value="gpt-5-mini">GPT-5 Mini (Fast)</option>
+                                <option value="gpt-5-pro">GPT-5 Pro (Advanced)</option>
+                            </select>
+                            <small class="form-help">AI model to use for this preset</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="preset-reasoning-level">Default Reasoning Level:</label>
+                            <select id="preset-reasoning-level" class="form-select" required>
+                                <option value="high">High (Detailed Analysis)</option>
+                                <option value="medium">Medium (Balanced)</option>
+                                <option value="low">Low (Quick Response)</option>
+                            </select>
+                            <small class="form-help">Default reasoning intensity for this preset</small>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button id="preset-modal-save" class="primary-button">Create Preset</button>
+                <button id="preset-modal-delete" class="danger-button" style="display: none;">Delete Preset</button>
+                <button id="preset-modal-cancel" class="secondary-button">Cancel</button>
             </div>
         </div>
     </div>
