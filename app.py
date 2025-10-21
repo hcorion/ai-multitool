@@ -358,6 +358,42 @@ def validate_reasoning_data(
     return reasoning_data
 
 
+class AgentPreset(BaseModel):
+    """Pydantic model for agent preset configuration."""
+    
+    id: str = Field(..., description="Unique identifier for the preset")
+    name: str = Field(..., description="User-friendly name for the preset")
+    instructions: str = Field(..., description="System instructions for the agent")
+    model: str = Field(
+        default="gpt-5", 
+        description="Model to use (gpt-5, gpt-5-mini, gpt-5-pro)"
+    )
+    default_reasoning_level: str = Field(
+        default="medium", 
+        description="Default reasoning level (high, medium, low)"
+    )
+    created_at: int = Field(..., description="Unix timestamp of creation")
+    updated_at: int = Field(..., description="Unix timestamp of last update")
+
+    @field_validator("model")
+    @classmethod
+    def validate_model(cls, v: str) -> str:
+        """Validate model type."""
+        valid_models = {"gpt-5", "gpt-5-mini", "gpt-5-pro"}
+        if v not in valid_models:
+            raise ValueError(f"Model must be one of {valid_models}, got: {v}")
+        return v
+
+    @field_validator("default_reasoning_level")
+    @classmethod
+    def validate_reasoning_level(cls, v: str) -> str:
+        """Validate reasoning level."""
+        valid_levels = {"high", "medium", "low"}
+        if v not in valid_levels:
+            raise ValueError(f"Reasoning level must be one of {valid_levels}, got: {v}")
+        return v
+
+
 class ChatMessage(BaseModel):
     """Pydantic model for individual chat messages."""
 
@@ -370,6 +406,15 @@ class ChatMessage(BaseModel):
     reasoning_data: Dict[str, Any] | None = Field(
         None, description="Reasoning summary data for assistant messages"
     )
+    agent_preset_id: str | None = Field(
+        None, description="ID of agent preset used for this message"
+    )
+    model: str | None = Field(
+        None, description="Model used for this message"
+    )
+    reasoning_level: str | None = Field(
+        None, description="Reasoning level used for this message"
+    )
 
     @field_validator("reasoning_data")
     @classmethod
@@ -378,6 +423,28 @@ class ChatMessage(BaseModel):
     ) -> Dict[str, Any] | None:
         """Validate reasoning data structure."""
         return validate_reasoning_data(v)
+
+    @field_validator("model")
+    @classmethod
+    def validate_model_field(cls, v: str | None) -> str | None:
+        """Validate model type if provided."""
+        if v is None:
+            return v
+        valid_models = {"gpt-5", "gpt-5-mini", "gpt-5-pro"}
+        if v not in valid_models:
+            raise ValueError(f"Model must be one of {valid_models}, got: {v}")
+        return v
+
+    @field_validator("reasoning_level")
+    @classmethod
+    def validate_reasoning_level_field(cls, v: str | None) -> str | None:
+        """Validate reasoning level if provided."""
+        if v is None:
+            return v
+        valid_levels = {"high", "medium", "low"}
+        if v not in valid_levels:
+            raise ValueError(f"Reasoning level must be one of {valid_levels}, got: {v}")
+        return v
 
 
 class Conversation(BaseModel):
@@ -929,6 +996,229 @@ class ConversationManager:
             }
 
 
+class AgentPresetManager:
+    """Manages agent preset storage and CRUD operations with file-based storage."""
+
+    def __init__(self, static_folder: str):
+        self.static_folder = static_folder
+        self.agents_dir = os.path.join(static_folder, "agents")
+        os.makedirs(self.agents_dir, exist_ok=True)
+
+        # Add thread locks for concurrent access protection
+        self._user_locks: Dict[str, threading.Lock] = {}
+        self._locks_lock = threading.Lock()
+
+    def _get_user_lock(self, username: str) -> threading.Lock:
+        """Get or create a thread lock for safe concurrent access to user data."""
+        with self._locks_lock:
+            if username not in self._user_locks:
+                self._user_locks[username] = threading.Lock()
+            return self._user_locks[username]
+
+    def _get_user_file_path(self, username: str) -> str:
+        """Get the JSON file path for storing user's agent presets."""
+        return os.path.join(self.agents_dir, f"{username}.json")
+
+    def _load_user_presets(self, username: str) -> Dict[str, AgentPreset]:
+        """Load all agent presets for a user from their JSON file with comprehensive error handling."""
+        with self._get_user_lock(username):
+            user_file = self._get_user_file_path(username)
+            if os.path.exists(user_file):
+                try:
+                    with open(user_file, "r", encoding="utf-8") as file:
+                        data = json.load(file)
+                        presets = {}
+                        for preset_id, preset_data in data.get("presets", {}).items():
+                            try:
+                                presets[preset_id] = AgentPreset.model_validate(preset_data)
+                            except ValueError as e:
+                                logging.error(f"Invalid preset data for {preset_id}: {e}")
+                                continue
+                        return presets
+                except json.JSONDecodeError as e:
+                    logging.error(f"JSON decode error loading presets for {username}: {e}")
+                    # Try to create backup of corrupted file
+                    try:
+                        backup_file = f"{user_file}.backup.{int(time.time())}"
+                        import shutil
+                        shutil.copy2(user_file, backup_file)
+                        logging.info(f"Created backup of corrupted file: {backup_file}")
+                    except Exception as backup_error:
+                        logging.error(f"Failed to create backup: {backup_error}")
+                    return {}
+                except IOError as e:
+                    logging.error(f"IO error loading presets for {username}: {e}")
+                    return {}
+                except Exception as e:
+                    logging.error(f"Unexpected error loading presets for {username}: {e}", exc_info=True)
+                    return {}
+            return {}
+
+    def _save_user_presets(self, username: str, presets: Dict[str, AgentPreset]) -> None:
+        """Save all agent presets for a user to their JSON file with comprehensive error handling and thread safety."""
+        with self._get_user_lock(username):
+            user_file = self._get_user_file_path(username)
+            # Use unique temp file name to avoid conflicts
+            temp_file = f"{user_file}.tmp.{threading.current_thread().ident}.{int(time.time() * 1000000)}"
+
+            try:
+                # Write to temporary file first for atomic operation
+                with open(temp_file, "w", encoding="utf-8") as file:
+                    # Convert Pydantic models to JSON-serializable format
+                    data = {
+                        "presets": {
+                            preset_id: preset.model_dump()
+                            for preset_id, preset in presets.items()
+                        }
+                    }
+                    json.dump(data, file, indent=2, ensure_ascii=False)
+
+                # Atomic move to final location
+                import shutil
+                shutil.move(temp_file, user_file)
+
+            except IOError as e:
+                logging.error(f"IO error saving presets for {username}: {e}")
+                # Clean up temp file if it exists
+                try:
+                    if os.path.exists(temp_file):
+                        os.remove(temp_file)
+                except OSError:
+                    pass
+                raise IOError(f"Failed to save presets for {username}: {e}")
+            except json.JSONEncodeError as e:
+                logging.error(f"JSON encode error saving presets for {username}: {e}")
+                # Clean up temp file if it exists
+                try:
+                    if os.path.exists(temp_file):
+                        os.remove(temp_file)
+                except OSError:
+                    pass
+                raise ValueError(f"Failed to encode presets for {username}: {e}")
+            except Exception as e:
+                logging.error(f"Unexpected error saving presets for {username}: {e}", exc_info=True)
+                # Clean up temp file if it exists
+                try:
+                    if os.path.exists(temp_file):
+                        os.remove(temp_file)
+                except OSError:
+                    pass
+                raise Exception(f"Unexpected error saving presets for {username}: {e}")
+
+    def create_preset(self, username: str, preset: AgentPreset) -> str:
+        """Create a new agent preset and return its ID."""
+        try:
+            presets = self._load_user_presets(username)
+            
+            # Ensure the preset has a unique ID
+            if preset.id in presets:
+                raise ValueError(f"Preset with ID {preset.id} already exists")
+            
+            # Set creation and update timestamps
+            current_time = int(time.time())
+            preset.created_at = current_time
+            preset.updated_at = current_time
+            
+            presets[preset.id] = preset
+            self._save_user_presets(username, presets)
+            
+            logging.info(f"Created agent preset {preset.id} for user {username}")
+            return preset.id
+            
+        except Exception as e:
+            logging.error(f"Error creating preset for {username}: {e}", exc_info=True)
+            raise
+
+    def get_preset(self, username: str, preset_id: str) -> AgentPreset | None:
+        """Retrieve a specific agent preset by ID."""
+        try:
+            presets = self._load_user_presets(username)
+            return presets.get(preset_id)
+        except Exception as e:
+            logging.error(f"Error getting preset {preset_id} for {username}: {e}", exc_info=True)
+            return None
+
+    def list_presets(self, username: str) -> List[AgentPreset]:
+        """List all agent presets for a user."""
+        try:
+            presets = self._load_user_presets(username)
+            return list(presets.values())
+        except Exception as e:
+            logging.error(f"Error listing presets for {username}: {e}", exc_info=True)
+            return []
+
+    def update_preset(self, username: str, preset: AgentPreset) -> bool:
+        """Update an existing agent preset."""
+        try:
+            presets = self._load_user_presets(username)
+            
+            if preset.id not in presets:
+                logging.warning(f"Preset {preset.id} not found for user {username}")
+                return False
+            
+            # Update timestamp
+            preset.updated_at = int(time.time())
+            
+            presets[preset.id] = preset
+            self._save_user_presets(username, presets)
+            
+            logging.info(f"Updated agent preset {preset.id} for user {username}")
+            return True
+            
+        except Exception as e:
+            logging.error(f"Error updating preset {preset.id} for {username}: {e}", exc_info=True)
+            return False
+
+    def delete_preset(self, username: str, preset_id: str) -> bool:
+        """Delete an agent preset."""
+        try:
+            presets = self._load_user_presets(username)
+            
+            if preset_id not in presets:
+                logging.warning(f"Preset {preset_id} not found for user {username}")
+                return False
+            
+            # Prevent deletion of default preset
+            if preset_id == "default":
+                logging.warning(f"Cannot delete default preset for user {username}")
+                return False
+            
+            del presets[preset_id]
+            self._save_user_presets(username, presets)
+            
+            logging.info(f"Deleted agent preset {preset_id} for user {username}")
+            return True
+            
+        except Exception as e:
+            logging.error(f"Error deleting preset {preset_id} for {username}: {e}", exc_info=True)
+            return False
+
+    def get_default_preset(self) -> AgentPreset:
+        """Get the built-in default agent preset."""
+        current_time = int(time.time())
+        return AgentPreset(
+            id="default",
+            name="Default Assistant",
+            instructions="You are a helpful AI assistant. Provide clear, accurate, and helpful responses to user questions.",
+            model="gpt-5",
+            default_reasoning_level="medium",
+            created_at=current_time,
+            updated_at=current_time
+        )
+
+    def ensure_default_preset(self, username: str) -> None:
+        """Ensure the user has a default preset available."""
+        try:
+            presets = self._load_user_presets(username)
+            if "default" not in presets:
+                default_preset = self.get_default_preset()
+                presets["default"] = default_preset
+                self._save_user_presets(username, presets)
+                logging.info(f"Created default preset for user {username}")
+        except Exception as e:
+            logging.error(f"Error ensuring default preset for {username}: {e}", exc_info=True)
+
+
 class ResponsesAPIClient:
     """Client wrapper for OpenAI Responses API with o4-mini model."""
 
@@ -1244,6 +1534,9 @@ Generate only the title (no quotes, no extra text)."""
 
 # Initialize the conversation manager
 conversation_manager = ConversationManager(app.static_folder or "static")
+
+# Initialize the agent preset manager
+agent_preset_manager = AgentPresetManager(app.static_folder or "static")
 
 # Initialize the Responses API client
 responses_client = ResponsesAPIClient(client)
