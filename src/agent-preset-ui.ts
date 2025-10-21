@@ -240,13 +240,15 @@ function renderAgentPresetSelector(): void {
     defaultOption.textContent = 'Default Assistant';
     selector.appendChild(defaultOption);
     
-    // Add preset options
-    allAgentPresets.forEach(preset => {
-        const option = document.createElement('option');
-        option.value = preset.id;
-        option.textContent = preset.name;
-        selector.appendChild(option);
-    });
+    // Add preset options (filter out the default preset since we already added it manually)
+    allAgentPresets
+        .filter(preset => preset.id !== 'default')
+        .forEach(preset => {
+            const option = document.createElement('option');
+            option.value = preset.id;
+            option.textContent = preset.name;
+            selector.appendChild(option);
+        });
     
     // Set current selection
     if (agentPresets.chatState.activeAgentPreset) {

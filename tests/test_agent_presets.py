@@ -348,14 +348,14 @@ class TestAgentPresetManager:
     def test_delete_default_preset_protection(self, manager):
         """Test that default preset cannot be deleted."""
         username = 'testuser'
-        manager.ensure_default_preset(username)
         
         success = manager.delete_preset(username, 'default')
         assert success is False
         
-        # Verify default preset still exists
-        default_preset = manager.get_preset(username, 'default')
+        # Verify default preset is still available via get_default_preset
+        default_preset = manager.get_default_preset()
         assert default_preset is not None
+        assert default_preset.id == 'default'
 
     def test_get_default_preset(self, manager):
         """Test getting the built-in default preset."""
@@ -368,20 +368,30 @@ class TestAgentPresetManager:
         assert len(default_preset.instructions) > 0
 
     def test_ensure_default_preset(self, manager):
-        """Test ensuring default preset exists for a user."""
+        """Test ensuring default preset removes any stored default from user files."""
         username = 'testuser'
         
         # Initially no presets
         presets = manager.list_presets(username)
         assert len(presets) == 0
         
-        # Ensure default preset
-        manager.ensure_default_preset(username)
+        # Manually add a default preset to simulate old behavior
+        user_presets = manager._load_user_presets(username)
+        default_preset = manager.get_default_preset()
+        user_presets["default"] = default_preset
+        manager._save_user_presets(username, user_presets)
         
-        # Verify default preset was created
+        # Verify it was stored
         presets = manager.list_presets(username)
         assert len(presets) == 1
         assert presets[0].id == 'default'
+        
+        # Ensure default preset (should remove the stored one)
+        manager.ensure_default_preset(username)
+        
+        # Verify default preset was removed from storage
+        presets = manager.list_presets(username)
+        assert len(presets) == 0
 
     def test_file_storage_persistence(self, manager, sample_preset, temp_dir):
         """Test that presets are properly persisted to file storage."""

@@ -1254,37 +1254,13 @@ code
         try:
             presets = self._load_user_presets(username)
 
-            # Check if default preset exists and is valid
-            if "default" not in presets:
-                default_preset = self.get_default_preset()
-                presets["default"] = default_preset
+            # Remove any stored default preset from user files - it should be built-in only
+            if "default" in presets:
+                del presets["default"]
                 self._save_user_presets(username, presets)
-                logging.info(f"Created default preset for user {username}")
-            else:
-                # Verify the existing default preset is valid and update if needed
-                existing_default = presets["default"]
-                current_default = self.get_default_preset()
-
-                # Check if the default preset needs to be updated (e.g., instructions changed)
-                if (
-                    existing_default.instructions != current_default.instructions
-                    or existing_default.model != current_default.model
-                    or existing_default.default_reasoning_level
-                    != current_default.default_reasoning_level
-                ):
-                    # Update the default preset while preserving creation time
-                    updated_default = AgentPreset(
-                        id="default",
-                        name=current_default.name,
-                        instructions=current_default.instructions,
-                        model=current_default.model,
-                        default_reasoning_level=current_default.default_reasoning_level,
-                        created_at=existing_default.created_at,
-                        updated_at=int(time.time()),
-                    )
-                    presets["default"] = updated_default
-                    self._save_user_presets(username, presets)
-                    logging.info(f"Updated default preset for user {username}")
+                logging.info(
+                    f"Removed stored default preset for user {username} - using built-in default"
+                )
 
         except Exception as e:
             logging.error(
@@ -3392,9 +3368,6 @@ def converse():
         model = None
         effective_reasoning_level = None
 
-        # Ensure default preset exists for the user
-        agent_preset_manager.ensure_default_preset(username)
-
         if agent_preset_id:
             # Load specific agent preset with fallback to default
             agent_preset = agent_preset_manager.get_preset_with_fallback(
@@ -4920,9 +4893,6 @@ def manage_agent_presets():
 
     try:
         if request.method == "GET":
-            # Ensure default preset exists first
-            agent_preset_manager.ensure_default_preset(username)
-
             # List all agent presets for the user
             presets = agent_preset_manager.list_presets(username)
 

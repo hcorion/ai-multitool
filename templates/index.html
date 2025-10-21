@@ -206,17 +206,19 @@
                             <span class="current-reasoning" id="current-reasoning-display">Medium</span>
                         </div>
                         <div class="preset-header-actions">
-                            <button id="manage-presets-btn" class="manage-presets-btn" title="Manage Agent Presets">⚙️</button>
-                            <button id="toggle-preset-controls" class="toggle-preset-btn" title="Expand Agent Controls">⮟</button>
+                            <button id="manage-presets-btn" class="manage-presets-btn"
+                                title="Manage Agent Presets">⚙️</button>
+                            <button id="toggle-preset-controls" class="toggle-preset-btn"
+                                title="Expand Agent Controls">⮟</button>
                         </div>
                     </div>
-                    
+
                     <!-- Expandable Controls -->
                     <div class="preset-controls-expanded" id="preset-controls-expanded" style="display: none;">
                         <div class="preset-selector-group">
                             <label for="agent-preset-selector">Agent:</label>
                             <select id="agent-preset-selector" class="preset-selector">
-                                <option value="">Default Assistant</option>
+                                <!-- Options populated by JavaScript -->
                             </select>
                         </div>
                         <div class="reasoning-selector-group">
@@ -227,11 +229,11 @@
                         </div>
                     </div>
                 </div>
-                
+
                 <!-- Floating Status Messages for Agent Presets -->
                 <div id="agent-preset-success" class="floating-success-message" style="display: none;"></div>
                 <div id="agent-preset-error" class="floating-error-message" style="display: none;"></div>
-                
+
                 <div id="chat-history"><!-- Populated in TypeScript at runtime --></div>
                 <div id="chat-current-status">Awaiting Input...</div>
                 <div class="input-area">
@@ -239,7 +241,8 @@
                         <div class="reasoning-level-indicator" id="reasoning-level-indicator" style="display: none;">
                             <span class="indicator-label">Reasoning Override:</span>
                             <span class="indicator-value" id="reasoning-override-display"></span>
-                            <button class="clear-override-btn" id="clear-reasoning-override" title="Clear reasoning level override">×</button>
+                            <button class="clear-override-btn" id="clear-reasoning-override"
+                                title="Clear reasoning level override">×</button>
                         </div>
                     </div>
                     <textarea id="chat-input" placeholder="Type your message here..."></textarea>
@@ -339,7 +342,7 @@
                 <div class="preset-management-actions">
                     <button id="create-new-preset-btn" class="primary-button">Create New Preset</button>
                 </div>
-                
+
                 <div id="preset-list-container">
                     <div id="preset-list-loading" class="loading-message" style="display: none;">
                         Loading presets...
@@ -366,20 +369,23 @@
                 <div id="preset-form-errors" class="error-message" style="display: none;">
                     <!-- Form validation errors will be displayed here -->
                 </div>
-                
+
                 <form id="agent-preset-form" class="agent-preset-form">
                     <div class="form-group">
                         <label for="preset-name">Name:</label>
-                        <input type="text" id="preset-name" class="form-input" placeholder="My Custom Assistant" maxlength="100" required>
+                        <input type="text" id="preset-name" class="form-input" placeholder="My Custom Assistant"
+                            maxlength="100" required>
                         <small class="form-help">A descriptive name for your agent preset</small>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="preset-instructions">Instructions:</label>
-                        <textarea id="preset-instructions" class="form-textarea" rows="8" placeholder="You are a helpful assistant that..." maxlength="5000" required></textarea>
-                        <small class="form-help">System instructions that define the agent's behavior and personality</small>
+                        <textarea id="preset-instructions" class="form-textarea" rows="8"
+                            placeholder="You are a helpful assistant that..." maxlength="5000" required></textarea>
+                        <small class="form-help">System instructions that define the agent's behavior and
+                            personality</small>
                     </div>
-                    
+
                     <div class="form-row">
                         <div class="form-group">
                             <label for="preset-model">Model:</label>
@@ -390,7 +396,7 @@
                             </select>
                             <small class="form-help">AI model to use for this preset</small>
                         </div>
-                        
+
                         <div class="form-group">
                             <label for="preset-reasoning-level">Default Reasoning Level:</label>
                             <select id="preset-reasoning-level" class="form-select" required>
