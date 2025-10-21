@@ -232,7 +232,7 @@ class TestResponsesAPIClientReasoning:
         # Check that reasoning is configured correctly
         assert "reasoning" in call_kwargs
         reasoning_config = call_kwargs["reasoning"]
-        assert reasoning_config["effort"] == "high"
+        assert reasoning_config["effort"] == "medium"  # Default reasoning level is medium
         assert reasoning_config["summary"] == "detailed"
 
         # Verify other expected parameters
@@ -259,7 +259,7 @@ class TestResponsesAPIClientReasoning:
         call_kwargs = mock_openai_client.responses.create.call_args[1]
 
         # Verify reasoning config is still present
-        assert call_kwargs["reasoning"]["effort"] == "high"
+        assert call_kwargs["reasoning"]["effort"] == "medium"  # Default reasoning level is medium
         assert call_kwargs["reasoning"]["summary"] == "detailed"
 
         # Verify other parameters
@@ -281,12 +281,73 @@ class TestResponsesAPIClientReasoning:
         mock_openai_client.responses.create.assert_called_once()
         call_kwargs = mock_openai_client.responses.create.call_args[1]
 
-        assert call_kwargs["reasoning"]["effort"] == "high"
+        assert call_kwargs["reasoning"]["effort"] == "medium"  # Default reasoning level is medium
         assert call_kwargs["reasoning"]["summary"] == "detailed"
 
         # Verify error was handled
         assert isinstance(result, dict)
         assert "error" in result
+
+    def test_model_validation_valid_models(self, mock_openai_client):
+        """Test that valid models are accepted."""
+        client = ResponsesAPIClient(mock_openai_client)
+        mock_openai_client.responses.create.return_value = Mock()
+        
+        # Test each valid model
+        for model in ["gpt-5", "gpt-5-mini", "gpt-5-pro"]:
+            client.create_response("test input", model=model)
+            call_kwargs = mock_openai_client.responses.create.call_args[1]
+            assert call_kwargs["model"] == model
+
+    def test_model_validation_invalid_model_fallback(self, mock_openai_client):
+        """Test that invalid models fall back to default."""
+        client = ResponsesAPIClient(mock_openai_client)
+        mock_openai_client.responses.create.return_value = Mock()
+        
+        # Test invalid model
+        client.create_response("test input", model="invalid-model")
+        call_kwargs = mock_openai_client.responses.create.call_args[1]
+        assert call_kwargs["model"] == "gpt-5"  # Should fall back to default
+
+    def test_reasoning_level_validation(self, mock_openai_client):
+        """Test reasoning level validation and configuration."""
+        client = ResponsesAPIClient(mock_openai_client)
+        mock_openai_client.responses.create.return_value = Mock()
+        
+        # Test valid reasoning levels
+        test_cases = [
+            ("high", {"effort": "high", "summary": "detailed"}),
+            ("medium", {"effort": "medium", "summary": "detailed"}),
+            ("low", {"effort": "low", "summary": "concise"}),
+        ]
+        
+        for level, expected_config in test_cases:
+            client.create_response("test input", reasoning_level=level)
+            call_kwargs = mock_openai_client.responses.create.call_args[1]
+            assert call_kwargs["reasoning"] == expected_config
+
+    def test_reasoning_level_invalid_fallback(self, mock_openai_client):
+        """Test that invalid reasoning levels fall back to default."""
+        client = ResponsesAPIClient(mock_openai_client)
+        mock_openai_client.responses.create.return_value = Mock()
+        
+        # Test invalid reasoning level
+        client.create_response("test input", reasoning_level="invalid-level")
+        call_kwargs = mock_openai_client.responses.create.call_args[1]
+        assert call_kwargs["reasoning"]["effort"] == "medium"  # Should fall back to default
+
+    def test_gpt5_pro_reasoning_override(self, mock_openai_client):
+        """Test that gpt-5-pro always uses high reasoning effort."""
+        client = ResponsesAPIClient(mock_openai_client)
+        mock_openai_client.responses.create.return_value = Mock()
+        
+        # Test that gpt-5-pro overrides reasoning level to high
+        for requested_level in ["low", "medium", "high"]:
+            client.create_response("test input", model="gpt-5-pro", reasoning_level=requested_level)
+            call_kwargs = mock_openai_client.responses.create.call_args[1]
+            assert call_kwargs["model"] == "gpt-5-pro"
+            assert call_kwargs["reasoning"]["effort"] == "high"
+            assert call_kwargs["reasoning"]["summary"] == "detailed"
 
 
 class TestConversationManagerReasoning:

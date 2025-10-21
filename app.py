@@ -360,17 +360,15 @@ def validate_reasoning_data(
 
 class AgentPreset(BaseModel):
     """Pydantic model for agent preset configuration."""
-    
+
     id: str = Field(..., description="Unique identifier for the preset")
     name: str = Field(..., description="User-friendly name for the preset")
     instructions: str = Field(..., description="System instructions for the agent")
     model: str = Field(
-        default="gpt-5", 
-        description="Model to use (gpt-5, gpt-5-mini, gpt-5-pro)"
+        default="gpt-5", description="Model to use (gpt-5, gpt-5-mini, gpt-5-pro)"
     )
     default_reasoning_level: str = Field(
-        default="medium", 
-        description="Default reasoning level (high, medium, low)"
+        default="medium", description="Default reasoning level (high, medium, low)"
     )
     created_at: int = Field(..., description="Unix timestamp of creation")
     updated_at: int = Field(..., description="Unix timestamp of last update")
@@ -409,9 +407,7 @@ class ChatMessage(BaseModel):
     agent_preset_id: str | None = Field(
         None, description="ID of agent preset used for this message"
     )
-    model: str | None = Field(
-        None, description="Model used for this message"
-    )
+    model: str | None = Field(None, description="Model used for this message")
     reasoning_level: str | None = Field(
         None, description="Reasoning level used for this message"
     )
@@ -466,6 +462,9 @@ class Conversation(BaseModel):
         content: str,
         response_id: str | None = None,
         reasoning_data: Dict[str, Any] | None = None,
+        agent_preset_id: str | None = None,
+        model: str | None = None,
+        reasoning_level: str | None = None,
     ) -> None:
         """Add a message to the conversation."""
         message = ChatMessage(
@@ -474,6 +473,9 @@ class Conversation(BaseModel):
             timestamp=int(time.time()),
             response_id=response_id,
             reasoning_data=reasoning_data,
+            agent_preset_id=agent_preset_id,
+            model=model,
+            reasoning_level=reasoning_level,
         )
         self.messages.append(message)
         self.last_update = int(time.time())
@@ -731,6 +733,9 @@ class ConversationManager:
         content: str,
         response_id: str | None = None,
         reasoning_data: Dict[str, Any] | None = None,
+        agent_preset_id: str | None = None,
+        model: str | None = None,
+        reasoning_level: str | None = None,
     ) -> None:
         """Add a message to a conversation."""
         user_conversations = self._load_user_conversations(username)
@@ -741,8 +746,16 @@ class ConversationManager:
                 f"Conversation {conversation_id} not found for user {username}"
             )
 
-        # Use the Pydantic model's add_message method
-        conversation.add_message(role, content, response_id, reasoning_data)
+        # Use the Pydantic model's add_message method with agent preset metadata
+        conversation.add_message(
+            role,
+            content,
+            response_id,
+            reasoning_data,
+            agent_preset_id,
+            model,
+            reasoning_level,
+        )
 
         self._save_user_conversations(username, user_conversations)
 
@@ -1030,17 +1043,24 @@ class AgentPresetManager:
                         presets = {}
                         for preset_id, preset_data in data.get("presets", {}).items():
                             try:
-                                presets[preset_id] = AgentPreset.model_validate(preset_data)
+                                presets[preset_id] = AgentPreset.model_validate(
+                                    preset_data
+                                )
                             except ValueError as e:
-                                logging.error(f"Invalid preset data for {preset_id}: {e}")
+                                logging.error(
+                                    f"Invalid preset data for {preset_id}: {e}"
+                                )
                                 continue
                         return presets
                 except json.JSONDecodeError as e:
-                    logging.error(f"JSON decode error loading presets for {username}: {e}")
+                    logging.error(
+                        f"JSON decode error loading presets for {username}: {e}"
+                    )
                     # Try to create backup of corrupted file
                     try:
                         backup_file = f"{user_file}.backup.{int(time.time())}"
                         import shutil
+
                         shutil.copy2(user_file, backup_file)
                         logging.info(f"Created backup of corrupted file: {backup_file}")
                     except Exception as backup_error:
@@ -1050,11 +1070,16 @@ class AgentPresetManager:
                     logging.error(f"IO error loading presets for {username}: {e}")
                     return {}
                 except Exception as e:
-                    logging.error(f"Unexpected error loading presets for {username}: {e}", exc_info=True)
+                    logging.error(
+                        f"Unexpected error loading presets for {username}: {e}",
+                        exc_info=True,
+                    )
                     return {}
             return {}
 
-    def _save_user_presets(self, username: str, presets: Dict[str, AgentPreset]) -> None:
+    def _save_user_presets(
+        self, username: str, presets: Dict[str, AgentPreset]
+    ) -> None:
         """Save all agent presets for a user to their JSON file with comprehensive error handling and thread safety."""
         with self._get_user_lock(username):
             user_file = self._get_user_file_path(username)
@@ -1075,6 +1100,7 @@ class AgentPresetManager:
 
                 # Atomic move to final location
                 import shutil
+
                 shutil.move(temp_file, user_file)
 
             except IOError as e:
@@ -1096,7 +1122,10 @@ class AgentPresetManager:
                     pass
                 raise ValueError(f"Failed to encode presets for {username}: {e}")
             except Exception as e:
-                logging.error(f"Unexpected error saving presets for {username}: {e}", exc_info=True)
+                logging.error(
+                    f"Unexpected error saving presets for {username}: {e}",
+                    exc_info=True,
+                )
                 # Clean up temp file if it exists
                 try:
                     if os.path.exists(temp_file):
@@ -1109,22 +1138,22 @@ class AgentPresetManager:
         """Create a new agent preset and return its ID."""
         try:
             presets = self._load_user_presets(username)
-            
+
             # Ensure the preset has a unique ID
             if preset.id in presets:
                 raise ValueError(f"Preset with ID {preset.id} already exists")
-            
+
             # Set creation and update timestamps
             current_time = int(time.time())
             preset.created_at = current_time
             preset.updated_at = current_time
-            
+
             presets[preset.id] = preset
             self._save_user_presets(username, presets)
-            
+
             logging.info(f"Created agent preset {preset.id} for user {username}")
             return preset.id
-            
+
         except Exception as e:
             logging.error(f"Error creating preset for {username}: {e}", exc_info=True)
             raise
@@ -1135,7 +1164,9 @@ class AgentPresetManager:
             presets = self._load_user_presets(username)
             return presets.get(preset_id)
         except Exception as e:
-            logging.error(f"Error getting preset {preset_id} for {username}: {e}", exc_info=True)
+            logging.error(
+                f"Error getting preset {preset_id} for {username}: {e}", exc_info=True
+            )
             return None
 
     def list_presets(self, username: str) -> List[AgentPreset]:
@@ -1151,80 +1182,197 @@ class AgentPresetManager:
         """Update an existing agent preset."""
         try:
             presets = self._load_user_presets(username)
-            
+
             if preset.id not in presets:
                 logging.warning(f"Preset {preset.id} not found for user {username}")
                 return False
-            
+
             # Update timestamp
             preset.updated_at = int(time.time())
-            
+
             presets[preset.id] = preset
             self._save_user_presets(username, presets)
-            
+
             logging.info(f"Updated agent preset {preset.id} for user {username}")
             return True
-            
+
         except Exception as e:
-            logging.error(f"Error updating preset {preset.id} for {username}: {e}", exc_info=True)
+            logging.error(
+                f"Error updating preset {preset.id} for {username}: {e}", exc_info=True
+            )
             return False
 
     def delete_preset(self, username: str, preset_id: str) -> bool:
         """Delete an agent preset."""
         try:
             presets = self._load_user_presets(username)
-            
+
             if preset_id not in presets:
                 logging.warning(f"Preset {preset_id} not found for user {username}")
                 return False
-            
+
             # Prevent deletion of default preset
             if preset_id == "default":
                 logging.warning(f"Cannot delete default preset for user {username}")
                 return False
-            
+
             del presets[preset_id]
             self._save_user_presets(username, presets)
-            
+
             logging.info(f"Deleted agent preset {preset_id} for user {username}")
             return True
-            
+
         except Exception as e:
-            logging.error(f"Error deleting preset {preset_id} for {username}: {e}", exc_info=True)
+            logging.error(
+                f"Error deleting preset {preset_id} for {username}: {e}", exc_info=True
+            )
             return False
 
     def get_default_preset(self) -> AgentPreset:
-        """Get the built-in default agent preset."""
+        """Get the built-in default agent preset that cannot be deleted or modified."""
         current_time = int(time.time())
+
+        # Use the current system instructions from ResponsesAPIClient
+        default_instructions = """You are CodeGPT, a large language model trained by OpenAI, based on the GPT-5 architecture.
+You are trained to act and respond like a professional software engineer would, with vast knowledge of every programming language and excellent reasoning skills. You write industry-standard clean, elegant, idomatic code. You output code in Markdown format like so:
+```lang
+code
+```"""
+
         return AgentPreset(
             id="default",
             name="Default Assistant",
-            instructions="You are a helpful AI assistant. Provide clear, accurate, and helpful responses to user questions.",
+            instructions=default_instructions,
             model="gpt-5",
             default_reasoning_level="medium",
             created_at=current_time,
-            updated_at=current_time
+            updated_at=current_time,
         )
 
     def ensure_default_preset(self, username: str) -> None:
-        """Ensure the user has a default preset available."""
+        """Ensure the user has a default preset available with comprehensive fallback handling."""
         try:
             presets = self._load_user_presets(username)
+
+            # Check if default preset exists and is valid
             if "default" not in presets:
                 default_preset = self.get_default_preset()
                 presets["default"] = default_preset
                 self._save_user_presets(username, presets)
                 logging.info(f"Created default preset for user {username}")
+            else:
+                # Verify the existing default preset is valid and update if needed
+                existing_default = presets["default"]
+                current_default = self.get_default_preset()
+
+                # Check if the default preset needs to be updated (e.g., instructions changed)
+                if (
+                    existing_default.instructions != current_default.instructions
+                    or existing_default.model != current_default.model
+                    or existing_default.default_reasoning_level
+                    != current_default.default_reasoning_level
+                ):
+                    # Update the default preset while preserving creation time
+                    updated_default = AgentPreset(
+                        id="default",
+                        name=current_default.name,
+                        instructions=current_default.instructions,
+                        model=current_default.model,
+                        default_reasoning_level=current_default.default_reasoning_level,
+                        created_at=existing_default.created_at,
+                        updated_at=int(time.time()),
+                    )
+                    presets["default"] = updated_default
+                    self._save_user_presets(username, presets)
+                    logging.info(f"Updated default preset for user {username}")
+
         except Exception as e:
-            logging.error(f"Error ensuring default preset for {username}: {e}", exc_info=True)
+            logging.error(
+                f"Error ensuring default preset for {username}: {e}", exc_info=True
+            )
+            # In case of any error, we should still be able to provide a default preset
+            # This ensures the system always has a fallback
+
+    def get_preset_with_fallback(self, username: str, preset_id: str) -> AgentPreset:
+        """Get a preset with fallback to default preset if loading fails."""
+        try:
+            if preset_id == "default":
+                # Always return the built-in default preset for consistency
+                return self.get_default_preset()
+
+            preset = self.get_preset(username, preset_id)
+            if preset:
+                return preset
+            else:
+                logging.warning(
+                    f"Preset {preset_id} not found for user {username}, falling back to default"
+                )
+                return self.get_default_preset()
+
+        except Exception as e:
+            logging.error(
+                f"Error loading preset {preset_id} for {username}: {e}, falling back to default"
+            )
+            return self.get_default_preset()
 
 
 class ResponsesAPIClient:
-    """Client wrapper for OpenAI Responses API with o4-mini model."""
+    """Client wrapper for OpenAI Responses API with support for multiple models and reasoning levels."""
+
+    # Valid models supported by the Responses API
+    VALID_MODELS = {"gpt-5", "gpt-5-mini", "gpt-5-pro"}
+
+    # Model knowledge cutoff dates
+    MODEL_KNOWLEDGE_CUTOFFS = {
+        "gpt-5": "2024-09-30",
+        "gpt-5-mini": "2024-09-30",
+        "gpt-5-pro": "2024-09-30",
+    }
+
+    # Valid reasoning levels and their mappings
+    REASONING_LEVELS = {
+        "high": {"effort": "high", "summary": "detailed"},
+        "medium": {"effort": "medium", "summary": "detailed"},
+        "low": {"effort": "low", "summary": "concise"},
+    }
 
     def __init__(self, openai_client: openai.OpenAI):
         self.client = openai_client
-        self.model = "gpt-5"
+        self.default_model = "gpt-5"
+        self.default_reasoning_level = "medium"
+
+    def _get_model_metadata(self, model: str) -> str:
+        """Get knowledge cutoff and current date metadata for a model."""
+        knowledge_cutoff = self.MODEL_KNOWLEDGE_CUTOFFS.get(model, "2024-09-30")
+        current_date = datetime.today().strftime("%Y-%m-%d")
+        return f"Knowledge cutoff: {knowledge_cutoff}. Current date: {current_date}."
+
+    def _enhance_instructions_with_metadata(self, instructions: str, model: str) -> str:
+        """Enhance agent instructions with model metadata (knowledge cutoff and current date)."""
+        metadata = self._get_model_metadata(model)
+
+        # Check if instructions already contain metadata to avoid duplication
+        if "Knowledge cutoff:" in instructions and "Current date:" in instructions:
+            return instructions
+
+        # Add metadata at the beginning of instructions after any existing model identification
+        lines = instructions.split("\n")
+        first_line = lines[0] if lines else ""
+
+        # Check if first line contains specific model identification (like "CodeGPT" or "GPT-5")
+        has_model_id = any(
+            keyword in first_line
+            for keyword in ["CodeGPT", "GPT-5", "GPT-4", "large language model"]
+        )
+
+        if has_model_id and len(lines) > 0:
+            # Insert metadata after the first line (model identification)
+            enhanced_lines = [lines[0], metadata] + lines[1:]
+        else:
+            # Insert metadata at the beginning
+            enhanced_lines = [metadata] + lines
+
+        return "\n".join(enhanced_lines)
 
     def create_response(
         self,
@@ -1232,11 +1380,35 @@ class ResponsesAPIClient:
         previous_response_id: str | None = None,
         stream: bool = True,
         username: str | None = None,
+        model: str | None = None,
+        reasoning_level: str | None = None,
+        instructions: str | None = None,
     ) -> Any:
-        """Create a response using the Responses API with comprehensive error handling."""
+        """Create a response using the Responses API with model and reasoning level support."""
         try:
+            # Validate and set model with fallback to default
+            validated_model = self._validate_model(model)
+
+            # Validate and get reasoning configuration
+            reasoning_config = self._get_reasoning_config(
+                reasoning_level, validated_model
+            )
+
+            # Use custom instructions from agent preset or fall back to default
+            default_instructions = """You are CodeGPT, a large language model trained by OpenAI, based on the GPT-5 architecture.
+You are trained to act and respond like a professional software engineer would, with vast knowledge of every programming language and excellent reasoning skills. You write industry-standard clean, elegant, idomatic code. You output code in Markdown format like so:
+```lang
+code
+```"""
+
+            # Get base instructions and enhance with model metadata
+            base_instructions = instructions or default_instructions
+            enhanced_instructions = self._enhance_instructions_with_metadata(
+                base_instructions, validated_model
+            )
+
             params: Dict[str, Any] = {
-                "model": self.model,
+                "model": validated_model,
                 "input": input_text,
                 "stream": stream,
                 "store": True,  # Store responses for conversation continuity
@@ -1252,20 +1424,13 @@ class ResponsesAPIClient:
                         },
                     }
                 ],
-                "instructions": f"""You are CodeGPT, a large language model trained by OpenAI, based on the GPT-5 architecture. Knowledge cutoff: 2024-09-30. Current date: {datetime.today().strftime("%Y-%m-%d")}.
-You are trained to act and respond like a professional software engineer would, with vast knowledge of every programming language and excellent reasoning skills. You write industry-standard clean, elegant, idomatic code. You output code in Markdown format like so:
-```lang
-code
-```""",
+                "instructions": enhanced_instructions,
             }
 
-            # Add reasoning configuration with error handling
-            try:
-                params["reasoning"] = {"effort": "high", "summary": "detailed"}
-                logging.debug("Added reasoning configuration to API request")
-            except Exception as e:
-                logging.warning(f"Failed to add reasoning configuration: {e}")
-                # Continue without reasoning - chat should still work
+            # Add reasoning configuration if available
+            if reasoning_config:
+                params["reasoning"] = reasoning_config
+                logging.debug(f"Added reasoning configuration: {reasoning_config}")
 
             # Add previous response ID for conversation continuity
             if previous_response_id:
@@ -1390,6 +1555,50 @@ code
             "message": "An unexpected error occurred. Please try again.",
             "user_action": "Try again or refresh the page if the problem continues.",
         }
+
+    def _validate_model(self, model: str | None) -> str:
+        """Validate model parameter and return valid model with fallback to default."""
+        if model is None:
+            logging.debug(f"No model specified, using default: {self.default_model}")
+            return self.default_model
+
+        if model in self.VALID_MODELS:
+            logging.debug(f"Using validated model: {model}")
+            return model
+
+        logging.warning(
+            f"Invalid model '{model}' specified, falling back to default: {self.default_model}"
+        )
+        return self.default_model
+
+    def _get_reasoning_config(
+        self, reasoning_level: str | None, model: str
+    ) -> dict[str, str] | None:
+        """Get reasoning configuration based on level and model compatibility."""
+        # Handle gpt-5-pro special case - it only supports high reasoning effort
+        if model == "gpt-5-pro":
+            if reasoning_level and reasoning_level != "high":
+                logging.warning(
+                    f"Model gpt-5-pro only supports high reasoning effort, ignoring requested level: {reasoning_level}"
+                )
+            return {"effort": "high", "summary": "detailed"}
+
+        # Use provided reasoning level or default
+        level = (
+            reasoning_level
+            if reasoning_level in self.REASONING_LEVELS
+            else self.default_reasoning_level
+        )
+
+        if level not in self.REASONING_LEVELS:
+            logging.warning(
+                f"Invalid reasoning level '{reasoning_level}' specified, using default: {self.default_reasoning_level}"
+            )
+            level = self.default_reasoning_level
+
+        config = self.REASONING_LEVELS[level]
+        logging.debug(f"Using reasoning configuration for level '{level}': {config}")
+        return config
 
     def process_stream_with_processor(
         self, stream: Any, event_processor: "StreamEventProcessor"
@@ -3174,6 +3383,36 @@ def converse():
         if not user_input:
             return {"error": "No input provided"}, 400
 
+        # Get agent preset and reasoning level parameters
+        agent_preset_id = request.json.get("agent_preset_id")
+        reasoning_level = request.json.get("reasoning_level")
+
+        # Load and validate agent preset configuration with robust fallback
+        agent_preset = None
+        model = None
+        effective_reasoning_level = None
+
+        # Ensure default preset exists for the user
+        agent_preset_manager.ensure_default_preset(username)
+
+        if agent_preset_id:
+            # Load specific agent preset with fallback to default
+            agent_preset = agent_preset_manager.get_preset_with_fallback(
+                username, agent_preset_id
+            )
+            logging.info(f"Using agent preset {agent_preset.id} for user {username}")
+        else:
+            # Use default agent preset
+            agent_preset = agent_preset_manager.get_default_preset()
+            logging.info(f"Using default agent preset for user {username}")
+
+        # Extract model and reasoning level from agent preset
+        # The get_preset_with_fallback method ensures we always have a valid preset
+        model = agent_preset.model
+        effective_reasoning_level = (
+            reasoning_level or agent_preset.default_reasoning_level
+        )
+
         # Handle existing conversation or create new one
         if conversation_id:
             # Check if conversation exists
@@ -3238,17 +3477,25 @@ def converse():
             previous_response_id: str | None,
             username: str,
             conversation_id: str,
+            model: str | None = None,
+            reasoning_level: str | None = None,
+            agent_preset_id: str | None = None,
+            agent_preset: AgentPreset | None = None,
         ):
             """Start streaming thread using Responses API with comprehensive error handling."""
             event_processor = StreamEventProcessor(event_queue)
 
             try:
-                # Create response using Responses API
+                # Create response using Responses API with model, reasoning level, and instructions
+                instructions = agent_preset.instructions if agent_preset else None
                 stream = responses_client.create_response(
                     input_text=user_input,
                     previous_response_id=previous_response_id,
                     stream=True,
                     username=username,
+                    model=model,
+                    reasoning_level=reasoning_level,
+                    instructions=instructions,
                 )
 
                 # Check if we got an error response
@@ -3289,7 +3536,7 @@ def converse():
 
                 if final_text and response_id:
                     try:
-                        # Store assistant response in conversation with reasoning data (if available)
+                        # Store assistant response in conversation with reasoning data and agent preset metadata
                         conversation_manager.add_message(
                             username,
                             conversation_id,
@@ -3297,6 +3544,9 @@ def converse():
                             final_text,
                             response_id,
                             reasoning_data,
+                            agent_preset_id=agent_preset_id,
+                            model=model,
+                            reasoning_level=reasoning_level,
                         )
 
                         # Log reasoning data status for debugging
@@ -3395,6 +3645,10 @@ def converse():
             user_input: str,
             previous_response_id: str | None,
             message_list: list[dict[str, str]],
+            model: str | None = None,
+            reasoning_level: str | None = None,
+            agent_preset_id: str | None = None,
+            agent_preset: AgentPreset | None = None,
         ) -> Generator[Any | AnyStr]:
             """Stream events to frontend using new Responses API."""
             # Send initial message list
@@ -3411,6 +3665,10 @@ def converse():
                     previous_response_id,
                     username,
                     conversation_id,
+                    model,
+                    reasoning_level,
+                    agent_preset_id,
+                    agent_preset,
                 ),
             ).start()
 
@@ -3422,7 +3680,14 @@ def converse():
         return Response(
             stream_with_context(
                 stream_events(
-                    conversation_id, user_input, previous_response_id, message_list
+                    conversation_id,
+                    user_input,
+                    previous_response_id,
+                    message_list,
+                    model,
+                    effective_reasoning_level,
+                    agent_preset_id,
+                    agent_preset,
                 )
             ),  # type: ignore
             mimetype="text/plain",
@@ -4643,6 +4908,230 @@ def delete_prompt_file(filename: str):
 
     except Exception as e:
         return jsonify({"error": f"Failed to delete file: {str(e)}"}), 500
+
+
+@app.route("/agents", methods=["GET", "POST"])
+def manage_agent_presets():
+    """Handle agent preset CRUD operations."""
+    if "username" not in session:
+        return jsonify({"error": "Not authenticated"}), 401
+
+    username = session["username"]
+
+    try:
+        if request.method == "GET":
+            # Ensure default preset exists first
+            agent_preset_manager.ensure_default_preset(username)
+
+            # List all agent presets for the user
+            presets = agent_preset_manager.list_presets(username)
+
+            # Always include the built-in default preset in the list
+            # This ensures the default preset is always available even if storage fails
+            default_preset = agent_preset_manager.get_default_preset()
+            preset_dict = {preset.id: preset for preset in presets}
+            preset_dict["default"] = (
+                default_preset  # Ensure default is always present and up-to-date
+            )
+
+            # Convert to JSON-serializable format
+            preset_list = [preset.model_dump() for preset in preset_dict.values()]
+
+            logging.info(
+                f"Retrieved {len(preset_list)} agent presets for user {username}"
+            )
+            return jsonify({"presets": preset_list})
+
+        elif request.method == "POST":
+            # Create a new agent preset
+            try:
+                # Parse JSON request data
+                if not request.is_json:
+                    return jsonify({"error": "Request must be JSON"}), 400
+
+                data = request.get_json()
+                if not data:
+                    return jsonify({"error": "Missing required field: name"}), 400
+
+                # Validate required fields
+                required_fields = ["name", "instructions"]
+                for field in required_fields:
+                    if field not in data or not data[field].strip():
+                        return jsonify(
+                            {"error": f"Missing required field: {field}"}
+                        ), 400
+
+                # Generate unique ID for the preset
+                preset_id = str(uuid.uuid4())
+
+                # Create AgentPreset object with validation
+                preset_data = {
+                    "id": preset_id,
+                    "name": data["name"].strip(),
+                    "instructions": data["instructions"].strip(),
+                    "model": data.get("model", "gpt-5"),
+                    "default_reasoning_level": data.get(
+                        "default_reasoning_level", "medium"
+                    ),
+                    "created_at": int(time.time()),
+                    "updated_at": int(time.time()),
+                }
+
+                # Validate the preset using Pydantic
+                preset = AgentPreset.model_validate(preset_data)
+
+                # Create the preset
+                created_id = agent_preset_manager.create_preset(username, preset)
+
+                logging.info(f"Created agent preset {created_id} for user {username}")
+                return jsonify(
+                    {
+                        "success": True,
+                        "preset_id": created_id,
+                        "preset": preset.model_dump(),
+                    }
+                ), 201
+
+            except ValueError as e:
+                logging.warning(f"Validation error creating preset for {username}: {e}")
+                return jsonify({"error": f"Validation error: {str(e)}"}), 400
+            except Exception as e:
+                logging.error(
+                    f"Error creating preset for {username}: {e}", exc_info=True
+                )
+                return jsonify({"error": f"Failed to create preset: {str(e)}"}), 500
+
+    except Exception as e:
+        logging.error(
+            f"Error in manage_agent_presets for {username}: {e}", exc_info=True
+        )
+        return jsonify({"error": "Internal server error"}), 500
+
+
+@app.route("/agents/<preset_id>", methods=["GET", "PUT", "DELETE"])
+def handle_agent_preset(preset_id: str):
+    """Handle individual agent preset operations."""
+    if "username" not in session:
+        return jsonify({"error": "Not authenticated"}), 401
+
+    username = session["username"]
+
+    try:
+        if request.method == "GET":
+            # Retrieve specific agent preset with fallback handling
+            if preset_id == "default":
+                # Always return the built-in default preset
+                preset = agent_preset_manager.get_default_preset()
+            else:
+                preset = agent_preset_manager.get_preset(username, preset_id)
+                if not preset:
+                    return jsonify({"error": "Agent preset not found"}), 404
+
+            logging.info(f"Retrieved agent preset {preset_id} for user {username}")
+            return jsonify({"preset": preset.model_dump()})
+
+        elif request.method == "PUT":
+            # Update existing agent preset
+            try:
+                # Parse JSON request data
+                if not request.is_json:
+                    return jsonify({"error": "Request must be JSON"}), 400
+
+                data = request.get_json()
+                if not data:
+                    return jsonify({"error": "No data provided"}), 400
+
+                # Check if preset exists
+                existing_preset = agent_preset_manager.get_preset(username, preset_id)
+                if not existing_preset:
+                    return jsonify({"error": "Agent preset not found"}), 404
+
+                # Prevent modification of default preset
+                if preset_id == "default":
+                    return jsonify({"error": "Cannot modify default preset"}), 403
+
+                # Validate required fields
+                required_fields = ["name", "instructions"]
+                for field in required_fields:
+                    if field not in data or not data[field].strip():
+                        return jsonify(
+                            {"error": f"Missing required field: {field}"}
+                        ), 400
+
+                # Create updated preset object with validation
+                preset_data = {
+                    "id": preset_id,
+                    "name": data["name"].strip(),
+                    "instructions": data["instructions"].strip(),
+                    "model": data.get("model", existing_preset.model),
+                    "default_reasoning_level": data.get(
+                        "default_reasoning_level",
+                        existing_preset.default_reasoning_level,
+                    ),
+                    "created_at": existing_preset.created_at,
+                    "updated_at": int(time.time()),
+                }
+
+                # Validate the preset using Pydantic
+                preset = AgentPreset.model_validate(preset_data)
+
+                # Update the preset
+                success = agent_preset_manager.update_preset(username, preset)
+
+                if not success:
+                    return jsonify({"error": "Failed to update preset"}), 500
+
+                logging.info(f"Updated agent preset {preset_id} for user {username}")
+                return jsonify({"success": True, "preset": preset.model_dump()})
+
+            except ValueError as e:
+                logging.warning(
+                    f"Validation error updating preset {preset_id} for {username}: {e}"
+                )
+                return jsonify({"error": f"Validation error: {str(e)}"}), 400
+            except Exception as e:
+                logging.error(
+                    f"Error updating preset {preset_id} for {username}: {e}",
+                    exc_info=True,
+                )
+                return jsonify({"error": f"Failed to update preset: {str(e)}"}), 500
+
+        elif request.method == "DELETE":
+            # Delete agent preset
+            try:
+                # Prevent deletion of default preset
+                if preset_id == "default":
+                    return jsonify({"error": "Cannot delete default preset"}), 403
+
+                # Check if preset exists
+                existing_preset = agent_preset_manager.get_preset(username, preset_id)
+                if not existing_preset:
+                    return jsonify({"error": "Agent preset not found"}), 404
+
+                # Delete the preset
+                success = agent_preset_manager.delete_preset(username, preset_id)
+
+                if not success:
+                    return jsonify({"error": "Failed to delete preset"}), 500
+
+                logging.info(f"Deleted agent preset {preset_id} for user {username}")
+                return jsonify(
+                    {"success": True, "message": "Preset deleted successfully"}
+                )
+
+            except Exception as e:
+                logging.error(
+                    f"Error deleting preset {preset_id} for {username}: {e}",
+                    exc_info=True,
+                )
+                return jsonify({"error": f"Failed to delete preset: {str(e)}"}), 500
+
+    except Exception as e:
+        logging.error(
+            f"Error in handle_agent_preset for {username}, preset {preset_id}: {e}",
+            exc_info=True,
+        )
+        return jsonify({"error": "Internal server error"}), 500
 
 
 if __name__ == "__main__":
