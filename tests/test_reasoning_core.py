@@ -318,7 +318,7 @@ class TestResponsesAPIClientReasoning:
         test_cases = [
             ("high", {"effort": "high", "summary": "detailed"}),
             ("medium", {"effort": "medium", "summary": "detailed"}),
-            ("low", {"effort": "low", "summary": "concise"}),
+            ("low", {"effort": "low", "summary": "detailed"}),
         ]
         
         for level, expected_config in test_cases:

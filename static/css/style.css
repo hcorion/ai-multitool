@@ -1264,6 +1264,79 @@ button#send-chat:hover {
   color: #fff;
 }
 
+.message-metadata {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.7);
+  margin-top: 0.5rem;
+  padding-top: 0.25rem;
+  border-top: 1px solid rgba(102, 102, 102, 0.3);
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.message-metadata .metadata-reasoning {
+  background: rgba(10, 132, 255, 0.1);
+  color: #0a84ff;
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  font-weight: 500;
+}
+.message-metadata .metadata-model {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  font-weight: 500;
+}
+.message-metadata .metadata-preset {
+  background: rgba(156, 39, 176, 0.1);
+  color: #9c27b0;
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  font-weight: 500;
+}
+
+.input-controls {
+  margin-bottom: 0.5rem;
+}
+
+.reasoning-level-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  background: rgba(10, 132, 255, 0.1);
+  border: 1px solid rgba(10, 132, 255, 0.3);
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+}
+.reasoning-level-indicator .indicator-label {
+  color: #fff;
+  font-weight: 500;
+}
+.reasoning-level-indicator .indicator-value {
+  color: #0a84ff;
+  font-weight: 600;
+}
+.reasoning-level-indicator .clear-override-btn {
+  background: rgba(10, 132, 255, 0.2);
+  border: none;
+  border-radius: 50%;
+  width: 1.25rem;
+  height: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #0a84ff;
+  font-weight: bold;
+  font-size: 0.875rem;
+  transition: background-color 0.2s ease;
+}
+.reasoning-level-indicator .clear-override-btn:hover {
+  background: rgba(10, 132, 255, 0.3);
+}
+
 .preset-management-actions {
   margin-bottom: 20px;
   text-align: center;

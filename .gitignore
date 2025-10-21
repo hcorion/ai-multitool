@@ -2,6 +2,7 @@ run-user.ps1
 static/images/*
 static/chats/*
 static/prompts/*
+static/agents/*
 !static/images/DONOTDELETE
 !static/chats/DONOTDELETE
 !static/prompts/DONOTDELETE

@@ -3,6 +3,12 @@ import * as utils from "./utils.js";
 export type ChatMessage = {
     role: string;
     text: string;
+    timestamp?: number;
+    response_id?: string;
+    reasoning_data?: any;
+    agent_preset_id?: string;
+    model?: string;
+    reasoning_level?: string;
 };
 export type MessageHistory = {
     type: string;
@@ -119,12 +125,13 @@ export function refreshChatMessages(messages: ChatMessage[]): void {
             html = converter.makeHtml(text);
 
         const messageDiv = document.createElement("div");
-        messageDiv.className = "ai-message";
+        messageDiv.className = message.role === "user" ? "user-message" : "ai-message";
         messageDiv.innerHTML = utils.unescapeHTML(html);
 
-        // Add reasoning button for assistant messages
+        // Add reasoning button and metadata for assistant messages
         if (message.role === "assistant") {
             addReasoningButton(messageDiv, index);
+            addMessageMetadata(messageDiv, message);
         }
 
         chatHistory.appendChild(messageDiv);
@@ -168,6 +175,76 @@ function addReasoningButton(messageElement: HTMLElement, messageIndex: number): 
     } catch (error) {
         console.warn("Failed to add reasoning button:", error);
         // Continue without reasoning button - chat functionality should not be affected
+    }
+}
+
+/**
+ * Add metadata display to assistant messages
+ */
+function addMessageMetadata(messageElement: HTMLElement, message: ChatMessage): void {
+    try {
+        const metadataContainer = document.createElement("div");
+        metadataContainer.className = "message-metadata";
+
+        const metadataItems: string[] = [];
+
+        // Add reasoning level indicator
+        if (message.reasoning_level) {
+            const reasoningLevel = message.reasoning_level;
+            const reasoningDisplay = formatReasoningLevel(reasoningLevel);
+            metadataItems.push(`<span class="metadata-reasoning" title="Reasoning Level">${reasoningDisplay}</span>`);
+        }
+
+        // Add model indicator
+        if (message.model) {
+            const modelDisplay = formatModelName(message.model);
+            metadataItems.push(`<span class="metadata-model" title="AI Model">${modelDisplay}</span>`);
+        }
+
+        // Add agent preset indicator (if not default)
+        if (message.agent_preset_id && message.agent_preset_id !== 'default') {
+            metadataItems.push(`<span class="metadata-preset" title="Agent Preset">Custom Agent</span>`);
+        }
+
+        if (metadataItems.length > 0) {
+            metadataContainer.innerHTML = metadataItems.join(' • ');
+            messageElement.appendChild(metadataContainer);
+        }
+    } catch (error) {
+        console.warn("Failed to add message metadata:", error);
+        // Continue without metadata - chat functionality should not be affected
+    }
+}
+
+/**
+ * Format reasoning level for display
+ */
+function formatReasoningLevel(level: string): string {
+    switch (level) {
+        case 'high':
+            return '🧠 High';
+        case 'medium':
+            return '⚡ Medium';
+        case 'low':
+            return '💨 Low';
+        default:
+            return level;
+    }
+}
+
+/**
+ * Format model name for display
+ */
+function formatModelName(model: string): string {
+    switch (model) {
+        case 'gpt-5':
+            return 'GPT-5';
+        case 'gpt-5-mini':
+            return 'GPT-5 Mini';
+        case 'gpt-5-pro':
+            return 'GPT-5 Pro';
+        default:
+            return model;
     }
 }
 

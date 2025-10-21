@@ -53,6 +53,7 @@ export async function initializeAgentPresetUI(): Promise<void> {
         // Initialize UI components (these should always work)
         renderAgentPresetSelector();
         renderReasoningLevelSelector();
+        updateReasoningLevelIndicator();
         
         console.log('Agent preset UI initialization completed');
         
@@ -87,6 +88,15 @@ function setupEventListeners(): void {
     if (reasoningSelector) {
         reasoningSelector.addEventListener('change', handleReasoningLevelSelection);
     }
+    
+    // Clear reasoning override button
+    const clearOverrideButton = document.getElementById('clear-reasoning-override');
+    if (clearOverrideButton) {
+        clearOverrideButton.addEventListener('click', clearReasoningOverride);
+    }
+    
+    // Listen for reasoning indicator updates
+    document.addEventListener('updateReasoningIndicator', updateReasoningLevelIndicator);
     
     // Manage presets button
     const manageButton = document.getElementById('manage-presets-btn');
@@ -316,7 +326,155 @@ function handleReasoningLevelSelection(event: Event): void {
     const selector = event.target as HTMLSelectElement;
     const level = selector.value as 'high' | 'medium' | 'low' | '';
     
-    agentPresets.setMessageReasoningLevel(level || null);
+    try {
+        agentPresets.setMessageReasoningLevel(level || null);
+        updateReasoningLevelIndicator();
+    } catch (error) {
+        handleReasoningLevelError(error as Error, 'set');
+        
+        // Reset selector to previous valid state
+        if (agentPresets.chatState.messageReasoningLevel) {
+            selector.value = agentPresets.chatState.messageReasoningLevel;
+        } else {
+            selector.value = '';
+        }
+    }
+}
+
+/**
+ * Clear reasoning level override
+ */
+function clearReasoningOverride(): void {
+    try {
+        agentPresets.setMessageReasoningLevel(null);
+        
+        // Update the selector
+        const reasoningSelector = document.getElementById('reasoning-level-selector') as HTMLSelectElement;
+        if (reasoningSelector) {
+            reasoningSelector.value = '';
+        }
+        
+        updateReasoningLevelIndicator();
+    } catch (error) {
+        handleReasoningLevelError(error as Error, 'clear');
+    }
+}
+
+/**
+ * Update the reasoning level indicator in the input area
+ */
+function updateReasoningLevelIndicator(): void {
+    try {
+        const indicator = document.getElementById('reasoning-level-indicator');
+        const displayElement = document.getElementById('reasoning-override-display');
+        
+        if (!indicator || !displayElement) return;
+        
+        const isOverride = agentPresets.chatState.messageReasoningLevel !== null;
+        
+        if (isOverride) {
+            const level = agentPresets.chatState.messageReasoningLevel!;
+            const displayText = formatReasoningLevelForIndicator(level);
+            displayElement.textContent = displayText;
+            indicator.style.display = 'block';
+        } else {
+            indicator.style.display = 'none';
+        }
+    } catch (error) {
+        handleReasoningLevelError(error as Error, 'display');
+    }
+}
+
+/**
+ * Format reasoning level for the input area indicator
+ */
+function formatReasoningLevelForIndicator(level: string): string {
+    switch (level) {
+        case 'high':
+            return '🧠 High (Detailed Analysis)';
+        case 'medium':
+            return '⚡ Medium (Balanced)';
+        case 'low':
+            return '💨 Low (Quick Response)';
+        default:
+            return level;
+    }
+}
+
+/**
+ * Handle reasoning level operation failures with retry logic
+ */
+export function handleReasoningLevelError(error: Error, operation: string, retryCount: number = 0): void {
+    console.error(`Reasoning level ${operation} error (attempt ${retryCount + 1}):`, error);
+    
+    const maxRetries = 2;
+    
+    if (retryCount < maxRetries) {
+        // Retry after a short delay
+        setTimeout(() => {
+            try {
+                switch (operation) {
+                    case 'set':
+                        // Retry setting the reasoning level
+                        const currentLevel = agentPresets.chatState.messageReasoningLevel;
+                        agentPresets.setMessageReasoningLevel(currentLevel);
+                        updateReasoningLevelIndicator();
+                        break;
+                    case 'clear':
+                        // Retry clearing the reasoning level
+                        clearReasoningOverride();
+                        break;
+                    case 'display':
+                        // Retry updating the display
+                        updateReasoningLevelIndicator();
+                        break;
+                }
+            } catch (retryError) {
+                handleReasoningLevelError(retryError as Error, operation, retryCount + 1);
+            }
+        }, 1000 * (retryCount + 1)); // Exponential backoff
+    } else {
+        // Max retries reached, show user-friendly error
+        let message = `Failed to ${operation} reasoning level`;
+        
+        if (error.message.includes('Network')) {
+            message = 'Network error - reasoning level changes may not be saved';
+        } else if (error.message.includes('validation')) {
+            message = 'Invalid reasoning level - using default instead';
+        }
+        
+        showReasoningLevelError(message);
+        
+        // Fallback to safe state
+        try {
+            agentPresets.setMessageReasoningLevel(null);
+            updateReasoningLevelIndicator();
+        } catch (fallbackError) {
+            console.error('Failed to reset to safe state:', fallbackError);
+        }
+    }
+}
+
+/**
+ * Show reasoning level error message to user
+ */
+function showReasoningLevelError(message: string): void {
+    console.error('Reasoning level error:', message);
+    
+    // Try to use existing error display mechanism
+    const errorContainer = document.getElementById('agent-preset-error');
+    if (errorContainer) {
+        errorContainer.textContent = message;
+        errorContainer.style.display = 'block';
+        
+        // Auto-hide after 5 seconds
+        setTimeout(() => {
+            errorContainer.style.display = 'none';
+        }, 5000);
+    } else {
+        // Fallback to console warning if no error container
+        console.warn('No error container found, reasoning level error:', message);
+    }
 }
 
 /**

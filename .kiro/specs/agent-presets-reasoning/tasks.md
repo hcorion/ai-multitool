@@ -83,7 +83,12 @@
   - Add user-friendly error messages for failed operations
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 2.1, 4.1, 4.4_
 
-- [ ] 7. Implement per-message reasoning level controls
+- [x] 7. Implement per-message reasoning level controls
+
+
+
+
+
   - Add reasoning level selector in chat input area with validation
   - Create visual indicators for active agent preset and reasoning level
   - Implement message-level reasoning override functionality with fallback handling

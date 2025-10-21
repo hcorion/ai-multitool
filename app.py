@@ -1333,7 +1333,7 @@ class ResponsesAPIClient:
     REASONING_LEVELS = {
         "high": {"effort": "high", "summary": "detailed"},
         "medium": {"effort": "medium", "summary": "detailed"},
-        "low": {"effort": "low", "summary": "concise"},
+        "low": {"effort": "low", "summary": "detailed"},
     }
 
     def __init__(self, openai_client: openai.OpenAI):

@@ -235,6 +235,13 @@
                 <div id="chat-history"><!-- Populated in TypeScript at runtime --></div>
                 <div id="chat-current-status">Awaiting Input...</div>
                 <div class="input-area">
+                    <div class="input-controls">
+                        <div class="reasoning-level-indicator" id="reasoning-level-indicator" style="display: none;">
+                            <span class="indicator-label">Reasoning Override:</span>
+                            <span class="indicator-value" id="reasoning-override-display"></span>
+                            <button class="clear-override-btn" id="clear-reasoning-override" title="Clear reasoning level override">×</button>
+                        </div>
+                    </div>
                     <textarea id="chat-input" placeholder="Type your message here..."></textarea>
                     <button id="send-chat">Send</button>
                 </div>

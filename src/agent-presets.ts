@@ -398,6 +398,13 @@ function updateReasoningLevelDisplay(): void {
         currentReasoningDisplay.textContent = displayText;
         currentReasoningDisplay.className = isOverride ? 'reasoning-override' : 'reasoning-default';
     }
+    
+    // Trigger update of reasoning level indicator in input area
+    // Use a small delay to ensure the DOM is ready
+    setTimeout(() => {
+        const updateIndicatorEvent = new CustomEvent('updateReasoningIndicator');
+        document.dispatchEvent(updateIndicatorEvent);
+    }, 0);
 }
 
 /**
