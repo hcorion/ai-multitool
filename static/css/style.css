@@ -905,6 +905,10 @@ button#send-chat:hover {
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
+.floating-agent-controls .preset-summary .current-reasoning.reasoning-default {
+  background: rgba(10, 132, 255, 0.15);
+  border-color: rgba(10, 132, 255, 0.3);
+}
 .floating-agent-controls .preset-summary .current-reasoning.reasoning-override {
   background: rgba(255, 152, 0, 0.25);
   border-color: rgba(255, 152, 0, 0.5);

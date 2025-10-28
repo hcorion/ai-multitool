@@ -682,7 +682,14 @@ button#send-chat {
         text-transform: uppercase;
         letter-spacing: 0.5px;
         
+        &.reasoning-default {
+            // Subtle variation for preset default (slightly more muted)
+            background: rgba($submit-btn-color, 0.15);
+            border-color: rgba($submit-btn-color, 0.3);
+        }
+        
         &.reasoning-override {
+            // More prominent styling for manual override
             background: rgba(#ff9800, 0.25);
             border-color: rgba(#ff9800, 0.5);
             color: #ffb74d;

@@ -234,6 +234,7 @@ export function setActiveAgentPreset(preset) {
     }
     // Update UI
     updateAgentPresetDisplay();
+    updateReasoningLevelDisplay(); // Update reasoning display to show preset's default level
 }
 /**
  * Set the message-level reasoning override
@@ -268,6 +269,7 @@ export async function loadActivePresetFromStorage() {
         if (savedPreset) {
             chatState.activeAgentPreset = savedPreset;
             updateAgentPresetDisplay();
+            updateReasoningLevelDisplay(); // Update reasoning display to show preset's default level
         }
         else {
             // Clean up invalid storage
@@ -323,7 +325,14 @@ function updateReasoningLevelDisplay() {
     if (currentReasoningDisplay) {
         const displayText = effectiveLevel.charAt(0).toUpperCase() + effectiveLevel.slice(1);
         currentReasoningDisplay.textContent = displayText;
-        currentReasoningDisplay.className = isOverride ? 'reasoning-override' : 'reasoning-default';
+        // Preserve base class and add appropriate modifier class
+        currentReasoningDisplay.className = 'current-reasoning';
+        if (isOverride) {
+            currentReasoningDisplay.classList.add('reasoning-override');
+        }
+        else {
+            currentReasoningDisplay.classList.add('reasoning-default');
+        }
     }
     // Trigger update of reasoning level indicator in input area
     // Use a small delay to ensure the DOM is ready
