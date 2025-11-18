@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from json import JSONDecodeError
 from queue import Queue
-from typing import Any, AnyStr, Dict, Generator, List, Mapping, NoReturn, Optional
+from typing import Any, AnyStr, Generator, Mapping, NoReturn
 
 import openai
 import requests
@@ -280,7 +280,7 @@ class MultiCharacterPromptData:
 
     main_prompt: str
     main_negative_prompt: str = ""
-    character_prompts: List[CharacterPrompt] = field(default_factory=list)
+    character_prompts: list[CharacterPrompt] = field(default_factory=list)
 
 
 # Pydantic models for conversation data structures
@@ -294,8 +294,8 @@ class ConversationData(BaseModel):
 
 
 def validate_reasoning_data(
-    reasoning_data: Dict[str, Any] | None,
-) -> Dict[str, Any] | None:
+    reasoning_data: dict[str, Any] | None,
+) -> dict[str, Any] | None:
     """Validate reasoning data structure and ensure it contains expected fields."""
     if reasoning_data is None:
         return None
@@ -401,7 +401,7 @@ class ChatMessage(BaseModel):
     response_id: str | None = Field(
         None, description="OpenAI response ID for assistant messages"
     )
-    reasoning_data: Dict[str, Any] | None = Field(
+    reasoning_data: dict[str, Any] | None = Field(
         None, description="Reasoning summary data for assistant messages"
     )
     agent_preset_id: str | None = Field(
@@ -415,8 +415,8 @@ class ChatMessage(BaseModel):
     @field_validator("reasoning_data")
     @classmethod
     def validate_reasoning_data_field(
-        cls, v: Dict[str, Any] | None
-    ) -> Dict[str, Any] | None:
+        cls, v: dict[str, Any] | None
+    ) -> dict[str, Any] | None:
         """Validate reasoning data structure."""
         return validate_reasoning_data(v)
 
@@ -461,7 +461,7 @@ class Conversation(BaseModel):
         role: str,
         content: str,
         response_id: str | None = None,
-        reasoning_data: Dict[str, Any] | None = None,
+        reasoning_data: dict[str, Any] | None = None,
         agent_preset_id: str | None = None,
         model: str | None = None,
         reasoning_level: str | None = None,
@@ -525,12 +525,12 @@ class ConversationManager:
         os.makedirs(self.chats_dir, exist_ok=True)
 
         # Add thread locks for concurrent access protection
-        self._user_locks: Dict[str, threading.Lock] = {}
+        self._user_locks: dict[str, threading.Lock] = {}
         self._locks_lock = threading.Lock()
 
         # Add conversation cache for performance optimization
-        self._conversation_cache: Dict[str, UserConversations] = {}
-        self._cache_timestamps: Dict[str, float] = {}
+        self._conversation_cache: dict[str, UserConversations] = {}
+        self._cache_timestamps: dict[str, float] = {}
         self._cache_ttl = 300  # 5 minutes cache TTL
 
     def _get_user_lock(self, username: str) -> threading.Lock:
@@ -732,7 +732,7 @@ class ConversationManager:
         role: str,
         content: str,
         response_id: str | None = None,
-        reasoning_data: Dict[str, Any] | None = None,
+        reasoning_data: dict[str, Any] | None = None,
         agent_preset_id: str | None = None,
         model: str | None = None,
         reasoning_level: str | None = None,
@@ -852,7 +852,7 @@ class ConversationManager:
 
     def get_message_reasoning_data(
         self, username: str, conversation_id: str, message_index: int
-    ) -> Dict[str, Any] | None:
+    ) -> dict[str, Any] | None:
         """Get reasoning data for a specific message by index with comprehensive error handling."""
         try:
             conversation = self.get_conversation(username, conversation_id)
@@ -960,7 +960,7 @@ class ConversationManager:
 
     def get_reasoning_availability_status(
         self, username: str, conversation_id: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Get reasoning availability status for a conversation to help with graceful degradation."""
         try:
             conversation = self.get_conversation(username, conversation_id)
@@ -1018,7 +1018,7 @@ class AgentPresetManager:
         os.makedirs(self.agents_dir, exist_ok=True)
 
         # Add thread locks for concurrent access protection
-        self._user_locks: Dict[str, threading.Lock] = {}
+        self._user_locks: dict[str, threading.Lock] = {}
         self._locks_lock = threading.Lock()
 
     def _get_user_lock(self, username: str) -> threading.Lock:
@@ -1032,7 +1032,7 @@ class AgentPresetManager:
         """Get the JSON file path for storing user's agent presets."""
         return os.path.join(self.agents_dir, f"{username}.json")
 
-    def _load_user_presets(self, username: str) -> Dict[str, AgentPreset]:
+    def _load_user_presets(self, username: str) -> dict[str, AgentPreset]:
         """Load all agent presets for a user from their JSON file with comprehensive error handling."""
         with self._get_user_lock(username):
             user_file = self._get_user_file_path(username)
@@ -1078,7 +1078,7 @@ class AgentPresetManager:
             return {}
 
     def _save_user_presets(
-        self, username: str, presets: Dict[str, AgentPreset]
+        self, username: str, presets: dict[str, AgentPreset]
     ) -> None:
         """Save all agent presets for a user to their JSON file with comprehensive error handling and thread safety."""
         with self._get_user_lock(username):
@@ -1169,7 +1169,7 @@ class AgentPresetManager:
             )
             return None
 
-    def list_presets(self, username: str) -> List[AgentPreset]:
+    def list_presets(self, username: str) -> list[AgentPreset]:
         """List all agent presets for a user."""
         try:
             presets = self._load_user_presets(username)
@@ -1385,7 +1385,7 @@ code
                 base_instructions, validated_model
             )
 
-            params: Dict[str, Any] = {
+            params: dict[str, Any] = {
                 "model": validated_model,
                 "input": input_text,
                 "stream": stream,
@@ -1786,8 +1786,8 @@ def generate_novelai_image(
     upscale: bool = False,
     variety: bool = False,
     grid_dynamic_prompt: GridDynamicPromptInfo | None = None,
-    character_prompts: Optional[List[Dict[str, str]]] = None,
-    followup_state: Optional[dict[str, FollowUpState]] = None,
+    character_prompts: list[dict[str, str]] | None = None,
+    followup_state: dict[str, FollowUpState] | None = None,
 ) -> GeneratedImageData:
     if not app.static_folder:
         raise ValueError("Flask static folder not defined")
@@ -1900,14 +1900,14 @@ def generate_novelai_inpaint_image(
     base_image: bytes,
     mask: bytes,
     prompt: str,
-    negative_prompt: Optional[str],
+    negative_prompt: str | None,
     username: str,
     size: tuple[int, int],
     seed: int = 0,
     variety: bool = False,
     grid_dynamic_prompt: GridDynamicPromptInfo | None = None,
-    character_prompts: Optional[List[Dict[str, str]]] = None,
-    followup_state: Optional[dict[str, FollowUpState]] = None,
+    character_prompts: list[dict[str, str]] | None = None,
+    followup_state: dict[str, FollowUpState] | None = None,
 ) -> GeneratedImageData:
     """Generate an inpainted image using NovelAI and return processed data."""
     if not app.static_folder:
@@ -1961,7 +1961,7 @@ def generate_novelai_inpaint_image(
         file_bytes = io.BytesIO(image_bytes)
 
         # Build image metadata
-        image_metadata: Dict[str, str] = {
+        image_metadata: dict[str, str] = {
             "Prompt": prompt,
             "Revised Prompt": revised_prompt,
             "Operation": "inpaint",
@@ -2020,13 +2020,13 @@ def generate_novelai_inpaint_image(
 def generate_novelai_img2img_image(
     base_image: bytes,
     prompt: str,
-    negative_prompt: Optional[str],
+    negative_prompt: str | None,
     username: str,
     size: tuple[int, int],
     seed: int = 0,
     strength: float = 0.7,
     variety: bool = False,
-    followup_state: Optional[dict[str, FollowUpState]] = None,
+    followup_state: dict[str, FollowUpState] | None = None,
 ) -> GeneratedImageData:
     """Generate an img2img image using NovelAI and return processed data."""
     if not app.static_folder:
@@ -2064,7 +2064,7 @@ def generate_novelai_img2img_image(
         file_bytes = io.BytesIO(image_bytes)
 
         # Build image metadata
-        image_metadata: Dict[str, str] = {
+        image_metadata: dict[str, str] = {
             "Prompt": prompt,
             "Revised Prompt": revised_prompt,
             "Operation": "img2img",
@@ -2101,7 +2101,7 @@ def generate_stability_image(
     aspect_ratio: str = "1:1",
     seed: int = 0,
     upscale: bool = False,
-    followup_state: Optional[dict[str, FollowUpState]] = None,
+    followup_state: dict[str, FollowUpState] | None = None,
 ) -> GeneratedImageData:
     if not app.static_folder:
         raise ValueError("Flask static folder not defined")
@@ -2174,7 +2174,7 @@ def _process_openai_prompt(
     username: str,
     seed: int = 0,
     strict_follow_prompt: bool = False,
-    followup_state: Optional[dict[str, FollowUpState]] = None,
+    followup_state: dict[str, FollowUpState] | None = None,
 ) -> tuple[str, str]:
     """
     Process and moderate a prompt for OpenAI API calls.
@@ -2266,7 +2266,7 @@ def generate_openai_image(
     quality: str = "standard",
     strict_follow_prompt: bool = False,
     seed: int = 0,
-    followup_state: Optional[dict[str, FollowUpState]] = None,
+    followup_state: dict[str, FollowUpState] | None = None,
 ) -> GeneratedImageData:
     """
     Generate an image using OpenAI's text-to-image model.
@@ -2515,7 +2515,7 @@ def generate_seed_for_provider(provider: str) -> int | None:
     return None
 
 
-def _extract_character_prompts_from_form(request: Request) -> List[Dict[str, str]]:
+def _extract_character_prompts_from_form(request: Request) -> list[dict[str, str]]:
     """
     Extract character prompt data from form submission.
     Expected form format: character_prompts[0][positive], character_prompts[0][negative], etc.
@@ -2656,8 +2656,8 @@ def generate_image_grid(
             raise ValueError("Unable to generate seed for provider")
 
     # Generate images using the unified image generation system
-    image_data_list: Dict[str, GeneratedImageData] = dict()
-    generation_errors: List[str] = []
+    image_data_list: dict[str, GeneratedImageData] = dict()
+    generation_errors: list[str] = []
 
     for dynamic_prompt in dynamic_prompts:
         # Create the image request using the unified system
@@ -3784,7 +3784,7 @@ class StreamEventProcessor:
         self.event_queue = event_queue
         self.current_response_id: str | None = None
         self.accumulated_text = ""
-        self.reasoning_data: Dict[str, Any] = {
+        self.reasoning_data: dict[str, Any] = {
             "summary_parts": [],
             "complete_summary": "",
             "timestamp": 0,
@@ -3793,9 +3793,9 @@ class StreamEventProcessor:
             "message_data": None,
         }
         # Track web search events and output items for correlation
-        self.web_search_events: Dict[str, Dict[str, Any]] = {}
-        self.web_search_output_items: Dict[str, Dict[str, Any]] = {}
-        self.message_output_items: Dict[str, Dict[str, Any]] = {}
+        self.web_search_events: dict[str, dict[str, Any]] = {}
+        self.web_search_output_items: dict[str, dict[str, Any]] = {}
+        self.message_output_items: dict[str, dict[str, Any]] = {}
 
     def process_stream(self, stream: Any) -> None:
         """Process the entire stream of ResponseStreamEvent objects with comprehensive error handling."""
@@ -4545,7 +4545,7 @@ class StreamEventProcessor:
             logging.warning(f"Error correlating web search data: {e}")
             # Continue processing - don't block chat functionality
 
-    def get_reasoning_data(self) -> Dict[str, Any] | None:
+    def get_reasoning_data(self) -> dict[str, Any] | None:
         """Get the reasoning data from the processed stream with comprehensive error handling."""
         try:
             # Ensure web search data is correlated before returning

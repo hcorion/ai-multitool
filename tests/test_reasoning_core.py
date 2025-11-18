@@ -3,18 +3,14 @@
 import json
 import pytest
 import tempfile
-import time
 from queue import Queue
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock
 from app import (
     app,
     ConversationManager,
     StreamEventProcessor,
     ResponsesAPIClient,
-    validate_reasoning_data,
-    ChatMessage,
-    Conversation,
-    ConversationData,
+    validate_reasoning_data
 )
 
 
@@ -223,7 +219,7 @@ class TestResponsesAPIClientReasoning:
         mock_openai_client.responses.create.return_value = mock_response
 
         # Call create_response
-        result = client.create_response("test input")
+        client.create_response("test input")
 
         # Verify that responses.create was called with correct reasoning config
         mock_openai_client.responses.create.assert_called_once()
@@ -249,7 +245,7 @@ class TestResponsesAPIClientReasoning:
         mock_openai_client.responses.create.return_value = mock_response
 
         # Call with all parameters
-        result = client.create_response(
+        client.create_response(
             input_text="test input",
             previous_response_id="prev_123",
             stream=False,

@@ -4,7 +4,7 @@ Data models for unified image generation API with strict typing.
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, Optional, Union
+from typing import Any
 
 from dynamic_prompts import GridDynamicPromptInfo
 
@@ -54,15 +54,15 @@ class ImageGenerationRequest:
     prompt: str
     provider: Provider = Provider.OPENAI
     operation: Operation = Operation.GENERATE
-    negative_prompt: Optional[str] = None
+    negative_prompt: str | None = None
     width: int = 1024
     height: int = 1024
     quality: Quality = Quality.HIGH
-    model: Optional[str] = None
-    character_prompts: Optional[list[dict[str, str]]] = None
+    model: str | None = None
+    character_prompts: list[dict[str, str]] | None = None
     variety: bool = False
     seed: int = (0,)
-    grid_dynamic_prompt: Optional[GridDynamicPromptInfo] = None
+    grid_dynamic_prompt: GridDynamicPromptInfo | None = None
 
     def __post_init__(self):
         """Validate prompt and dimensions after object initialization."""
@@ -124,15 +124,15 @@ class ImageOperationResponse:
     """Unified response model for all image operations."""
 
     success: bool
-    image_path: Optional[str] = None
-    image_name: Optional[str] = None
-    revised_prompt: Optional[str] = None
-    error_message: Optional[str] = None
-    error_type: Optional[str] = None
-    provider: Optional[str] = None
-    operation: Optional[str] = None
-    timestamp: Optional[int] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    image_path: str | None = None
+    image_name: str | None = None
+    revised_prompt: str | None = None
+    error_message: str | None = None
+    error_type: str | None = None
+    provider: str | None = None
+    operation: str | None = None
+    timestamp: int | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 class ImageRequestValidator:
@@ -156,7 +156,7 @@ class ImageRequestValidator:
         return operation in compatibility_matrix.get(provider, [])
 
     @staticmethod
-    def validate_model_for_provider(provider: Provider, model: Optional[str]) -> bool:
+    def validate_model_for_provider(provider: Provider, model: str | None) -> bool:
         """Validate that the specified model is available for the provider."""
         if model is None:
             return True  # Default models will be used
@@ -188,8 +188,8 @@ class ImageRequestValidator:
 
 
 def create_request_from_form_data(
-    form_data: Dict[str, Any],
-) -> Union[ImageGenerationRequest, InpaintingRequest, Img2ImgRequest]:
+    form_data: dict[str, Any],
+) -> ImageGenerationRequest | InpaintingRequest | Img2ImgRequest:
     """Create typed request object from HTML form data with validation."""
     # Handle empty operation field - default to GENERATE for regular image generation
     operation_value = form_data.get("operation", Operation.GENERATE.value)
@@ -318,8 +318,8 @@ def create_success_response(
     image_name: str,
     provider: Provider,
     operation: Operation,
-    revised_prompt: Optional[str] = None,
-    metadata: Optional[Dict[str, Any]] = None,
+    revised_prompt: str | None = None,
+    metadata: dict[str, Any] | None = None,
 ) -> ImageOperationResponse:
     """Create a successful image operation response with metadata."""
     import time
@@ -340,7 +340,7 @@ def create_error_response(
     error: Exception,
     provider: Provider,
     operation: Operation,
-    error_message: Optional[str] = None,
+    error_message: str | None = None,
 ) -> ImageOperationResponse:
     """Create an error response with exception details and context."""
     import time

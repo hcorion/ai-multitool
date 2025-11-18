@@ -1,5 +1,26 @@
 # Technology Stack
 
+## Coding Principles
+
+### Pragmatic Development Philosophy
+
+1. **KISS (Keep It Simple, Stupid)**: Prefer simple, straightforward solutions over clever abstractions
+2. **YAGNI (You Aren't Gonna Need It)**: Don't build functionality until it's actually needed
+3. **Prefer Duplication Over Wrong Abstraction**: Duplication is cheaper than the wrong abstraction - wait for 3+ use cases before generalizing
+4. **Synchronous by Default**: Use async only when genuinely needed for performance or responsiveness
+5. **Avoid Premature Generalization**: Solve specific problems; generalize only with multiple concrete use cases
+6. **Cognitive Load Over Rules**: Measure code quality by how easy it is to understand, not by arbitrary metrics like line count
+7. **Idiomatic Code**: Follow language conventions and community best practices
+
+### When to Refactor
+
+- **DO** refactor when code is genuinely hard to understand
+- **DO** extract when you have 3+ identical use cases
+- **DO** simplify when cognitive load is high
+- **DON'T** split functions just to meet line count rules
+- **DON'T** create abstractions for 1-2 use cases
+- **DON'T** optimize without measuring first
+
 ## Backend
 - **Python 3.13** Latest idiomatic python with Flask web framework
 - **OpenAI Python SDK** for GPT-Image-1 generation, inpainting, and Responses API (gpt-5/gpt-5-nano models)

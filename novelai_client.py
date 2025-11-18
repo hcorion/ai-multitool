@@ -12,7 +12,7 @@ import math
 import zipfile
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import requests
 from PIL import Image as PILImage
@@ -55,7 +55,7 @@ class NovelAIGenerationPayload:
     input: str
     model: NovelAIModel = NovelAIModel.DIFFUSION_4_5_FULL
     action: NovelAIAction = NovelAIAction.GENERATE
-    parameters: Dict[str, Any] = field(default_factory=dict)
+    parameters: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -99,7 +99,7 @@ class NovelAIClient:
     def _build_common_parameters(
         self,
         prompt: str,
-        negative_prompt: Optional[str] = None,
+        negative_prompt: str | None = None,
         width: int = 1024,
         height: int = 1024,
         seed: int = 0,
@@ -107,9 +107,9 @@ class NovelAIClient:
         scale: float = 6.0,
         strength: float = 0.6,
         variety: bool = False,
-        character_prompts: Optional[List[Dict[str, str]]] = None,
+        character_prompts: list[dict[str, str]] | None = None,
         **kwargs,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Build common parameters used across all NovelAI generation methods.
 
@@ -208,7 +208,7 @@ class NovelAIClient:
         return parameters
 
     def _make_request(
-        self, endpoint: str, payload: Dict[str, Any]
+        self, endpoint: str, payload: dict[str, Any]
     ) -> requests.Response:
         """
         Make a request to the NovelAI API.
@@ -251,14 +251,14 @@ class NovelAIClient:
     def generate_image(
         self,
         prompt: str,
-        negative_prompt: Optional[str] = None,
+        negative_prompt: str | None = None,
         width: int = 1024,
         height: int = 1024,
         seed: int = 0,
         steps: int = 28,
         scale: float = 6.0,
         variety: bool = False,
-        character_prompts: Optional[List[Dict[str, str]]] = None,
+        character_prompts: list[dict[str, str]] | None = None,
         **kwargs,
     ) -> bytes:
         """
@@ -375,14 +375,14 @@ class NovelAIClient:
         base_image: bytes,
         mask: bytes,
         prompt: str,
-        negative_prompt: Optional[str] = None,
+        negative_prompt: str | None = None,
         width: int = 1024,
         height: int = 1024,
         seed: int = 0,
         steps: int = 28,
         scale: float = 6.0,
         variety: bool = False,
-        character_prompts: Optional[List[Dict[str, str]]] = None,
+        character_prompts: list[dict[str, str]] | None = None,
         **kwargs,
     ) -> bytes:
         """
@@ -457,7 +457,7 @@ class NovelAIClient:
         self,
         base_image: bytes,
         prompt: str,
-        negative_prompt: Optional[str] = None,
+        negative_prompt: str | None = None,
         strength: float = 0.7,
         width: int = 1024,
         height: int = 1024,
@@ -465,7 +465,7 @@ class NovelAIClient:
         steps: int = 28,
         scale: float = 6.0,
         variety: bool = False,
-        character_prompts: Optional[List[Dict[str, str]]] = None,
+        character_prompts: list[dict[str, str]] | None = None,
         **kwargs,
     ) -> bytes:
         """

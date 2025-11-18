@@ -46,7 +46,6 @@ import os
 import random
 import re
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple
 
 
 @dataclass
@@ -77,7 +76,7 @@ class GridDynamicPromptInfo:
 
     str_to_replace_with: str
     prompt_file: str
-    followup_row_index: Optional[int] = None
+    followup_row_index: int | None = None
 
 
 @dataclass
@@ -86,7 +85,7 @@ class FollowUpPromptFile:
 
     name: str
     column_count: int  # Number of columns (determined by row parsing)
-    rows: List[List[str]]  # Each row contains options for each column
+    rows: list[list[str]]  # Each row contains options for each column
 
 
 @dataclass
@@ -98,7 +97,7 @@ class FollowUpState:
     selected_row_index: int  # Which row was selected with the locked seed
 
 
-def parse_followup_file(file_path: str) -> Optional[FollowUpPromptFile]:
+def parse_followup_file(file_path: str) -> FollowUpPromptFile | None:
     """
     Parse a follow-up prompt file with column-based options.
 
@@ -183,7 +182,7 @@ def parse_followup_file(file_path: str) -> Optional[FollowUpPromptFile]:
 
 def get_prompt_dict(
     username: str, static_folder: str
-) -> Tuple[dict[str, list[str]], dict[str, FollowUpPromptFile]]:
+) -> tuple[dict[str, list[str]], dict[str, FollowUpPromptFile]]:
     """
     Load user's prompt files, separating regular and follow-up files.
 
@@ -333,7 +332,7 @@ def get_followup_option(
         return file_name
 
 
-def get_prompts_for_name(username: str, static_folder: str, name: str) -> List[str]:
+def get_prompts_for_name(username: str, static_folder: str, name: str) -> list[str]:
     """Get prompt options from a specific prompt file by name."""
     regular_prompts, followup_prompts = get_prompt_dict(username, static_folder)
 
@@ -630,13 +629,13 @@ def make_prompt_dynamic(
 
 
 def make_character_prompts_dynamic(
-    character_prompts: List[Dict[str, str]],
+    character_prompts: list[dict[str, str]],
     username: str,
     static_folder: str,
     seed: int,
     grid_prompt: GridDynamicPromptInfo | None = None,
     followup_state: dict[str, FollowUpState] | None = None,
-) -> List[Dict[str, str]]:
+) -> list[dict[str, str]]:
     """
     Process dynamic prompts for character prompts with unique seeds for variety.
 
@@ -648,7 +647,7 @@ def make_character_prompts_dynamic(
 
     Requirements: 3.1, 3.2, 3.3, 3.4, 3.5
     """
-    processed_character_prompts: List[Dict[str, str]] = []
+    processed_character_prompts: list[dict[str, str]] = []
 
     # Use provided follow-up state or initialize new state
     if followup_state is None:
@@ -658,7 +657,7 @@ def make_character_prompts_dynamic(
         # Use seed offset for each character to ensure variety for regular files
         char_seed = seed + i + 1
 
-        processed_char: Dict[str, str] = {}
+        processed_char: dict[str, str] = {}
 
         # Process positive prompt
         if char_prompt.get("positive", "").strip():

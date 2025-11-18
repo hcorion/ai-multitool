@@ -1,220 +1,126 @@
 # Implementation Plan
 
-- [x] 1. Organize inpainting source files into subfolder
-
-
-
-
-
-
-  - Create `src/inpainting/` directory
-  - Move inpainting-related TypeScript files to the new subfolder
-  - Update all import statements in dependent files to use new paths
-  - Verify TypeScript compilation succeeds after moves
-  - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5_
-
-- [x] 2. Clean up redundant reasoning API tests
-
-
-
-
-
-  - Analyze reasoning test files to identify overlapping functionality
-  - Consolidate `test_reasoning_*.py` files into core reasoning tests
-  - Remove duplicate integration tests and redundant error handling tests
-  - Verify remaining tests provide comprehensive coverage
-  - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
-
-- [x] 3. Consolidate undo/redo button tests
-
-
-
-
-
-
-
-
-
-  - Keep `test_undo_redo_buttons.py` as the comprehensive test
-  - Remove `test_undo_redo_debug.py` and `test_undo_redo_buttons_fix.py`
-  - Verify remaining test covers all undo/redo functionality
-  - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
-
-- [x] 3b. Cleanup outdated tests
-
-
-  - Cleanup any tests that point to test-inpainting-canvas or similar endpoints that no longer exists
-  - Replace or combine tests that have equivalent logic that use the main user endpoints.
-
-- [x] 4. Consolidate performance optimization tests
-
-
-
-
-
-
-  - Merge `test_performance_optimizations.py` and `test_performance_optimizations_unit.py`
-  - Create single comprehensive performance test file
-  - Remove duplicate test implementations
-  - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
-
-- [x] 5. Consolidate mask export tests
-
-
-
-
-
-
-  - Merge `test_mask_export_functionality.py`, `test_mask_export_unit.py`, and `test_mask_export_verification.py`
-  - Create single comprehensive mask export test file
-  - Remove redundant test implementations
-  - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
-
-- [x] 6. Clean up webworker tests
-
-
-
-
-
-  - Keep core webworker functionality tests
-  - Remove redundant `test_webworker_integration.py` and `test_worker_recursion_fix.py`
-  - Verify remaining tests cover essential webworker functionality
-  - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
-
-- [x] 7. Consolidate seed functionality tests
-
-
-
-
-
-  - Merge `test_seed_functionality.py` and `test_seed_integration.py`
-  - Create single comprehensive seed test file
-  - Remove duplicate test implementations
-  - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
-
-
-- [x] 9. Cleanup redundant tests that just read the contents of ts/js files
-
-
-
-
-
-  - Identify tests that read the contents of TypeScript/JavaScript files
-  - Either remove the useless tests, or replace with something that actually tests the functionality.
-  - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
-
-- [x] 8. Consolidate misc. tests
-
-
-
-
-
-  - Cleanup race condition, worker, zoom pan tests
-  - Verify remaining tests cover essential functionality
-  - Ensure all tests are passing
-  - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
-
-- [x] 10. Connect Generate Grid to unified image API
-
-
-
-
-
-
-
-
-  - Identify Generate Grid functionality in frontend code
-  - Update Generate Grid to use unified `/image` endpoint for batch generation
-  - Remove legacy Generate Grid implementation that bypasses unified API
-  - Test Generate Grid functionality with unified API
-  - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
-
-- [x] 11. Remove legacy webworker implementations
-
-
-
-
-
-  - Identify old implementations replaced by webworker async equivalents
-  - Verify async replacements handle all use cases
-  - Update any remaining references to use async implementations
-  - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
-
-- [x] 12. Identify and remove dead code paths
-
-
-
-
-
-  - Scan codebase for unused functions and classes
-  - Identify unreachable code paths and outdated testing infrastructure
-  - Verify no active functionality depends on identified dead code
-  - Remove dead code and update imports accordingly
+- [x] 1. Standardize Python type hints to Python 3.13 syntax
+
+
+
+
+
+  - Update all `Optional[X]` to `X | None`
+  - Update all `List[X]` to `list[X]`
+  - Update all `Dict[K, V]` to `dict[K, V]`
+  - Update all `Union[X, Y]` to `X | Y`
+  - _Requirements: 2.1_
+
+- [ ] 2. Fix TypeScript type safety issues
+  - Add proper type declarations for UMD globals (showdown, hljs)
+  - Remove unused variables in chat.ts and other files
+  - Add null checks for DOM element queries
+  - Improve type safety for API response handling
+  - _Requirements: 3.1, 3.3_
+
+- [ ] 3. Standardize error handling patterns
+- [ ] 3.1 Create unified error response format for backend
+  - Define standard error response structure
+  - Create error response factory function
+  - Update all route handlers to use standard format
+  - _Requirements: 6.1, 6.2, 6.3_
+
+- [ ] 3.2 Implement consistent frontend error handling
+  - Create error display utility function
+  - Standardize error message formatting
+  - Add retry logic for transient failures
+  - _Requirements: 6.1, 6.2, 6.5_
+
+- [ ] 4. Evaluate and refactor high cognitive load functions
+- [ ] 4.1 Audit script.ts for cognitive load issues
+  - Identify functions with complex control flow
+  - Evaluate whether splitting improves understanding
+  - Only refactor if it genuinely reduces cognitive load
+  - _Requirements: 1.3, 13.1, 13.2, 13.3, 13.4, 13.5_
+
+- [ ] 4.2 Refactor identified high cognitive load functions
+  - Extract only when it improves readability
+  - Maintain clear story flow
+  - Add comments explaining complex logic
+  - _Requirements: 1.3, 13.1, 13.2, 13.3, 13.4, 13.5_
+
+- [ ] 5. Review and address code duplication thoughtfully
+- [ ] 5.1 Identify accidental vs essential duplication
+  - Find truly identical code blocks
+  - Evaluate whether duplication may diverge
+  - Document decision to keep or extract
+  - _Requirements: 4.1, 4.2, 4.3_
+
+- [ ] 5.2 Extract only accidental duplication
+  - Create shared utilities for identical logic
+  - Keep essential duplication that may diverge
+  - Prefer duplication over wrong abstraction
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
 
-- [x] 13. Remove commented-out code blocks
-
-
-
-
-
-  - Search for commented-out code blocks throughout the codebase
-  - Remove commented code that serves no documentation purpose
-  - Preserve comments that explain complex logic or provide context
+- [ ] 6. Improve naming consistency
+  - Ensure Python uses snake_case for functions/variables
+  - Ensure Python uses PascalCase for classes
+  - Ensure TypeScript uses camelCase for functions/variables
+  - Ensure TypeScript uses PascalCase for interfaces/types
+  - Ensure constants use UPPER_SNAKE_CASE
   - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5_
 
-- [x] 14. Clean up debugging console output
+- [ ] 7. Add missing documentation
+  - Add docstrings to public Python functions
+  - Add JSDoc comments to public TypeScript functions
+  - Document complex algorithms and edge cases
+  - Explain non-obvious design decisions
+  - _Requirements: 10.1, 10.2, 10.3, 10.4, 10.5_
 
+- [ ] 8. Review and simplify data models
+  - Standardize on Pydantic models for validation
+  - Use dataclasses for simple containers
+  - Remove unnecessary custom classes
+  - Ensure consistent model usage
+  - _Requirements: 2.5_
 
+- [ ] 9. Evaluate async usage and simplify where appropriate
+  - Identify unnecessary async code
+  - Convert to synchronous where async provides no benefit
+  - Document why async is needed where it remains
+  - _Requirements: 11.1, 11.2, 11.3, 11.4, 11.5_
 
+- [ ] 10. Remove unused code and features (YAGNI)
+  - Identify unused functions and classes
+  - Remove dead code paths
+  - Eliminate unnecessary configuration options
+  - _Requirements: 1.7, 12.1, 12.2, 12.3, 12.4, 12.5_
 
-  - Remove `console.log()` statements used for debugging in TypeScript files
-  - Remove `print()` statements used for debugging in Python files
-  - Remove development-only performance timing code
-  - Preserve error logging and user-facing status messages
-  - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5_
+- [ ] 11. Validate input handling and security
+  - Review all user input validation
+  - Ensure HTML escaping for XSS prevention
+  - Validate file paths to prevent directory traversal
+  - Check authentication and session management
+  - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5_
 
-- [ ] 15. Upgrade operational monitoring to frontend displays
-  - Identify operational monitoring that currently uses print/console output
-  - Replace with user-visible progress indicators or status displays in the UI
-  - Remove console-based performance monitoring
-  - Test that operational information is still accessible to users
-  - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5_
+- [ ] 12. Extract magic numbers to named constants
+  - Identify hard-coded numbers without explanation
+  - Create named constants with comments
+  - Update code to use named constants
+  - _Requirements: 1.5, 10.2_
 
-- [x] 16. Consolidate duplicate code implementations
+- [ ] 13. Improve separation of concerns
+  - Extract business logic from route handlers
+  - Ensure data access uses manager classes
+  - Separate data transformation from HTTP handling
+  - _Requirements: 9.1, 9.2, 9.3, 9.4, 9.5_
 
-
-
-
-
-  - Identify duplicate function implementations across the codebase
-  - Identify similar code patterns that can be abstracted into utilities
-  - Create reusable utility functions for common patterns
-  - Update all references to use consolidated implementations
-  - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
-
-- [x] 17. Add minimal function documentation
-
-
-
-
-
-  - Identify functions lacking documentation in Python and TypeScript files
-  - Write brief, clear docstrings focusing on function purpose and key parameters
-  - Avoid verbose or redundant comments
-  - Follow Python and TypeScript documentation conventions
-  - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5_
-
-- [ ] 18. Apply consistent code organization patterns
-  - Identify inconsistent naming patterns across the codebase
-  - Identify misplaced utility functions that should be grouped together
-  - Reorganize code to group related functionality
-  - Update references to moved code while maintaining existing import paths where possible
+- [ ] 14. Review performance optimizations
+  - Identify premature optimizations
+  - Remove unnecessary caching if not measured
+  - Document why optimizations are needed
+  - Only optimize when performance issues are confirmed
   - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5_
 
-- [ ] 19. Verify system functionality after cleanup
-  - Run full test suite to ensure no regressions
-  - Test key user workflows manually
-  - Verify TypeScript compilation succeeds
-  - Test grid functionality and image generation workflows
-  - _Requirements: All requirements verification_
+- [ ] 15. Final checkpoint - Ensure all tests pass
+  - Run full test suite
+  - Verify no regressions
+  - Check TypeScript compilation
+  - Run Python type checker
+  - Ask user if questions arise

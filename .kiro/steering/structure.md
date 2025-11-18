@@ -1,5 +1,25 @@
 # Project Structure
 
+## Code Organization Principles
+
+### Separation of Concerns
+- **Keep route handlers thin**: Delegate business logic to service functions
+- **Separate data access**: Use manager classes for file operations and data persistence
+- **Isolate presentation**: Keep data transformation separate from HTTP response construction
+- **Modular frontend**: Separate DOM manipulation from business logic
+
+### Abstraction Guidelines
+- **Prefer duplication over wrong abstraction**: Don't extract until you have 3+ identical use cases
+- **Flat over deep**: Avoid deep inheritance hierarchies; prefer composition
+- **Explicit over clever**: Clear, straightforward code beats clever abstractions
+- **Measure by cognitive load**: Code should be easy to understand, not just follow rules
+
+### Function Design
+- **Tell a clear story**: A long function with clear flow is better than artificially split functions
+- **Single responsibility**: But don't over-split - jumping between files increases cognitive load
+- **Synchronous by default**: Only use async when genuinely needed for performance
+- **Avoid premature generalization**: Solve specific problems; generalize only when needed
+
 ## Root Level
 - `app.py` - Main Flask application with unified image API and Responses API chat integration
 - `image_models.py` - Pydantic data models for unified image generation API
