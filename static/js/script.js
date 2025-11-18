@@ -290,6 +290,10 @@ function providerChanged() {
  */
 function modelButtonChanged() {
     const provider = document.getElementById("provider");
+    if (!provider) {
+        console.error("Provider select element not found");
+        return;
+    }
     modelChanged(provider.value);
 }
 /**
@@ -325,8 +329,12 @@ function modelChanged(provider) {
  */
 function updateCharacterCount() {
     const promptInput = document.getElementById("prompt");
-    const charCount = promptInput.value.length;
     const charCountDisplay = document.getElementById("charCount");
+    if (!promptInput || !charCountDisplay) {
+        console.error("Prompt input or character count display element not found");
+        return;
+    }
+    const charCount = promptInput.value.length;
     charCountDisplay.textContent = `${charCount} / 4000`;
 }
 /**
@@ -338,6 +346,10 @@ function openTab(evt, tabName) {
     const tablinks = Array.from(document.getElementsByClassName("tablinks"));
     tablinks.forEach((element) => (element.className = element.className.replace(" active", "")));
     const tab = document.getElementById(tabName);
+    if (!tab) {
+        console.error(`Tab element '${tabName}' not found`);
+        return;
+    }
     tab.style.display = "block";
     evt.currentTarget.className += " active";
     switch (tabName) {
@@ -1164,6 +1176,10 @@ window.clearInpaintingMode = clearInpaintingMode;
  */
 function toggleShowAdvanced(event) {
     const advancedDropdown = document.getElementById("advanced-dropdown");
+    if (!advancedDropdown) {
+        console.error("Advanced dropdown element not found");
+        return;
+    }
     // Toggle visibility based on current state.
     if (advancedDropdown.style.display === "none") {
         advancedDropdown.style.display = "block";
@@ -1188,6 +1204,10 @@ function toggleAdvancedInput(event) {
     const inputToggle = event.target;
     const inputContainer = document.querySelector(".advanced-input-container");
     const advancedOption = document.getElementById("grid-prompt-file");
+    if (!inputContainer || !advancedOption) {
+        console.error("Advanced input elements not found");
+        return;
+    }
     if (inputToggle.checked) {
         inputContainer.style.display = "block";
         advancedOption.disabled = false;
@@ -1214,6 +1234,10 @@ function chatTabLoaded() {
  */
 function refreshConversationList() {
     const conversationsList = document.getElementById("conversations-list");
+    if (!conversationsList) {
+        console.error("Conversations list element not found");
+        return;
+    }
     $.get("/get-all-conversations", (response) => {
         let conversations = JSON.parse(response);
         allConversations = conversations;

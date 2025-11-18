@@ -334,8 +334,12 @@ function providerChanged() {
  * Handle model selection changes for current provider
  */
 function modelButtonChanged() {
-    const provider = document.getElementById("provider") as HTMLSelectElement;
-    modelChanged(provider.value)
+    const provider = document.getElementById("provider") as HTMLSelectElement | null;
+    if (!provider) {
+        console.error("Provider select element not found");
+        return;
+    }
+    modelChanged(provider.value);
 }
 
 /**
@@ -367,9 +371,15 @@ function modelChanged(provider: string) {
  * Update character count display for prompt input field
  */
 function updateCharacterCount(): void {
-    const promptInput = document.getElementById("prompt") as HTMLInputElement;
+    const promptInput = document.getElementById("prompt") as HTMLInputElement | null;
+    const charCountDisplay = document.getElementById("charCount") as HTMLDivElement | null;
+    
+    if (!promptInput || !charCountDisplay) {
+        console.error("Prompt input or character count display element not found");
+        return;
+    }
+    
     const charCount: number = promptInput.value.length;
-    const charCountDisplay = document.getElementById("charCount") as HTMLDivElement;
     charCountDisplay.textContent = `${charCount} / 4000`;
 }
 
@@ -383,7 +393,12 @@ function openTab(evt: MouseEvent, tabName: string): void {
     const tablinks = Array.from(document.getElementsByClassName("tablinks") as HTMLCollectionOf<HTMLElement>);
     tablinks.forEach((element) => (element.className = element.className.replace(" active", "")));
 
-    const tab = document.getElementById(tabName) as HTMLElement;
+    const tab = document.getElementById(tabName) as HTMLElement | null;
+    if (!tab) {
+        console.error(`Tab element '${tabName}' not found`);
+        return;
+    }
+    
     tab.style.display = "block";
     (evt.currentTarget as HTMLElement).className += " active";
 
@@ -1308,18 +1323,23 @@ function clearInpaintingMode(): void {
  * Toggle visibility of advanced options dropdown
  */
 function toggleShowAdvanced(event: Event): void {
-    const advancedDropdown = document.getElementById("advanced-dropdown") as HTMLElement;
+    const advancedDropdown = document.getElementById("advanced-dropdown") as HTMLElement | null;
+    if (!advancedDropdown) {
+        console.error("Advanced dropdown element not found");
+        return;
+    }
+    
     // Toggle visibility based on current state.
     if (advancedDropdown.style.display === "none") {
         advancedDropdown.style.display = "block";
     } else {
         advancedDropdown.style.display = "none";
         // Also reset the custom input toggle and hide its container when closing.
-        const inputToggle = document.getElementById("advanced-generate-grid") as HTMLInputElement;
+        const inputToggle = document.getElementById("advanced-generate-grid") as HTMLInputElement | null;
         if (inputToggle) {
             inputToggle.checked = false;
         }
-        const inputContainer = document.querySelector(".advanced-input-container") as HTMLElement;
+        const inputContainer = document.querySelector(".advanced-input-container") as HTMLElement | null;
         if (inputContainer) {
             inputContainer.style.display = "none";
         }
@@ -1331,8 +1351,13 @@ function toggleShowAdvanced(event: Event): void {
  */
 function toggleAdvancedInput(event: Event): void {
     const inputToggle = event.target as HTMLInputElement;
-    const inputContainer = document.querySelector(".advanced-input-container") as HTMLElement;
-    const advancedOption = document.getElementById("grid-prompt-file") as HTMLInputElement;
+    const inputContainer = document.querySelector(".advanced-input-container") as HTMLElement | null;
+    const advancedOption = document.getElementById("grid-prompt-file") as HTMLInputElement | null;
+
+    if (!inputContainer || !advancedOption) {
+        console.error("Advanced input elements not found");
+        return;
+    }
 
     if (inputToggle.checked) {
         inputContainer.style.display = "block";
@@ -1379,7 +1404,11 @@ function chatTabLoaded(): void {
  * Load and display user's conversation list from server
  */
 function refreshConversationList(): void {
-    const conversationsList = document.getElementById("conversations-list") as HTMLDivElement;
+    const conversationsList = document.getElementById("conversations-list") as HTMLDivElement | null;
+    if (!conversationsList) {
+        console.error("Conversations list element not found");
+        return;
+    }
 
     $.get("/get-all-conversations", (response: string) => {
         let conversations: { [key: string]: ConversationData } = JSON.parse(response);

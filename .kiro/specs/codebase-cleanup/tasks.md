@@ -12,7 +12,12 @@
   - Update all `Union[X, Y]` to `X | Y`
   - _Requirements: 2.1_
 
-- [ ] 2. Fix TypeScript type safety issues
+- [x] 2. Fix TypeScript type safety issues
+
+
+
+
+
   - Add proper type declarations for UMD globals (showdown, hljs)
   - Remove unused variables in chat.ts and other files
   - Add null checks for DOM element queries

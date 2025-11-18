@@ -44,16 +44,29 @@ export async function onConversationSelected(conversationId: string): Promise<Me
             url: "/chat?thread_id=" + encodeURIComponent(conversationId),
             contentType: "application/json",
             scriptCharset: "utf-8",
-            success: (response: string) => {
+            success: (response: string | MessageHistory) => {
                 try {
-                    const chatData: MessageHistory = JSON.parse(response);
+                    // Handle both string and object responses
+                    const chatData: MessageHistory = typeof response === 'string' 
+                        ? JSON.parse(response) 
+                        : response;
+                    
+                    // Validate response structure
+                    if (!chatData || typeof chatData !== 'object') {
+                        throw new Error('Invalid response format');
+                    }
+                    
                     resolve(chatData);
                 } catch (error) {
                     reject(new Error(`Failed to parse chat data: ${error}`));
                 }
             },
-            error: (error) => {
-                reject(new Error(`Error loading conversation: ${error}`));
+            error: (xhr: JQuery.jqXHR) => {
+                const errorMessage = xhr.responseJSON?.error_message 
+                    || xhr.responseJSON?.error 
+                    || xhr.statusText 
+                    || 'Unknown error';
+                reject(new Error(`Error loading conversation: ${errorMessage}`));
             },
         });
     });
@@ -64,7 +77,7 @@ showdown.extension("highlight", function () {
     return [
         {
             type: "output",
-            filter: function (text, converter, options) {
+            filter: function (text) {
                 var left = "<pre><code\\b[^>]*>",
                     right = "</code></pre>",
                     flags = "g";
@@ -96,33 +109,29 @@ function isScrolledToBottom(element: HTMLElement, threshold: number = 50): boole
 }
 
 /**
- * Conditionally scroll to bottom only if user is already at the bottom
- */
-function smartScrollToBottom(element: HTMLElement): void {
-    if (isScrolledToBottom(element)) {
-        element.scrollTop = element.scrollHeight;
-    }
-}
-
-/**
  * Render chat messages with markdown formatting and reasoning buttons
  */
 export function refreshChatMessages(messages: ChatMessage[]): void {
-    const chatHistory = document.getElementById("chat-history") as HTMLDivElement;
+    const chatHistory = document.getElementById("chat-history") as HTMLDivElement | null;
+    if (!chatHistory) {
+        console.error("Chat history element not found");
+        return;
+    }
+    
     const wasAtBottom = isScrolledToBottom(chatHistory);
 
     chatHistory.innerHTML = "";
     // Display AI response in chat history
-    messages.forEach((message, index) => {
-        var converter = new showdown.Converter({
+    messages.forEach((message, messageIndex) => {
+        const converter = new showdown.Converter({
             strikethrough: true,
             smoothLivePreview: true,
             tasklists: true,
             tables: true,
             extensions: ["highlight"],
-        }),
-            text = message.text,
-            html = converter.makeHtml(text);
+        });
+        const text = message.text;
+        const html = converter.makeHtml(text);
 
         const messageDiv = document.createElement("div");
         messageDiv.className = message.role === "user" ? "user-message" : "ai-message";
@@ -130,7 +139,7 @@ export function refreshChatMessages(messages: ChatMessage[]): void {
 
         // Add reasoning button and metadata for assistant messages
         if (message.role === "assistant") {
-            addReasoningButton(messageDiv, index);
+            addReasoningButton(messageDiv, messageIndex);
             addMessageMetadata(messageDiv, message);
         }
 
