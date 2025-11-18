@@ -77,7 +77,15 @@ os.makedirs("logs", exist_ok=True)
 
 # Optional: Clean up old log files (keep last 30 days)
 def cleanup_old_logs(days_to_keep=30):
-    """Remove log files older than specified days."""
+    """
+    Remove log files older than specified days to prevent disk space issues.
+    
+    Args:
+        days_to_keep: Number of days of logs to retain (default: 30)
+    
+    Note:
+        Silently continues if cleanup fails to avoid blocking application startup.
+    """
     try:
         import glob
 
@@ -96,11 +104,11 @@ def cleanup_old_logs(days_to_keep=30):
 cleanup_old_logs()
 
 # Generate dated log filename for this session
-session_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-log_filename = f"logs/app_{session_timestamp}.log"
+SESSION_TIMESTAMP = datetime.now().strftime("%Y%m%d_%H%M%S")
+LOG_FILENAME = f"logs/app_{SESSION_TIMESTAMP}.log"
 
 # Create a file handler for this session
-file_handler = logging.FileHandler(log_filename)
+file_handler = logging.FileHandler(LOG_FILENAME)
 file_handler.setLevel(logging.INFO)
 
 # Create console handler
@@ -116,7 +124,7 @@ console_handler.setFormatter(formatter)
 logging.basicConfig(level=logging.INFO, handlers=[file_handler, console_handler])
 
 # Log session start
-logging.info(f"=== New session started - Log file: {log_filename} ===")
+logging.info(f"=== New session started - Log file: {LOG_FILENAME} ===")
 
 app = Flask(__name__)
 
@@ -124,26 +132,43 @@ app = Flask(__name__)
 client = openai.OpenAI()
 
 
-stability_api_key = os.environ.get("STABILITY_API_KEY")
-novelai_api_key = os.environ.get("NOVELAI_API_KEY")
+STABILITY_API_KEY = os.environ.get("STABILITY_API_KEY")
+NOVELAI_API_KEY = os.environ.get("NOVELAI_API_KEY")
 
-secret_key_filename = "secret-key.txt"
-if not os.path.isfile(secret_key_filename):
-    with open(secret_key_filename, "a") as f:
+SECRET_KEY_FILENAME = "secret-key.txt"
+if not os.path.isfile(SECRET_KEY_FILENAME):
+    with open(SECRET_KEY_FILENAME, "a") as f:
         f.write(secrets.token_urlsafe(16))
-with open(secret_key_filename, "r") as f:
+with open(SECRET_KEY_FILENAME, "r") as f:
     app.secret_key = f.read()
 
 
 @app.errorhandler(404)
 def resource_not_found(e: Response):
-    """Handle 404 errors with JSON response."""
+    """
+    Handle 404 errors with JSON response.
+    
+    Args:
+        e: Flask response object containing error details
+    
+    Returns:
+        JSON error response with 404 status code
+    """
     return jsonify(error=str(e)), 404
 
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
-    """Handle user login with username storage in session."""
+    """
+    Handle user login with username storage in session.
+    
+    GET: Renders the login page
+    POST: Processes login form and stores username in session
+    
+    Returns:
+        GET: Rendered login template
+        POST: Redirect to index page after successful login
+    """
     if request.method == "POST":
         session["username"] = request.form["username"].strip()
         return redirect(url_for("index"))
@@ -152,7 +177,14 @@ def login():
 
 @app.route("/share")
 def share():
-    """Render the share page for viewing shared conversations."""
+    """
+    Render the share page for viewing shared conversations.
+    
+    Requires user authentication via session.
+    
+    Returns:
+        Rendered share template or redirect to login if not authenticated
+    """
     if "username" not in session:
         return redirect(url_for("login"))
     return render_template("share.html")
@@ -1643,7 +1675,7 @@ def generate_novelai_image(
     if not app.static_folder:
         raise ValueError("Flask static folder not defined")
 
-    if not novelai_api_key:
+    if not NOVELAI_API_KEY:
         raise ValueError("NovelAI API key not configured")
 
     # Use provided follow-up state or initialize new state for this generation
@@ -1673,7 +1705,7 @@ def generate_novelai_image(
     height = size[1]
 
     # Create NovelAI client
-    client = NovelAIClient(novelai_api_key)
+    client = NovelAIClient(NOVELAI_API_KEY)
 
     try:
         # Generate image using the client
@@ -1744,7 +1776,7 @@ def generate_novelai_inpaint_image(
     if not app.static_folder:
         raise ValueError("Flask static folder not defined")
 
-    if not novelai_api_key:
+    if not NOVELAI_API_KEY:
         raise ValueError("NovelAI API key not configured")
 
     # Use provided follow-up state or initialize new state for this generation
@@ -1773,7 +1805,7 @@ def generate_novelai_inpaint_image(
     width, height = size
 
     # Create NovelAI client
-    client = NovelAIClient(novelai_api_key)
+    client = NovelAIClient(NOVELAI_API_KEY)
 
     try:
         # Generate inpainted image using the client
@@ -1843,7 +1875,7 @@ def generate_novelai_img2img_image(
     if not app.static_folder:
         raise ValueError("Flask static folder not defined")
 
-    if not novelai_api_key:
+    if not NOVELAI_API_KEY:
         raise ValueError("NovelAI API key not configured")
 
     # Use provided follow-up state or initialize new state for this generation
@@ -1857,7 +1889,7 @@ def generate_novelai_img2img_image(
     width, height = size
 
     # Create NovelAI client
-    client = NovelAIClient(novelai_api_key)
+    client = NovelAIClient(NOVELAI_API_KEY)
 
     try:
         # Generate img2img image using the client
@@ -1936,12 +1968,12 @@ def generate_stability_image(
 
     if negative_prompt:
         data["negative_prompt"] = negative_prompt
-    if not stability_api_key:
+    if not STABILITY_API_KEY:
         raise Exception(
             "Stability API key not provided to server, unable to generate image using this backend!"
         )
     stability_headers = {
-        "authorization": f"Bearer {stability_api_key}",
+        "authorization": f"Bearer {STABILITY_API_KEY}",
         "accept": "image/*",
         "stability-client-id": "ai-toolkit",
         "stability-client-user-id": username,
@@ -3187,7 +3219,7 @@ def _get_aspect_ratio_from_dimensions(width: int, height: int) -> str:
             return "9:16"  # Default for portrait
 
 
-eos_str = "␆␄"
+EOS_STR = "␆␄"
 
 
 @app.route("/chat", methods=["GET", "POST"])  # type: ignore
@@ -3487,7 +3519,7 @@ def converse():
         ) -> Generator[Any | AnyStr]:
             """Stream events to frontend using new Responses API."""
             # Send initial message list
-            yield f"{json.dumps(json.dumps({'type': 'message_list', 'threadId': conversation_id, 'messages': message_list}))}{eos_str}"
+            yield f"{json.dumps(json.dumps({'type': 'message_list', 'threadId': conversation_id, 'messages': message_list}))}{EOS_STR}"
 
             event_queue: Queue[Any] = Queue()
 
@@ -3510,7 +3542,7 @@ def converse():
             # Yield from queue as events come
             while True:
                 event = event_queue.get()  # This will block until an item is available
-                yield event + eos_str
+                yield event + EOS_STR
 
         return Response(
             stream_with_context(

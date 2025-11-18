@@ -429,7 +429,7 @@ def make_prompt_dynamic(
     image grids where one element varies systematically while others remain consistent.
     """
     # Initialize seeded random generator for deterministic behavior
-    dynamicRandom = random.Random(seed)
+    dynamic_random = random.Random(seed)
 
     # Load all available prompt files for this user
     regular_prompts, followup_prompts = get_prompt_dict(username, static_folder)
@@ -467,7 +467,7 @@ def make_prompt_dynamic(
                     # Swap if min > max for graceful handling
                     min_val, max_val = max_val, min_val
                 # Generate random decimal between min and max
-                emphasis_value = dynamicRandom.uniform(min_val, max_val)
+                emphasis_value = dynamic_random.uniform(min_val, max_val)
             else:
                 # Single value format: value::content::
                 emphasis_value = min_val
@@ -518,7 +518,7 @@ def make_prompt_dynamic(
                 return ""
 
             # Randomly select one option (may be empty string)
-            selected_option = dynamicRandom.choice(options)
+            selected_option = dynamic_random.choice(options)
             return selected_option
 
         except (AttributeError, IndexError):
@@ -574,7 +574,7 @@ def make_prompt_dynamic(
             # Select random prompt from the file
             # Note: We always call choice() even if using grid override to maintain RNG consistency
             # This ensures that the same seed produces the same results for non-overridden elements
-            prompt_text = dynamicRandom.choice(regular_prompts[content])
+            prompt_text = dynamic_random.choice(regular_prompts[content])
 
             # Override with grid-specific value if this is the target file for grid generation
             if grid_prompt and content == grid_prompt.prompt_file:
