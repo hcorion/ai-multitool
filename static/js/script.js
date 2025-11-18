@@ -112,19 +112,15 @@ function keyDownEvent(evt) {
  * Render successful image generation result with metadata and actions
  */
 function renderImageResult(response) {
-    // Extract character prompts from metadata
+    // Extract character prompts from metadata using existing extraction function
     let characterPromptsHtml = '';
     if (response.metadata) {
-        const characterPrompts = [];
-        for (const [key, value] of Object.entries(response.metadata)) {
-            // Look for processed character prompt metadata (revised prompts)
-            const match = key.match(/^Character (\d+) Processed Prompt$/);
-            if (match && value && typeof value === 'string') {
-                characterPrompts.push(value);
+        const { characterPrompts } = extractPromptsFromMetadata(response.metadata);
+        if (characterPrompts && characterPrompts.length > 0) {
+            const promptTexts = characterPrompts.map(cp => cp.positive).filter(p => p);
+            if (promptTexts.length > 0) {
+                characterPromptsHtml = `<p><strong>Character Prompts:</strong> ${promptTexts.join(', ')}</p>`;
             }
-        }
-        if (characterPrompts.length > 0) {
-            characterPromptsHtml = `<p><strong>Character Prompts:</strong> ${characterPrompts.join(', ')}</p>`;
         }
     }
     const resultHtml = `
@@ -569,267 +565,281 @@ function escapeHtml(text) {
 }
 /**
  * Update grid modal image and metadata display
+ * Orchestrates navigation, metadata fetching, and UI updates
  */
 function updateGridModalImage() {
-    // Get the list of grid images from the current grid DOM.
+    // Handle navigation and get current image
+    const imageInfo = handleGridImageNavigation();
+    if (!imageInfo)
+        return;
+    // Update the modal image
+    document.getElementById("grid-modal-image").src = imageInfo.fullImagePath;
+    // Fetch and display metadata
+    $.getJSON("/get-image-metadata/" + imageInfo.fileName, function (metadata) {
+        const metadataDiv = document.getElementById("grid-info-panel");
+        metadataDiv.innerHTML = ""; // Clear previous metadata
+        // Process and render metadata
+        const { processedMetadata, characterPromptData, mainPromptData } = processImageMetadata(metadata);
+        renderMetadataDisplay(metadataDiv, processedMetadata, characterPromptData, mainPromptData);
+        // Attach action buttons
+        attachMetadataActions(metadataDiv, metadata);
+    });
+}
+/**
+ * Handle grid image navigation with wrap-around logic
+ * Returns image information or null if navigation is in progress
+ */
+function handleGridImageNavigation() {
     const gridImages = $(".image-grid img");
     if (gridImages.length === 0) {
         console.warn("No grid images found.");
-        return;
+        return null;
     }
-    // Wrap-around logic.
+    // Handle backward wrap-around
     if (currentGridImageIndex < 0) {
         if (currentPage <= 1) {
             currentGridImageIndex = 0;
-            return;
+            return null;
         }
         previousGrid();
-        // After loading the previous page, we need to wait for the images to load
-        // and then go to the last image of that page
         setTimeout(() => {
             const newGridImages = $(".image-grid img");
             currentGridImageIndex = newGridImages.length - 1;
             updateGridModalImage();
         }, 100);
-        return;
+        return null;
     }
-    else if (currentGridImageIndex >= gridImages.length) {
+    // Handle forward wrap-around
+    if (currentGridImageIndex >= gridImages.length) {
         if (currentPage >= totalPages) {
             currentGridImageIndex = gridImages.length - 1;
-            return;
+            return null;
         }
         nextGrid();
-        // After loading the next page, we need to wait for the images to load
-        // and then continue with the first image of the new page
         setTimeout(() => {
             currentGridImageIndex = 0;
             updateGridModalImage();
         }, 100);
-        return;
+        return null;
     }
+    // Extract image path information
     const newImgElement = gridImages.get(currentGridImageIndex);
     const filePath = newImgElement.src;
     const thumbFileName = filePath.split("/").pop();
     const pathDir = filePath.slice(0, -(thumbFileName?.length ?? 0));
-    // This works with .thumb.png as well since we just trim the length regardless of the contents
     const fileName = thumbFileName?.slice(0, -".thumb.jpg".length).concat(".png");
-    // Update the modal image.
-    document.getElementById("grid-modal-image").src = pathDir + fileName;
-    // Fetch and update the metadata.
-    $.getJSON("/get-image-metadata/" + fileName, function (metadata) {
-        const metadataDiv = document.getElementById("grid-info-panel");
-        metadataDiv.innerHTML = ""; // Clear previous metadata
-        // Process character prompts and main prompts to determine what to display
-        const processedMetadata = {};
-        const characterPromptData = {};
-        const mainPromptData = {};
-        // First pass: identify character prompts and compare base vs processed
-        for (const key in metadata) {
-            const characterMatch = key.match(/^Character (\d+) (Prompt|Negative)$/);
-            const processedMatch = key.match(/^Character (\d+) Processed (Prompt|Negative)$/);
-            const mainPromptMatch = key.match(/^(Prompt|Negative Prompt)$/);
-            const processedMainMatch = key.match(/^Revised (Prompt|Negative Prompt)$/);
-            if (characterMatch) {
-                const charNum = characterMatch[1];
-                const promptType = characterMatch[2];
-                const baseKey = `Character ${charNum} ${promptType}`;
-                const processedKey = `Character ${charNum} Processed ${promptType}`;
-                const baseValue = metadata[baseKey] || "";
-                const processedValue = metadata[processedKey] || "";
-                // If both exist, compare them
-                if (baseValue && processedValue) {
-                    const isDifferent = baseValue !== processedValue;
-                    characterPromptData[baseKey] = {
-                        base: baseValue,
-                        processed: processedValue,
-                        isDifferent: isDifferent
-                    };
-                    if (isDifferent) {
-                        // Show both base and processed with different styling
-                        processedMetadata[baseKey] = baseValue;
-                        processedMetadata[processedKey] = processedValue;
-                    }
-                    else {
-                        // Show only the base prompt
-                        processedMetadata[baseKey] = baseValue;
-                    }
-                }
-                else if (baseValue) {
-                    // Only base exists
-                    processedMetadata[baseKey] = baseValue;
-                }
-                else if (processedValue) {
-                    // Only processed exists (shouldn't happen, but handle it)
-                    processedMetadata[processedKey] = processedValue;
-                }
-            }
-            else if (mainPromptMatch) {
-                // Handle main prompts (Prompt, Negative Prompt)
-                const promptType = mainPromptMatch[1];
-                const baseKey = promptType;
-                const processedKey = `Revised ${promptType}`;
-                const baseValue = metadata[baseKey] || "";
-                const processedValue = metadata[processedKey] || "";
-                // If both exist, compare them
-                if (baseValue && processedValue) {
-                    const isDifferent = baseValue !== processedValue;
-                    mainPromptData[baseKey] = {
-                        base: baseValue,
-                        processed: processedValue,
-                        isDifferent: isDifferent
-                    };
-                    if (isDifferent) {
-                        // Show both base and processed with different styling
-                        processedMetadata[baseKey] = baseValue;
-                        processedMetadata[processedKey] = processedValue;
-                    }
-                    else {
-                        // Show only the base prompt
-                        processedMetadata[baseKey] = baseValue;
-                    }
-                }
-                else if (baseValue) {
-                    // Only base exists
-                    processedMetadata[baseKey] = baseValue;
-                }
-                else if (processedValue) {
-                    // Only processed exists (shouldn't happen, but handle it)
-                    processedMetadata[processedKey] = processedValue;
-                }
-            }
-            else if (!processedMatch && !processedMainMatch) {
-                // Non-prompt metadata, add as-is
-                processedMetadata[key] = metadata[key];
-            }
-            // Skip processed prompts in this pass as they're handled above
+    return {
+        fullImagePath: pathDir + fileName,
+        fileName: fileName
+    };
+}
+/**
+ * Process image metadata to identify and compare base vs processed prompts
+ * Returns processed metadata and comparison data for rendering
+ */
+function processImageMetadata(metadata) {
+    const processedMetadata = {};
+    const characterPromptData = {};
+    const mainPromptData = {};
+    // Process each metadata key to identify prompts and compare versions
+    for (const key in metadata) {
+        const characterMatch = key.match(/^Character (\d+) (Prompt|Negative)$/);
+        const processedMatch = key.match(/^Character (\d+) Processed (Prompt|Negative)$/);
+        const mainPromptMatch = key.match(/^(Prompt|Negative Prompt)$/);
+        const processedMainMatch = key.match(/^Revised (Prompt|Negative Prompt)$/);
+        if (characterMatch) {
+            processCharacterPrompt(metadata, characterMatch, processedMetadata, characterPromptData);
         }
-        // Display each metadata key–value pair.
-        for (const key in processedMetadata) {
-            const infoItem = document.createElement("div");
-            infoItem.className = "info-item";
-            // Add special styling for character prompts
-            if (key.match(/^Character \d+ (Prompt|Negative|Processed Prompt|Processed Negative)$/)) {
-                infoItem.classList.add("character-prompt-item");
-            }
-            infoItem.textContent = key + ":";
-            metadataDiv.appendChild(infoItem);
-            const infoValue = document.createElement("div");
-            infoValue.className = "prompt-value";
-            // Add special styling for character prompt values
-            if (key.match(/^Character \d+ (Prompt|Negative|Processed Prompt|Processed Negative)$/)) {
-                infoValue.classList.add("character-prompt-value");
-                // Add additional styling for processed prompts when they differ from base
-                if (key.match(/^Character \d+ Processed (Prompt|Negative)$/)) {
-                    infoValue.classList.add("processed-prompt-value");
-                    // Find the corresponding base prompt to highlight differences
-                    const baseKey = key.replace(" Processed ", " ");
-                    const basePromptData = characterPromptData[baseKey];
-                    if (basePromptData && basePromptData.isDifferent) {
-                        // Use diff highlighting for processed prompts
-                        infoValue.innerHTML = highlightTextDifferences(basePromptData.base, basePromptData.processed);
-                    }
-                    else {
-                        infoValue.textContent = processedMetadata[key];
-                    }
-                }
-                else {
-                    infoValue.textContent = processedMetadata[key];
-                }
-            }
-            else if (key.match(/^Revised (Prompt|Negative Prompt)$/)) {
-                // Handle main revised prompts
-                infoValue.classList.add("character-prompt-value", "processed-prompt-value");
-                // Find the corresponding base prompt to highlight differences
-                const baseKey = key.replace("Revised ", "");
-                const basePromptData = mainPromptData[baseKey];
-                if (basePromptData && basePromptData.isDifferent) {
-                    // Use diff highlighting for processed main prompts
-                    infoValue.innerHTML = highlightTextDifferences(basePromptData.base, basePromptData.processed);
-                }
-                else {
-                    infoValue.textContent = processedMetadata[key];
-                }
+        else if (mainPromptMatch) {
+            processMainPrompt(metadata, mainPromptMatch, processedMetadata, mainPromptData);
+        }
+        else if (!processedMatch && !processedMainMatch) {
+            // Non-prompt metadata, add as-is
+            processedMetadata[key] = metadata[key];
+        }
+    }
+    return { processedMetadata, characterPromptData, mainPromptData };
+}
+/**
+ * Process character prompt metadata, comparing base and processed versions
+ */
+function processCharacterPrompt(metadata, characterMatch, processedMetadata, characterPromptData) {
+    const charNum = characterMatch[1];
+    const promptType = characterMatch[2];
+    const baseKey = `Character ${charNum} ${promptType}`;
+    const processedKey = `Character ${charNum} Processed ${promptType}`;
+    const baseValue = metadata[baseKey] || "";
+    const processedValue = metadata[processedKey] || "";
+    if (baseValue && processedValue) {
+        const isDifferent = baseValue !== processedValue;
+        characterPromptData[baseKey] = { base: baseValue, processed: processedValue, isDifferent };
+        if (isDifferent) {
+            processedMetadata[baseKey] = baseValue;
+            processedMetadata[processedKey] = processedValue;
+        }
+        else {
+            processedMetadata[baseKey] = baseValue;
+        }
+    }
+    else if (baseValue) {
+        processedMetadata[baseKey] = baseValue;
+    }
+    else if (processedValue) {
+        processedMetadata[processedKey] = processedValue;
+    }
+}
+/**
+ * Process main prompt metadata, comparing base and revised versions
+ */
+function processMainPrompt(metadata, mainPromptMatch, processedMetadata, mainPromptData) {
+    const promptType = mainPromptMatch[1];
+    const baseKey = promptType;
+    const processedKey = `Revised ${promptType}`;
+    const baseValue = metadata[baseKey] || "";
+    const processedValue = metadata[processedKey] || "";
+    if (baseValue && processedValue) {
+        const isDifferent = baseValue !== processedValue;
+        mainPromptData[baseKey] = { base: baseValue, processed: processedValue, isDifferent };
+        if (isDifferent) {
+            processedMetadata[baseKey] = baseValue;
+            processedMetadata[processedKey] = processedValue;
+        }
+        else {
+            processedMetadata[baseKey] = baseValue;
+        }
+    }
+    else if (baseValue) {
+        processedMetadata[baseKey] = baseValue;
+    }
+    else if (processedValue) {
+        processedMetadata[processedKey] = processedValue;
+    }
+}
+/**
+ * Render metadata display with appropriate styling and diff highlighting
+ */
+function renderMetadataDisplay(metadataDiv, processedMetadata, characterPromptData, mainPromptData) {
+    for (const key in processedMetadata) {
+        const infoItem = document.createElement("div");
+        infoItem.className = "info-item";
+        // Add special styling for character prompts
+        if (key.match(/^Character \d+ (Prompt|Negative|Processed Prompt|Processed Negative)$/)) {
+            infoItem.classList.add("character-prompt-item");
+        }
+        infoItem.textContent = key + ":";
+        metadataDiv.appendChild(infoItem);
+        const infoValue = document.createElement("div");
+        infoValue.className = "prompt-value";
+        // Render value with appropriate styling and diff highlighting
+        renderMetadataValue(infoValue, key, processedMetadata[key], characterPromptData, mainPromptData);
+        metadataDiv.appendChild(infoValue);
+    }
+}
+/**
+ * Render individual metadata value with diff highlighting for processed prompts
+ */
+function renderMetadataValue(infoValue, key, value, characterPromptData, mainPromptData) {
+    // Handle character prompts
+    if (key.match(/^Character \d+ (Prompt|Negative|Processed Prompt|Processed Negative)$/)) {
+        infoValue.classList.add("character-prompt-value");
+        if (key.match(/^Character \d+ Processed (Prompt|Negative)$/)) {
+            infoValue.classList.add("processed-prompt-value");
+            const baseKey = key.replace(" Processed ", " ");
+            const basePromptData = characterPromptData[baseKey];
+            if (basePromptData && basePromptData.isDifferent) {
+                infoValue.innerHTML = highlightTextDifferences(basePromptData.base, basePromptData.processed);
             }
             else {
-                infoValue.textContent = processedMetadata[key];
+                infoValue.textContent = value;
             }
-            metadataDiv.appendChild(infoValue);
         }
-        // Create button container for better layout
-        let buttonContainer = document.getElementById("modal-button-container");
-        if (!buttonContainer) {
-            buttonContainer = document.createElement("div");
-            buttonContainer.id = "modal-button-container";
-            buttonContainer.className = "modal-button-container";
-            metadataDiv.appendChild(buttonContainer);
+        else {
+            infoValue.textContent = value;
         }
-        // Create (or update) the "Copy Prompt" button.
-        let copyPromptButton = document.getElementById("copy-prompt-btn");
-        if (!copyPromptButton) {
-            copyPromptButton = document.createElement("button");
-            copyPromptButton.id = "copy-prompt-btn";
-            copyPromptButton.textContent = "Copy Prompt";
-            buttonContainer.appendChild(copyPromptButton);
+    }
+    // Handle main revised prompts
+    else if (key.match(/^Revised (Prompt|Negative Prompt)$/)) {
+        infoValue.classList.add("character-prompt-value", "processed-prompt-value");
+        const baseKey = key.replace("Revised ", "");
+        const basePromptData = mainPromptData[baseKey];
+        if (basePromptData && basePromptData.isDifferent) {
+            infoValue.innerHTML = highlightTextDifferences(basePromptData.base, basePromptData.processed);
         }
-        // Create (or update) the "Inpaint" button.
-        let inpaintButton = document.getElementById("inpaint-btn");
-        if (!inpaintButton) {
-            inpaintButton = document.createElement("button");
-            inpaintButton.id = "inpaint-btn";
-            inpaintButton.textContent = "Inpaint";
-            inpaintButton.className = "inpaint-button";
-            buttonContainer.appendChild(inpaintButton);
+        else {
+            infoValue.textContent = value;
         }
-        // Add listener (or rebind) for the copy action.
-        copyPromptButton.onclick = () => {
-            const promptTextarea = document.getElementById("prompt");
-            const negativePromptTextarea = document.getElementById("negative_prompt");
-            // Try various key cases in case the keys are not lowercase.
-            const promptText = metadata["Prompt"];
-            const negativePromptText = metadata["Negative Prompt"] || "";
-            promptTextarea.value = promptText;
-            negativePromptTextarea.value = negativePromptText;
-            // Handle character prompt metadata if present
-            // Extract character prompts from metadata and populate character interface when available
-            const characterPrompts = [];
-            for (const key in metadata) {
-                const characterMatch = key.match(/^Character (\d+) Prompt$/);
-                if (characterMatch) {
-                    const charNum = parseInt(characterMatch[1]);
-                    const negativeKey = `Character ${charNum} Negative`;
-                    characterPrompts[charNum - 1] = {
-                        positive: metadata[key],
-                        negative: metadata[negativeKey] || ""
-                    };
-                }
+    }
+    // Handle regular metadata
+    else {
+        infoValue.textContent = value;
+    }
+}
+/**
+ * Attach action buttons (Copy Prompt, Inpaint) to metadata display
+ */
+function attachMetadataActions(metadataDiv, metadata) {
+    // Create button container
+    let buttonContainer = document.getElementById("modal-button-container");
+    if (!buttonContainer) {
+        buttonContainer = document.createElement("div");
+        buttonContainer.id = "modal-button-container";
+        buttonContainer.className = "modal-button-container";
+        metadataDiv.appendChild(buttonContainer);
+    }
+    // Create or update Copy Prompt button
+    let copyPromptButton = document.getElementById("copy-prompt-btn");
+    if (!copyPromptButton) {
+        copyPromptButton = document.createElement("button");
+        copyPromptButton.id = "copy-prompt-btn";
+        copyPromptButton.textContent = "Copy Prompt";
+        buttonContainer.appendChild(copyPromptButton);
+    }
+    // Create or update Inpaint button
+    let inpaintButton = document.getElementById("inpaint-btn");
+    if (!inpaintButton) {
+        inpaintButton = document.createElement("button");
+        inpaintButton.id = "inpaint-btn";
+        inpaintButton.textContent = "Inpaint";
+        inpaintButton.className = "inpaint-button";
+        buttonContainer.appendChild(inpaintButton);
+    }
+    // Attach Copy Prompt action
+    copyPromptButton.onclick = () => {
+        const promptTextarea = document.getElementById("prompt");
+        const negativePromptTextarea = document.getElementById("negative_prompt");
+        promptTextarea.value = metadata["Prompt"];
+        negativePromptTextarea.value = metadata["Negative Prompt"] || "";
+        // Extract and handle character prompts
+        const characterPrompts = [];
+        for (const key in metadata) {
+            const characterMatch = key.match(/^Character (\d+) Prompt$/);
+            if (characterMatch) {
+                const charNum = parseInt(characterMatch[1]);
+                const negativeKey = `Character ${charNum} Negative`;
+                characterPrompts[charNum - 1] = {
+                    positive: metadata[key],
+                    negative: metadata[negativeKey] || ""
+                };
             }
-            // Store character prompts for when character interface becomes available
-            // This will be used by the character prompt interface implementation
-            if (characterPrompts.length > 0) {
-                window.pendingCharacterPrompts = characterPrompts;
-                // If NovelAI is currently selected, populate immediately
-                const provider = document.getElementById("provider");
-                if (provider && provider.value === "novelai") {
-                    populateCharacterPrompts(characterPrompts);
-                    delete window.pendingCharacterPrompts;
-                }
+        }
+        if (characterPrompts.length > 0) {
+            window.pendingCharacterPrompts = characterPrompts;
+            const provider = document.getElementById("provider");
+            if (provider && provider.value === "novelai") {
+                populateCharacterPrompts(characterPrompts);
+                delete window.pendingCharacterPrompts;
             }
-            // Switch to the Generation tab.
-            document.getElementById("generationTab")?.click();
-        };
-        // Add listener for the inpaint action.
-        inpaintButton.onclick = () => {
-            // Get the current image URL from the modal
-            const modalImage = document.getElementById("grid-modal-image");
-            const imageUrl = modalImage.src;
-            // Extract prompts from the current metadata
-            const { prompt, negativePrompt, characterPrompts } = extractPromptsFromMetadata(metadata);
-            // Close the grid modal
-            closeGridModal();
-            // Open the inpainting mask canvas with the current image and prompts
-            openInpaintingMaskCanvas(imageUrl, prompt, negativePrompt, characterPrompts);
-        };
-    });
+        }
+        document.getElementById("generationTab")?.click();
+    };
+    // Attach Inpaint action
+    inpaintButton.onclick = () => {
+        const modalImage = document.getElementById("grid-modal-image");
+        const imageUrl = modalImage.src;
+        const { prompt, negativePrompt, characterPrompts } = extractPromptsFromMetadata(metadata);
+        closeGridModal();
+        openInpaintingMaskCanvas(imageUrl, prompt, negativePrompt, characterPrompts);
+    };
 }
 /**
  * Navigate to previous image in grid modal
@@ -1008,23 +1018,25 @@ function showInpaintingSection(baseImageUrl, maskDataUrl, baseImagePath, maskPat
 }
 /**
  * Extract prompts from image metadata for inpainting
+ *
+ * Priority Logic:
+ * - Prefers original user input over AI-processed versions
+ * - Falls back to processed versions if originals are missing
+ * - This ensures we preserve user intent when available
  */
 function extractPromptsFromMetadata(metadata) {
     let prompt;
     let negativePrompt;
     const characterPrompts = [];
-    // Priority order for main prompt extraction:
-    // 1. Original "Prompt" (user's input)
-    // 2. "Revised Prompt" (AI-processed version)
+    // Extract main prompt with priority: Original > Revised
+    // We prefer the original because it represents the user's exact intent
     if (metadata['Prompt']) {
         prompt = metadata['Prompt'];
     }
     else if (metadata['Revised Prompt']) {
         prompt = metadata['Revised Prompt'];
     }
-    // Priority order for main negative prompt:
-    // 1. Original "Negative Prompt" (user's input)  
-    // 2. "Revised Negative Prompt" (AI-processed version)
+    // Extract negative prompt with same priority logic
     if (metadata['Negative Prompt']) {
         negativePrompt = metadata['Negative Prompt'];
     }
@@ -1032,12 +1044,15 @@ function extractPromptsFromMetadata(metadata) {
         negativePrompt = metadata['Revised Negative Prompt'];
     }
     // Extract character prompts (NovelAI specific)
+    // Build a map indexed by character number to handle out-of-order metadata
     const characterMap = {};
     for (const key in metadata) {
-        // Look for character prompts: "Character 1 Prompt", "Character 1 Negative", etc.
+        // Match original character prompts: "Character 1 Prompt", "Character 1 Negative"
         const characterMatch = key.match(/^Character (\d+) (Prompt|Negative)$/);
+        // Match processed character prompts: "Character 1 Processed Prompt"
         const processedMatch = key.match(/^Character (\d+) Processed (Prompt|Negative)$/);
         if (characterMatch) {
+            // Handle original character prompts (preferred)
             const charNum = parseInt(characterMatch[1]);
             const promptType = characterMatch[2];
             if (!characterMap[charNum]) {
@@ -1051,10 +1066,12 @@ function extractPromptsFromMetadata(metadata) {
             }
         }
         else if (processedMatch) {
-            // If no original character prompt exists, use processed version as fallback
+            // Handle processed character prompts (fallback only)
+            // Only use processed version if original doesn't exist
             const charNum = parseInt(processedMatch[1]);
             const promptType = processedMatch[2];
             const originalKey = `Character ${charNum} ${promptType}`;
+            // Check if original exists - if not, use processed as fallback
             if (!metadata[originalKey]) {
                 if (!characterMap[charNum]) {
                     characterMap[charNum] = { positive: '', negative: '' };
@@ -1068,7 +1085,8 @@ function extractPromptsFromMetadata(metadata) {
             }
         }
     }
-    // Convert character map to array (sorted by character number)
+    // Convert character map to sorted array
+    // Sort by character number to maintain consistent ordering
     const characterNumbers = Object.keys(characterMap).map(num => parseInt(num)).sort((a, b) => a - b);
     for (const charNum of characterNumbers) {
         characterPrompts.push(characterMap[charNum]);
@@ -1381,108 +1399,135 @@ var cachedMessageList;
 var progressNum = 0;
 /**
  * Send chat message and handle streaming response
+ * Orchestrates message preparation, streaming, and UI updates
  */
 function sendChatMessage() {
-    var chatName = "";
-    if (currentThreadId) {
-        // Use existing conversation title
-        chatName = allConversations[currentThreadId].chat_name;
-    }
-    else {
-        // For new conversations, use a default title (server will generate the actual title)
-        chatName = "New Chat";
-    }
+    // Prepare chat message data
     const chatInput = document.getElementById("chat-input");
-    const sendChatButton = document.getElementById("send-chat");
-    const chatStatusText = document.getElementById("chat-current-status");
     const userMessage = chatInput.value.trim();
+    // Handle empty message (share URL copy)
     if (!userMessage) {
-        // If now user message, then copy the url for sharing
         if (currentThreadId) {
             const shareUrl = `${document.baseURI}/share?id=${currentThreadId}`;
             utils.copyToClipboard(shareUrl);
         }
         return;
     }
-    // Send the message to the server
+    // Determine chat name
+    const chatName = currentThreadId
+        ? allConversations[currentThreadId].chat_name
+        : "New Chat";
+    // Disable send button during processing
+    const sendChatButton = document.getElementById("send-chat");
     sendChatButton.disabled = true;
     // Get agent preset and reasoning level data
     const agentPresetData = agentPresetUI.getChatRequestData();
+    // Stream chat response
     fetchWithStreaming("/chat", {
         user_input: userMessage,
         chat_name: chatName,
         thread_id: currentThreadId,
         ...agentPresetData,
     }, (chunkData) => {
-        var parsedData = JSON.parse(chunkData);
-        // Weird hack to prevent "too stringified" json blobs getting converted to just strings.
-        let chatData = typeof parsedData === "string" ? JSON.parse(parsedData) : parsedData;
-        if (chatData.type == "message_list") {
-            chatStatusText.textContent = "In queue...";
-            currentThreadId = chatData.threadId;
-            // Expose currentThreadId to window for reasoning modal access
-            window.currentThreadId = currentThreadId;
-            cachedMessageList = chatData.messages;
-            chatInput.value = ""; // Clear input field
-            chat.refreshChatMessages(cachedMessageList);
-            // Just populate it with dummy data so that we have data in case the refresh takes too long
-            let currentTimeEpoch = new Date(Date.now()).getUTCSeconds();
-            const isNewConversation = !allConversations[chatData.threadId];
-            allConversations[chatData.threadId] = {
-                data: {
-                    id: chatData.threadId,
-                    created_at: new Date(Date.now()).getUTCSeconds(),
-                    metadata: {},
-                    object: "thread",
-                },
-                chat_name: chatName,
-                last_update: currentTimeEpoch,
-            };
-            // For new conversations, set up title refresh to catch AI-generated titles
-            if (isNewConversation && chatName === "New Chat") {
-                scheduleConversationTitleRefresh(chatData.threadId);
-            }
-        }
-        else if (chatData.type == "text_created") {
-            cachedMessageList.push({ role: "assistant", text: "" });
-            chatStatusText.textContent = "In progress...";
-        }
-        else if (chatData.type == "text_delta") {
-            cachedMessageList[cachedMessageList.length - 1].text += chatData.delta;
-            updateMostRecentChatMessage(cachedMessageList);
-            switch (progressNum) {
-                case 0:
-                    chatStatusText.textContent = "In progress.";
-                    break;
-                case 1:
-                    chatStatusText.textContent = "In progress..";
-                    break;
-                case 2:
-                    chatStatusText.textContent = "In progress...";
-                    break;
-                default:
-                    break;
-            }
-            progressNum += 1;
-            if (progressNum > 3) {
-                progressNum = 0;
-            }
-        }
-        else if (chatData.type == "text_done") {
-            sendChatButton.disabled = false;
-            chatStatusText.textContent = "Awaiting Input...";
-            progressNum = 0;
-        }
-        else if (chatData.type == "search_started" || chatData.type == "search_in_progress" || chatData.type == "search_completed") {
-            // Handle web search status updates
-            chat.handleWebSearchStatus(chatData);
-        }
-        else if (chatData.type == "reasoning_started" || chatData.type == "reasoning_in_progress" || chatData.type == "reasoning_completed") {
-            // Handle reasoning status updates
-            chat.handleReasoningStatus(chatData);
-        }
-        // TODO: Hook up the tool-based outputs
+        const parsedData = JSON.parse(chunkData);
+        // Handle double-stringified JSON
+        const chatData = typeof parsedData === "string"
+            ? JSON.parse(parsedData)
+            : parsedData;
+        // Process chunk based on type
+        processChatChunk(chatData, chatName, chatInput, sendChatButton);
     });
+}
+/**
+ * Process individual chat stream chunks based on type
+ * Handles different chunk types: message_list, text_created, text_delta, text_done, search, reasoning
+ */
+function processChatChunk(chatData, chatName, chatInput, sendChatButton) {
+    const chatStatusText = document.getElementById("chat-current-status");
+    switch (chatData.type) {
+        case "message_list":
+            handleMessageListChunk(chatData, chatName, chatInput, chatStatusText);
+            break;
+        case "text_created":
+            handleTextCreatedChunk(chatStatusText);
+            break;
+        case "text_delta":
+            handleTextDeltaChunk(chatData, chatStatusText);
+            break;
+        case "text_done":
+            handleTextDoneChunk(sendChatButton, chatStatusText);
+            break;
+        case "search_started":
+        case "search_in_progress":
+        case "search_completed":
+            chat.handleWebSearchStatus(chatData);
+            break;
+        case "reasoning_started":
+        case "reasoning_in_progress":
+        case "reasoning_completed":
+            chat.handleReasoningStatus(chatData);
+            break;
+        default:
+            // Unknown chunk type - log for debugging
+            console.warn("Unknown chat chunk type:", chatData.type);
+            break;
+    }
+}
+/**
+ * Handle message_list chunk: initialize conversation and update UI
+ */
+function handleMessageListChunk(chatData, chatName, chatInput, chatStatusText) {
+    chatStatusText.textContent = "In queue...";
+    // Update current thread ID
+    currentThreadId = chatData.threadId;
+    window.currentThreadId = currentThreadId;
+    // Update message cache and UI
+    cachedMessageList = chatData.messages;
+    chatInput.value = "";
+    chat.refreshChatMessages(cachedMessageList);
+    // Update conversation list
+    const currentTimeEpoch = new Date(Date.now()).getUTCSeconds();
+    const isNewConversation = !allConversations[chatData.threadId];
+    allConversations[chatData.threadId] = {
+        data: {
+            id: chatData.threadId,
+            created_at: currentTimeEpoch,
+            metadata: {},
+            object: "thread",
+        },
+        chat_name: chatName,
+        last_update: currentTimeEpoch,
+    };
+    // Schedule title refresh for new conversations
+    if (isNewConversation && chatName === "New Chat") {
+        scheduleConversationTitleRefresh(chatData.threadId);
+    }
+}
+/**
+ * Handle text_created chunk: add new assistant message
+ */
+function handleTextCreatedChunk(chatStatusText) {
+    cachedMessageList.push({ role: "assistant", text: "" });
+    chatStatusText.textContent = "In progress...";
+}
+/**
+ * Handle text_delta chunk: append text to current message with animated status
+ */
+function handleTextDeltaChunk(chatData, chatStatusText) {
+    cachedMessageList[cachedMessageList.length - 1].text += chatData.delta;
+    updateMostRecentChatMessage(cachedMessageList);
+    // Animate status text with dots
+    const statusTexts = ["In progress.", "In progress..", "In progress..."];
+    chatStatusText.textContent = statusTexts[progressNum % 3];
+    progressNum = (progressNum + 1) % 4;
+}
+/**
+ * Handle text_done chunk: re-enable send button and reset status
+ */
+function handleTextDoneChunk(sendChatButton, chatStatusText) {
+    sendChatButton.disabled = false;
+    chatStatusText.textContent = "Awaiting Input...";
+    progressNum = 0;
 }
 /**
  * Check if the chat container is scrolled to or near the bottom
@@ -1542,14 +1587,18 @@ function addReasoningButtonToMessage(messageElement, messageIndex) {
     });
     messageElement.appendChild(reasoningButton);
 }
+/**
+ * Show reasoning modal for a specific message
+ * Fetches reasoning data from server and displays it with comprehensive error handling
+ */
 function showReasoningModalFromScript(messageIndex) {
-    // Get current conversation ID
+    // Validate conversation ID
     const conversationId = currentThreadId;
     if (!conversationId) {
         showReasoningErrorFromScript("No conversation selected");
         return;
     }
-    // Show modal with loading state
+    // Validate modal elements
     const modal = document.getElementById("reasoning-modal");
     const content = document.getElementById("reasoning-content");
     const loading = document.getElementById("reasoning-loading");
@@ -1566,10 +1615,8 @@ function showReasoningModalFromScript(messageIndex) {
     modal.style.display = "block";
     // Set up timeout for the request
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => {
-        controller.abort();
-    }, 10000); // 10 second timeout
-    // Fetch reasoning data with comprehensive error handling
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    // Fetch reasoning data
     fetch(`/chat/reasoning/${conversationId}/${messageIndex}`, {
         signal: controller.signal,
         headers: {
@@ -1580,28 +1627,13 @@ function showReasoningModalFromScript(messageIndex) {
         .then(response => {
         clearTimeout(timeoutId);
         if (!response.ok) {
-            // Handle specific HTTP error codes
-            if (response.status === 404) {
-                throw new Error("Reasoning data not found for this message");
-            }
-            else if (response.status === 400) {
-                throw new Error("Invalid request - this message may not support reasoning");
-            }
-            else if (response.status === 401) {
-                throw new Error("Authentication required - please refresh the page");
-            }
-            else if (response.status === 500) {
-                throw new Error("Server error - please try again later");
-            }
-            else {
-                throw new Error(`Request failed (${response.status}): ${response.statusText}`);
-            }
+            throw new Error(getReasoningHttpErrorMessage(response.status, response.statusText));
         }
         return response.json();
     })
         .then(data => {
         loading.style.display = "none";
-        // Validate response structure
+        // Validate and display response
         if (!data) {
             throw new Error("Empty response received");
         }
@@ -1628,18 +1660,41 @@ function showReasoningModalFromScript(messageIndex) {
         .catch(err => {
         clearTimeout(timeoutId);
         loading.style.display = "none";
-        // Handle different types of errors
-        if (err.name === 'AbortError') {
-            showReasoningErrorFromScript("Request timed out - please try again");
-        }
-        else if (err.name === 'TypeError' && err.message.includes('fetch')) {
-            showReasoningErrorFromScript("Network error - please check your connection");
-        }
-        else {
-            showReasoningErrorFromScript(`Failed to load reasoning data: ${err.message}`);
-        }
+        const errorMessage = getReasoningFetchErrorMessage(err);
+        showReasoningErrorFromScript(errorMessage);
         console.error("Reasoning modal error:", err);
     });
+}
+/**
+ * Get user-friendly error message for HTTP errors
+ */
+function getReasoningHttpErrorMessage(status, statusText) {
+    switch (status) {
+        case 404:
+            return "Reasoning data not found for this message";
+        case 400:
+            return "Invalid request - this message may not support reasoning";
+        case 401:
+            return "Authentication required - please refresh the page";
+        case 500:
+            return "Server error - please try again later";
+        default:
+            return `Request failed (${status}): ${statusText}`;
+    }
+}
+/**
+ * Get user-friendly error message for fetch errors
+ */
+function getReasoningFetchErrorMessage(error) {
+    if (error.name === 'AbortError') {
+        return "Request timed out - please try again";
+    }
+    else if (error.name === 'TypeError' && error.message.includes('fetch')) {
+        return "Network error - please check your connection";
+    }
+    else {
+        return `Failed to load reasoning data: ${error.message}`;
+    }
 }
 function displayReasoningDataFromScript(reasoningData) {
     const content = document.getElementById("reasoning-content");
