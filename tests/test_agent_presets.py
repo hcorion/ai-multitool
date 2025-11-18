@@ -9,8 +9,7 @@ import pytest
 import time
 import json
 import os
-from unittest.mock import patch, Mock
-from typing import Dict, Any
+from unittest.mock import patch
 
 # Mock OpenAI client before importing app components
 with patch('openai.OpenAI'):
@@ -363,7 +362,7 @@ class TestAgentPresetManager:
         
         assert default_preset.id == 'default'
         assert default_preset.name == 'Default Assistant'
-        assert default_preset.model == 'gpt-5'
+        assert default_preset.model == 'gpt-5.1'
         assert default_preset.default_reasoning_level == 'medium'
         assert len(default_preset.instructions) > 0
 

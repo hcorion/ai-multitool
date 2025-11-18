@@ -13,7 +13,6 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from json import JSONDecodeError
 from queue import Queue
 from typing import Any, AnyStr, Generator, Mapping, NoReturn
 
@@ -53,6 +52,11 @@ from error_handlers import (
     create_internal_error,
     create_not_found_error,
     create_validation_error,
+)
+from file_manager_utils import (
+    UserFileManager,
+    load_json_file_with_backup,
+    save_json_file_atomic,
 )
 from image_models import (
     ImageGenerationRequest,
@@ -521,33 +525,16 @@ class UserConversations(BaseModel):
         }
 
 
-class ConversationManager:
+class ConversationManager(UserFileManager):
     """Manages local conversation storage and response ID tracking for the Responses API migration."""
 
     def __init__(self, static_folder: str):
-        self.static_folder = static_folder
-        self.chats_dir = os.path.join(static_folder, "chats")
-        os.makedirs(self.chats_dir, exist_ok=True)
-
-        # Add thread locks for concurrent access protection
-        self._user_locks: dict[str, threading.Lock] = {}
-        self._locks_lock = threading.Lock()
+        super().__init__(static_folder, "chats")
 
         # Add conversation cache for performance optimization
         self._conversation_cache: dict[str, UserConversations] = {}
         self._cache_timestamps: dict[str, float] = {}
         self._cache_ttl = 300  # 5 minutes cache TTL
-
-    def _get_user_lock(self, username: str) -> threading.Lock:
-        """Get or create a thread lock for safe concurrent access to user data."""
-        with self._locks_lock:
-            if username not in self._user_locks:
-                self._user_locks[username] = threading.Lock()
-            return self._user_locks[username]
-
-    def _get_user_file_path(self, username: str) -> str:
-        """Get the JSON file path for storing user's conversation data."""
-        return os.path.join(self.chats_dir, f"{username}.json")
 
     def _is_cache_valid(self, username: str) -> bool:
         """Check if cached conversation data is within TTL window."""
@@ -583,45 +570,27 @@ class ConversationManager:
                 return cached_conversations
 
             user_file = self._get_user_file_path(username)
-            if os.path.exists(user_file):
+            
+            # Use shared utility for JSON loading with error handling
+            data = load_json_file_with_backup(
+                user_file, "conversations", username, {}
+            )
+            
+            if data:
                 try:
-                    with open(user_file, "r", encoding="utf-8") as file:
-                        data = json.load(file)
-                        # Use Pydantic's model_validate to create UserConversations directly
-                        user_conversations = UserConversations.model_validate(
-                            {"conversations": data}
-                        )
-                        # Update cache
-                        self._update_cache(username, user_conversations)
-                        return user_conversations
-                except json.JSONDecodeError as e:
-                    logging.error(
-                        f"JSON decode error loading conversations for {username}: {e}"
+                    # Use Pydantic's model_validate to create UserConversations directly
+                    user_conversations = UserConversations.model_validate(
+                        {"conversations": data}
                     )
-                    # Try to create backup of corrupted file
-                    try:
-                        backup_file = f"{user_file}.backup.{int(time.time())}"
-                        import shutil
-
-                        shutil.copy2(user_file, backup_file)
-                        logging.info(f"Created backup of corrupted file: {backup_file}")
-                    except Exception as backup_error:
-                        logging.error(f"Failed to create backup: {backup_error}")
-                    return UserConversations()
-                except IOError as e:
-                    logging.error(f"IO error loading conversations for {username}: {e}")
-                    return UserConversations()
+                    # Update cache
+                    self._update_cache(username, user_conversations)
+                    return user_conversations
                 except ValueError as e:
                     logging.error(
                         f"Validation error loading conversations for {username}: {e}"
                     )
                     return UserConversations()
-                except Exception as e:
-                    logging.error(
-                        f"Unexpected error loading conversations for {username}: {e}",
-                        exc_info=True,
-                    )
-                    return UserConversations()
+            
             return UserConversations()
 
     def _save_user_conversations(
@@ -631,64 +600,24 @@ class ConversationManager:
         # Use thread lock for file operations
         with self._get_user_lock(username):
             user_file = self._get_user_file_path(username)
-            # Use unique temp file name to avoid conflicts
-            temp_file = f"{user_file}.tmp.{threading.current_thread().ident}.{int(time.time() * 1000000)}"
-
+            
+            # Convert Pydantic models to JSON-serializable format
+            data = {}
+            for conv_id, conversation in user_conversations.conversations.items():
+                data[conv_id] = conversation.model_dump()
+            
             try:
-                # Write to temporary file first for atomic operation
-                with open(temp_file, "w", encoding="utf-8") as file:
-                    # Convert Pydantic models to JSON-serializable format
-                    data = {}
-                    for (
-                        conv_id,
-                        conversation,
-                    ) in user_conversations.conversations.items():
-                        data[conv_id] = conversation.model_dump()
-                    json.dump(data, file, indent=2, ensure_ascii=False)
-
-                # Atomic move to final location
-                import shutil
-
-                shutil.move(temp_file, user_file)
-
+                # Use shared utility for atomic JSON save
+                save_json_file_atomic(user_file, data, "conversations", username)
+                
                 # Update cache after successful save
                 self._update_cache(username, user_conversations)
-
-            except IOError as e:
-                logging.error(f"IO error saving conversations for {username}: {e}")
-                # Clean up temp file if it exists
-                try:
-                    if os.path.exists(temp_file):
-                        os.remove(temp_file)
-                except OSError:
-                    pass
+                
+            except (IOError, ValueError) as e:
                 raise ConversationStorageError(
                     f"Failed to save conversations for {username}: {e}"
                 )
-            except JSONDecodeError as e:
-                logging.error(
-                    f"JSON encode error saving conversations for {username}: {e}"
-                )
-                # Clean up temp file if it exists
-                try:
-                    if os.path.exists(temp_file):
-                        os.remove(temp_file)
-                except OSError:
-                    pass
-                raise ConversationStorageError(
-                    f"Failed to encode conversations for {username}: {e}"
-                )
             except Exception as e:
-                logging.error(
-                    f"Unexpected error saving conversations for {username}: {e}",
-                    exc_info=True,
-                )
-                # Clean up temp file if it exists
-                try:
-                    if os.path.exists(temp_file):
-                        os.remove(temp_file)
-                except OSError:
-                    pass
                 raise ConversationStorageError(
                     f"Unexpected error saving conversations for {username}: {e}"
                 )
@@ -1014,73 +943,29 @@ class ConversationManager:
             }
 
 
-class AgentPresetManager:
+class AgentPresetManager(UserFileManager):
     """Manages agent preset storage and CRUD operations with file-based storage."""
 
     def __init__(self, static_folder: str):
-        self.static_folder = static_folder
-        self.agents_dir = os.path.join(static_folder, "agents")
-        os.makedirs(self.agents_dir, exist_ok=True)
-
-        # Add thread locks for concurrent access protection
-        self._user_locks: dict[str, threading.Lock] = {}
-        self._locks_lock = threading.Lock()
-
-    def _get_user_lock(self, username: str) -> threading.Lock:
-        """Get or create a thread lock for safe concurrent access to user data."""
-        with self._locks_lock:
-            if username not in self._user_locks:
-                self._user_locks[username] = threading.Lock()
-            return self._user_locks[username]
-
-    def _get_user_file_path(self, username: str) -> str:
-        """Get the JSON file path for storing user's agent presets."""
-        return os.path.join(self.agents_dir, f"{username}.json")
+        super().__init__(static_folder, "agents")
 
     def _load_user_presets(self, username: str) -> dict[str, AgentPreset]:
         """Load all agent presets for a user from their JSON file with comprehensive error handling."""
         with self._get_user_lock(username):
             user_file = self._get_user_file_path(username)
-            if os.path.exists(user_file):
+            
+            # Use shared utility for JSON loading with error handling
+            data = load_json_file_with_backup(user_file, "presets", username, {})
+            
+            presets = {}
+            for preset_id, preset_data in data.get("presets", {}).items():
                 try:
-                    with open(user_file, "r", encoding="utf-8") as file:
-                        data = json.load(file)
-                        presets = {}
-                        for preset_id, preset_data in data.get("presets", {}).items():
-                            try:
-                                presets[preset_id] = AgentPreset.model_validate(
-                                    preset_data
-                                )
-                            except ValueError as e:
-                                logging.error(
-                                    f"Invalid preset data for {preset_id}: {e}"
-                                )
-                                continue
-                        return presets
-                except json.JSONDecodeError as e:
-                    logging.error(
-                        f"JSON decode error loading presets for {username}: {e}"
-                    )
-                    # Try to create backup of corrupted file
-                    try:
-                        backup_file = f"{user_file}.backup.{int(time.time())}"
-                        import shutil
-
-                        shutil.copy2(user_file, backup_file)
-                        logging.info(f"Created backup of corrupted file: {backup_file}")
-                    except Exception as backup_error:
-                        logging.error(f"Failed to create backup: {backup_error}")
-                    return {}
-                except IOError as e:
-                    logging.error(f"IO error loading presets for {username}: {e}")
-                    return {}
-                except Exception as e:
-                    logging.error(
-                        f"Unexpected error loading presets for {username}: {e}",
-                        exc_info=True,
-                    )
-                    return {}
-            return {}
+                    presets[preset_id] = AgentPreset.model_validate(preset_data)
+                except ValueError as e:
+                    logging.error(f"Invalid preset data for {preset_id}: {e}")
+                    continue
+            
+            return presets
 
     def _save_user_presets(
         self, username: str, presets: dict[str, AgentPreset]
@@ -1088,56 +973,17 @@ class AgentPresetManager:
         """Save all agent presets for a user to their JSON file with comprehensive error handling and thread safety."""
         with self._get_user_lock(username):
             user_file = self._get_user_file_path(username)
-            # Use unique temp file name to avoid conflicts
-            temp_file = f"{user_file}.tmp.{threading.current_thread().ident}.{int(time.time() * 1000000)}"
-
-            try:
-                # Write to temporary file first for atomic operation
-                with open(temp_file, "w", encoding="utf-8") as file:
-                    # Convert Pydantic models to JSON-serializable format
-                    data = {
-                        "presets": {
-                            preset_id: preset.model_dump()
-                            for preset_id, preset in presets.items()
-                        }
-                    }
-                    json.dump(data, file, indent=2, ensure_ascii=False)
-
-                # Atomic move to final location
-                import shutil
-
-                shutil.move(temp_file, user_file)
-
-            except IOError as e:
-                logging.error(f"IO error saving presets for {username}: {e}")
-                # Clean up temp file if it exists
-                try:
-                    if os.path.exists(temp_file):
-                        os.remove(temp_file)
-                except OSError:
-                    pass
-                raise IOError(f"Failed to save presets for {username}: {e}")
-            except json.JSONEncodeError as e:
-                logging.error(f"JSON encode error saving presets for {username}: {e}")
-                # Clean up temp file if it exists
-                try:
-                    if os.path.exists(temp_file):
-                        os.remove(temp_file)
-                except OSError:
-                    pass
-                raise ValueError(f"Failed to encode presets for {username}: {e}")
-            except Exception as e:
-                logging.error(
-                    f"Unexpected error saving presets for {username}: {e}",
-                    exc_info=True,
-                )
-                # Clean up temp file if it exists
-                try:
-                    if os.path.exists(temp_file):
-                        os.remove(temp_file)
-                except OSError:
-                    pass
-                raise Exception(f"Unexpected error saving presets for {username}: {e}")
+            
+            # Convert Pydantic models to JSON-serializable format
+            data = {
+                "presets": {
+                    preset_id: preset.model_dump()
+                    for preset_id, preset in presets.items()
+                }
+            }
+            
+            # Use shared utility for atomic JSON save
+            save_json_file_atomic(user_file, data, "presets", username)
 
     def create_preset(self, username: str, preset: AgentPreset) -> str:
         """Create a new agent preset and return its ID."""
@@ -1855,32 +1701,12 @@ def generate_novelai_image(
         if negative_prompt:
             image_metadata["Negative Prompt"] = negative_prompt
 
-        # Add character prompt metadata (both original and processed)
+        # Add character prompt metadata using shared utility
         if character_prompts and processed_character_prompts:
-            for i, (original_char_prompt, processed_char_prompt) in enumerate(
-                zip(character_prompts, processed_character_prompts)
-            ):
-                char_num = i + 1
-                # Only include character metadata if positive prompt exists
-                if original_char_prompt.get("positive", "").strip():
-                    # Save original prompt (with dynamic prompt syntax) for copying
-                    image_metadata[f"Character {char_num} Prompt"] = (
-                        original_char_prompt["positive"]
-                    )
-                    # Save processed prompt for reference
-                    image_metadata[f"Character {char_num} Processed Prompt"] = (
-                        processed_char_prompt["positive"]
-                    )
-
-                    # Only include negative prompts if they exist
-                    if original_char_prompt.get("negative", "").strip():
-                        image_metadata[f"Character {char_num} Negative"] = (
-                            original_char_prompt["negative"]
-                        )
-                    if processed_char_prompt.get("negative", "").strip():
-                        image_metadata[f"Character {char_num} Processed Negative"] = (
-                            processed_char_prompt["negative"]
-                        )
+            char_metadata = build_character_prompt_metadata(
+                character_prompts, processed_character_prompts
+            )
+            image_metadata.update(char_metadata)
 
         saved_data = process_image_response(
             file_bytes, prompt, revised_prompt, username, image_metadata
@@ -1976,32 +1802,12 @@ def generate_novelai_inpaint_image(
         if negative_prompt:
             image_metadata["Negative Prompt"] = negative_prompt
 
-        # Add character prompt metadata (both original and processed)
+        # Add character prompt metadata using shared utility
         if character_prompts and processed_character_prompts:
-            for i, (original_char_prompt, processed_char_prompt) in enumerate(
-                zip(character_prompts, processed_character_prompts)
-            ):
-                char_num = i + 1
-                # Only include character metadata if positive prompt exists
-                if original_char_prompt.get("positive", "").strip():
-                    # Save original prompt (with dynamic prompt syntax) for copying
-                    image_metadata[f"Character {char_num} Prompt"] = (
-                        original_char_prompt["positive"]
-                    )
-                    # Save processed prompt for reference
-                    image_metadata[f"Character {char_num} Processed Prompt"] = (
-                        processed_char_prompt["positive"]
-                    )
-
-                    # Only include negative prompts if they exist
-                    if original_char_prompt.get("negative", "").strip():
-                        image_metadata[f"Character {char_num} Negative"] = (
-                            original_char_prompt["negative"]
-                        )
-                    if processed_char_prompt.get("negative", "").strip():
-                        image_metadata[f"Character {char_num} Processed Negative"] = (
-                            processed_char_prompt["negative"]
-                        )
+            char_metadata = build_character_prompt_metadata(
+                character_prompts, processed_character_prompts
+            )
+            image_metadata.update(char_metadata)
 
         saved_data = process_image_response(
             file_bytes, prompt, revised_prompt, username, image_metadata
@@ -2172,6 +1978,56 @@ def generate_stability_image(
         for error in body["errors"]:
             error_message += f"{error}\n"
         raise Exception(error_message)
+
+
+def build_character_prompt_metadata(
+    character_prompts: list[dict[str, str]],
+    processed_character_prompts: list[dict[str, str]],
+) -> dict[str, str]:
+    """
+    Build metadata dictionary for character prompts.
+
+    Args:
+        character_prompts: List of original character prompts with 'positive' and 'negative' keys
+        processed_character_prompts: List of processed character prompts with same structure
+
+    Returns:
+        Dictionary of metadata entries for character prompts
+
+    Note:
+        Only includes metadata for characters with non-empty positive prompts.
+        Negative prompts are only included if they exist.
+    """
+    metadata: dict[str, str] = {}
+
+    if not character_prompts or not processed_character_prompts:
+        return metadata
+
+    for i, (original_char_prompt, processed_char_prompt) in enumerate(
+        zip(character_prompts, processed_character_prompts)
+    ):
+        char_num = i + 1
+
+        # Only include character metadata if positive prompt exists
+        if original_char_prompt.get("positive", "").strip():
+            # Save original prompt (with dynamic prompt syntax) for copying
+            metadata[f"Character {char_num} Prompt"] = original_char_prompt["positive"]
+            # Save processed prompt for reference
+            metadata[f"Character {char_num} Processed Prompt"] = processed_char_prompt[
+                "positive"
+            ]
+
+            # Only include negative prompts if they exist
+            if original_char_prompt.get("negative", "").strip():
+                metadata[f"Character {char_num} Negative"] = original_char_prompt[
+                    "negative"
+                ]
+            if processed_char_prompt.get("negative", "").strip():
+                metadata[f"Character {char_num} Processed Negative"] = (
+                    processed_char_prompt["negative"]
+                )
+
+    return metadata
 
 
 def _process_openai_prompt(

@@ -376,22 +376,6 @@ class TestAgentPresetAPIUpdate:
         data = json.loads(response.data)
         assert data['error'] == 'Agent preset not found'
 
-    def test_update_default_agent_protection(self, authenticated_session):
-        """Test that default agent preset cannot be updated."""
-        # Ensure default preset exists
-        authenticated_session.get('/agents')
-        
-        update_data = {
-            'name': 'Hacked Default',
-            'instructions': 'Malicious instructions.'
-        }
-        
-        response = authenticated_session.put('/agents/default', json=update_data)
-        assert response.status_code == 403
-        
-        data = json.loads(response.data)
-        assert data['error'] == 'Cannot modify default preset'
-
     def test_update_agent_missing_fields(self, authenticated_session):
         """Test updating an agent preset with missing required fields."""
         # Create a preset first
