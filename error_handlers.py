@@ -161,35 +161,6 @@ def create_not_found_error(
     )
 
 
-def create_rate_limit_error(
-    retry_after: int | None = None,
-) -> tuple[dict[str, Any], int]:
-    """Create a rate limit error response.
-
-    Args:
-        retry_after: Optional seconds to wait before retrying (0 is valid)
-
-    Returns:
-        Tuple of (error_dict, status_code) for Flask response
-    """
-    details = {}
-    if retry_after is not None:
-        message = f"Too many requests. Please wait {retry_after} seconds before trying again."
-        details["retry_after"] = retry_after
-    else:
-        message = "Too many requests. Please wait a moment before trying again."
-
-    return create_error_response(
-        error=RuntimeError(message),
-        error_type="RateLimitError",
-        error_message=message,
-        status_code=HTTPStatus.TOO_MANY_REQUESTS,
-        error_details=details,
-        user_action="Please wait before sending another request.",
-        log_error=False,
-    )
-
-
 def create_internal_error(
     error: Exception | None = None,
     message: str = "Internal server error",

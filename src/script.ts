@@ -3,7 +3,7 @@ import * as chat from "./chat.js";
 import { InpaintingMaskCanvas } from "./inpainting/inpainting-mask-canvas.js";
 import { getElementByIdSafe } from './dom_utils.js';
 import * as agentPresetUI from './agent-preset-ui.js';
-import { displayError, parseJQueryError, extractErrorMessage } from './error-handler.js';
+import { parseJQueryError, extractErrorMessage } from './error-handler.js';
 
 
 // TypeScript interfaces for the new image API

@@ -117,57 +117,6 @@ function escapeHtml(text) {
 // Track active timeout for error display
 let errorDisplayTimeout = null;
 /**
- * Display error message to user
- */
-export function displayError(error, options = {}) {
-    const { targetElement = null, showDetails = false, errorClass = 'error-message', autoHideDuration = 0 } = options;
-    const errorMessage = extractErrorMessage(error);
-    const errorType = extractErrorType(error);
-    // Log to console for debugging
-    console.error(`${errorType}:`, errorMessage, error);
-    // Display in target element if provided
-    if (targetElement) {
-        // Clear any existing timeout
-        if (errorDisplayTimeout !== null) {
-            clearTimeout(errorDisplayTimeout);
-            errorDisplayTimeout = null;
-        }
-        // Add error class without overwriting existing classes
-        targetElement.classList.add(errorClass);
-        // Build error message safely using DOM nodes
-        targetElement.innerHTML = ''; // Clear existing content
-        const strongEl = document.createElement('strong');
-        strongEl.textContent = `${errorType}: `;
-        targetElement.appendChild(strongEl);
-        const messageText = document.createTextNode(errorMessage);
-        targetElement.appendChild(messageText);
-        // Add user action if available (escaped)
-        if (isErrorResponse(error) && error.user_action) {
-            const br = document.createElement('br');
-            targetElement.appendChild(br);
-            const emEl = document.createElement('em');
-            emEl.textContent = error.user_action;
-            targetElement.appendChild(emEl);
-        }
-        // Add technical details if requested
-        if (showDetails && isErrorResponse(error) && error.error_details) {
-            const br = document.createElement('br');
-            targetElement.appendChild(br);
-            const smallEl = document.createElement('small');
-            smallEl.textContent = `Details: ${JSON.stringify(error.error_details)}`;
-            targetElement.appendChild(smallEl);
-        }
-        targetElement.style.display = 'block';
-        // Auto-hide if duration specified
-        if (autoHideDuration > 0) {
-            errorDisplayTimeout = window.setTimeout(() => {
-                targetElement.style.display = 'none';
-                errorDisplayTimeout = null;
-            }, autoHideDuration);
-        }
-    }
-}
-/**
  * Clear error display
  */
 export function clearError(targetElement) {

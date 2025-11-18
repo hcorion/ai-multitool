@@ -6,7 +6,6 @@ from error_handlers import (
     create_error_response,
     create_internal_error,
     create_not_found_error,
-    create_rate_limit_error,
     create_validation_error,
 )
 
@@ -121,23 +120,6 @@ class TestErrorFactoryFunctions:
         assert "User" in result_dict["error_message"]
         assert "123" in result_dict["error_message"]
 
-    def test_create_rate_limit_error(self):
-        """Test rate limit error creation."""
-        result_dict, status_code = create_rate_limit_error(retry_after=60)
-
-        assert status_code == 429
-        assert result_dict["error_type"] == "RateLimitError"
-        assert "60 seconds" in result_dict["error_message"]
-        assert result_dict["error_details"]["retry_after"] == 60
-
-    def test_create_rate_limit_error_no_retry(self):
-        """Test rate limit error without retry_after."""
-        result_dict, status_code = create_rate_limit_error()
-
-        assert status_code == 429
-        assert result_dict["error_type"] == "RateLimitError"
-        assert "wait a moment" in result_dict["error_message"].lower()
-
     def test_create_internal_error(self):
         """Test internal server error creation."""
         error = RuntimeError("Something broke")
@@ -158,7 +140,6 @@ class TestErrorResponseFormat:
             create_validation_error("test"),
             create_authentication_error(),
             create_not_found_error("Resource"),
-            create_rate_limit_error(),
             create_internal_error(),
         ]
 
