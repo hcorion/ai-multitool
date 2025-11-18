@@ -48,6 +48,12 @@ from dynamic_prompts import (
     make_character_prompts_dynamic,
     make_prompt_dynamic,
 )
+from error_handlers import (
+    create_authentication_error,
+    create_internal_error,
+    create_not_found_error,
+    create_validation_error,
+)
 from image_models import (
     ImageGenerationRequest,
     ImageOperationResponse,
@@ -55,7 +61,7 @@ from image_models import (
     InpaintingRequest,
     Operation,
     Provider,
-    create_error_response,
+    create_error_response as create_image_error_response,
     create_request_from_form_data,
     create_success_response,
 )
@@ -152,14 +158,14 @@ def share():
 def save_mask():
     """Save uploaded mask file for inpainting operations."""
     if "username" not in session:
-        return jsonify({"error": "Not authenticated"}), 401
+        return create_authentication_error()
 
     if "mask" not in request.files:
-        return jsonify({"error": "No mask file provided"}), 400
+        return create_validation_error("No mask file provided", field="mask")
 
     mask_file = request.files["mask"]
     if mask_file.filename == "":
-        return jsonify({"error": "No mask file selected"}), 400
+        return create_validation_error("No mask file selected", field="mask")
 
     try:
         username = session["username"]
@@ -196,8 +202,7 @@ def save_mask():
         )
 
     except Exception as e:
-        logging.error(f"Error saving mask: {e}", exc_info=True)
-        return jsonify({"error": f"Failed to save mask: {str(e)}"}), 500
+        return create_internal_error(error=e, message="Failed to save mask")
 
 
 @app.route("/logout")
@@ -2923,18 +2928,18 @@ def get_all_conversations() -> str:
 def update_conversation_title():
     """Update conversation title and return updated conversation list."""
     if "username" not in session:
-        return jsonify({"error": "Username not in session"}), 401
+        return create_authentication_error()
 
     username = session["username"]
 
     if not request.json:
-        return jsonify({"error": "Invalid request format"}), 400
+        return create_validation_error("Invalid request format")
 
     conversation_id = request.json.get("conversation_id")
     new_title = request.json.get("title")
 
     if not conversation_id or not new_title:
-        return jsonify({"error": "Missing conversation_id or title"}), 400
+        return create_validation_error("Missing conversation_id or title")
 
     try:
         # Update the conversation title
@@ -2958,8 +2963,7 @@ def update_conversation_title():
             ), 400
 
     except Exception as e:
-        logging.error(f"Error updating conversation title: {e}", exc_info=True)
-        return jsonify({"success": False, "error": "Internal server error"}), 500
+        return create_internal_error(error=e, message="Failed to update conversation title")
 
 
 # Old get_message_list function removed - now using ConversationManager.get_message_list()
@@ -2969,7 +2973,7 @@ def update_conversation_title():
 def handle_image_request():
     """Unified endpoint for all image operations (generate, inpaint, img2img)."""
     if "username" not in session:
-        return jsonify({"error": "Not authenticated"}), 401
+        return create_authentication_error()
 
     try:
         # Check if this is a grid generation request
@@ -3068,10 +3072,9 @@ def handle_image_request():
             ), 400
 
     except ValueError as e:
-        return jsonify({"error": str(e)}), 400
+        return create_validation_error(str(e))
     except Exception as e:
-        logging.error(f"Error in image request: {e}", exc_info=True)
-        return jsonify({"error": "Internal server error"}), 500
+        return create_internal_error(error=e, message="Image request failed")
 
 
 def _handle_generation_request(
@@ -3143,7 +3146,7 @@ def _handle_generation_request(
         )
 
     except Exception as e:
-        return create_error_response(
+        return create_image_error_response(
             error=e, provider=image_request.provider, operation=image_request.operation
         )
 
@@ -3236,7 +3239,7 @@ def _handle_inpainting_request(
 
     except (ValueError, FileNotFoundError, IOError) as e:
         # These are user-facing errors that should be shown to the user
-        return create_error_response(
+        return create_image_error_response(
             error=e,
             provider=image_request.provider,
             operation=image_request.operation,
@@ -3246,7 +3249,7 @@ def _handle_inpainting_request(
         # Log unexpected errors for debugging
         logging.error(f"Unexpected error in inpainting request: {e}", exc_info=True)
 
-        return create_error_response(
+        return create_image_error_response(
             error=e,
             provider=image_request.provider,
             operation=image_request.operation,
@@ -3303,7 +3306,7 @@ def _handle_img2img_request(image_request: Img2ImgRequest) -> ImageOperationResp
         )
 
     except Exception as e:
-        return create_error_response(
+        return create_image_error_response(
             error=e, provider=image_request.provider, operation=image_request.operation
         )
 
@@ -3360,7 +3363,7 @@ def converse():
 
         user_input = request.json.get("user_input")
         if not user_input:
-            return {"error": "No input provided"}, 400
+            return create_validation_error("No input provided", field="user_input")
 
         # Get agent preset and reasoning level parameters
         agent_preset_id = request.json.get("agent_preset_id")
@@ -3396,7 +3399,7 @@ def converse():
                 username, conversation_id
             )
             if not conversation:
-                return {"error": "Conversation not found"}, 404
+                return create_not_found_error("Conversation", conversation_id)
 
         else:
             # Create new conversation with temporary title
@@ -3674,7 +3677,7 @@ def converse():
 def get_message_reasoning(conversation_id: str, message_index: int):
     """API endpoint to retrieve reasoning data for a specific message."""
     if "username" not in session:
-        return jsonify({"error": "Authentication required"}), 401
+        return create_authentication_error()
 
     username = session["username"]
 
@@ -3764,8 +3767,7 @@ def get_message_reasoning(conversation_id: str, message_index: int):
         return jsonify(response_data)
 
     except ValueError as e:
-        logging.warning(f"Validation error in get_message_reasoning: {e}")
-        return jsonify({"error": "Invalid request", "message": str(e)}), 400
+        return create_validation_error(str(e))
 
     except Exception as e:
         logging.error(f"Unexpected error in get_message_reasoning: {e}", exc_info=True)
@@ -4724,10 +4726,10 @@ def detect_followup_file(content_lines: list[str]) -> tuple[bool, int]:
 def get_prompt_files():
     """Get all prompt files for the current user."""
     if "username" not in session:
-        return jsonify({"error": "Not authenticated"}), 401
+        return create_authentication_error()
 
     if not app.static_folder:
-        return jsonify({"error": "Static folder not configured"}), 500
+        return create_internal_error(message="Static folder not configured")
 
     username = session["username"]
     prompt_files_dir = os.path.join(app.static_folder, "prompts", username)
@@ -4768,36 +4770,35 @@ def get_prompt_files():
         return jsonify(files)
 
     except Exception as e:
-        return jsonify({"error": f"Failed to read prompt files: {str(e)}"}), 500
+        return create_internal_error(error=e, message="Failed to read prompt files")
 
 
 @app.route("/prompt-files", methods=["POST"])
 def save_prompt_file():
     """Create or update a prompt file."""
     if "username" not in session:
-        return jsonify({"error": "Not authenticated"}), 401
+        return create_authentication_error()
 
     if not app.static_folder:
-        return jsonify({"error": "Static folder not configured"}), 500
+        return create_internal_error(message="Static folder not configured")
 
     try:
         data = request.get_json()
         if not data:
-            return jsonify({"error": "No data provided"}), 400
+            return create_validation_error("No data provided")
 
         filename = data.get("name", "").strip()
         content = data.get("content", "")
 
         if not filename:
-            return jsonify({"error": "File name is required"}), 400
+            return create_validation_error("File name is required", field="name")
 
         # Validate filename
         if not re.match(r"^[a-zA-Z0-9_-]+$", filename):
-            return jsonify(
-                {
-                    "error": "File name can only contain letters, numbers, underscores, and hyphens"
-                }
-            ), 400
+            return create_validation_error(
+                "File name can only contain letters, numbers, underscores, and hyphens",
+                field="name",
+            )
 
         username = session["username"]
         prompt_files_dir = os.path.join(app.static_folder, "prompts", username)
@@ -4811,29 +4812,29 @@ def save_prompt_file():
         return jsonify({"success": True, "message": "File saved successfully"})
 
     except Exception as e:
-        return jsonify({"error": f"Failed to save file: {str(e)}"}), 500
+        return create_internal_error(error=e, message="Failed to save file")
 
 
 @app.route("/prompt-files/<filename>", methods=["GET"])
 def get_prompt_file(filename: str):
     """Get a specific prompt file content."""
     if "username" not in session:
-        return jsonify({"error": "Not authenticated"}), 401
+        return create_authentication_error()
 
     if not app.static_folder:
-        return jsonify({"error": "Static folder not configured"}), 500
+        return create_internal_error(message="Static folder not configured")
 
     try:
         # Validate filename
         if not re.match(r"^[a-zA-Z0-9_-]+$", filename):
-            return jsonify({"error": "Invalid filename"}), 400
+            return create_validation_error("Invalid filename", field="filename")
 
         username = session["username"]
         prompts_dir = os.path.join(app.static_folder, "prompts", username)
         file_path = os.path.join(prompts_dir, f"{filename}.txt")
 
         if not os.path.exists(file_path):
-            return jsonify({"error": "File not found"}), 404
+            return create_not_found_error("Prompt file", filename)
 
         with open(file_path, "r", encoding="utf-8") as f:
             content_lines = f.read().splitlines()
@@ -4854,22 +4855,22 @@ def get_prompt_file(filename: str):
         return jsonify(file_data)
 
     except Exception as e:
-        return jsonify({"error": f"Failed to read file: {str(e)}"}), 500
+        return create_internal_error(error=e, message="Failed to read file")
 
 
 @app.route("/prompt-files/<filename>", methods=["DELETE"])
 def delete_prompt_file(filename: str):
     """Delete a prompt file."""
     if "username" not in session:
-        return jsonify({"error": "Not authenticated"}), 401
+        return create_authentication_error()
 
     if not app.static_folder:
-        return jsonify({"error": "Static folder not configured"}), 500
+        return create_internal_error(message="Static folder not configured")
 
     try:
         # Validate filename
         if not re.match(r"^[a-zA-Z0-9_-]+$", filename):
-            return jsonify({"error": "Invalid file name"}), 400
+            return create_validation_error("Invalid file name", field="filename")
 
         username = session["username"]
         file_path = os.path.join(
@@ -4877,20 +4878,20 @@ def delete_prompt_file(filename: str):
         )
 
         if not os.path.exists(file_path):
-            return jsonify({"error": "File not found"}), 404
+            return create_not_found_error("Prompt file", filename)
 
         os.remove(file_path)
         return jsonify({"success": True, "message": "File deleted successfully"})
 
     except Exception as e:
-        return jsonify({"error": f"Failed to delete file: {str(e)}"}), 500
+        return create_internal_error(error=e, message="Failed to delete file")
 
 
 @app.route("/agents", methods=["GET", "POST"])
 def manage_agent_presets():
     """Handle agent preset CRUD operations."""
     if "username" not in session:
-        return jsonify({"error": "Not authenticated"}), 401
+        return create_authentication_error()
 
     username = session["username"]
 
@@ -4920,11 +4921,11 @@ def manage_agent_presets():
             try:
                 # Parse JSON request data
                 if not request.is_json:
-                    return jsonify({"error": "Request must be JSON"}), 400
+                    return create_validation_error("Request must be JSON")
 
                 data = request.get_json()
                 if not data:
-                    return jsonify({"error": "Missing required field: name"}), 400
+                    return create_validation_error("Missing required field: name", field="name")
 
                 # Validate required fields
                 required_fields = ["name", "instructions"]

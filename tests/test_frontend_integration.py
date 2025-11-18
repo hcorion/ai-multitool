@@ -88,8 +88,9 @@ class TestFrontendIntegration:
         assert response.content_type == 'application/json'
         
         data = json.loads(response.data)
-        assert 'error' in data
-        assert 'Prompt cannot be empty' in data['error']
+        assert not data['success']
+        assert data['error_type'] == 'ValidationError'
+        assert 'Prompt cannot be empty' in data['error_message']
     
     @patch('app.generate_openai_image')
     def test_endpoint_selection_logic(self, mock_generate, client, authenticated_session):
@@ -127,8 +128,9 @@ class TestFrontendIntegration:
         
         assert response.status_code == 400
         data = json.loads(response.data)
-        assert 'error' in data
-        assert isinstance(data['error'], str)
+        assert not data['success']
+        assert data['error_type'] == 'ValidationError'
+        assert isinstance(data['error_message'], str)
         
         # Test unsupported operation
         response = client.post('/image', data={
@@ -139,8 +141,9 @@ class TestFrontendIntegration:
         
         assert response.status_code == 400
         data = json.loads(response.data)
-        assert 'error' in data
-        assert 'does not support operation' in data['error']
+        assert not data['success']
+        assert data['error_type'] == 'ValidationError'
+        assert 'does not support operation' in data['error_message']
 
 
 class TestEndpointCompatibility:

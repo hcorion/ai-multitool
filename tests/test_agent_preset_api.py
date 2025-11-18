@@ -7,14 +7,13 @@ including authentication, validation, and CRUD operations.
 
 import pytest
 import json
-import time
 import tempfile
 import shutil
 from unittest.mock import patch
 
 # Mock OpenAI client before importing app
 with patch('openai.OpenAI'):
-    from app import app, AgentPreset
+    from app import app
 
 
 @pytest.fixture
@@ -63,14 +62,16 @@ class TestAgentPresetAPIAuthentication:
         response = client.get('/agents')
         assert response.status_code == 401
         data = json.loads(response.data)
-        assert data['error'] == 'Not authenticated'
+        assert not data['success']
+        assert data['error_type'] == 'AuthenticationError'
 
     def test_post_agents_requires_authentication(self, client):
         """Test that POST /agents requires authentication."""
         response = client.post('/agents', json={'name': 'Test', 'instructions': 'Test'})
         assert response.status_code == 401
         data = json.loads(response.data)
-        assert data['error'] == 'Not authenticated'
+        assert not data['success']
+        assert data['error_type'] == 'AuthenticationError'
 
     def test_get_agent_by_id_requires_authentication(self, client):
         """Test that GET /agents/<id> requires authentication."""
@@ -176,7 +177,7 @@ class TestAgentPresetAPICreate:
         
         data = json.loads(response.data)
         preset = data['preset']
-        assert preset['model'] == 'gpt-5'  # Default value
+        assert preset['model'] == 'gpt-5.1'  # Default value
         assert preset['default_reasoning_level'] == 'medium'  # Default value
 
     def test_create_agent_missing_name(self, authenticated_session):
@@ -255,7 +256,9 @@ class TestAgentPresetAPICreate:
         assert response.status_code == 400
         
         data = json.loads(response.data)
-        assert data['error'] == 'Request must be JSON'
+        assert not data['success']
+        assert data['error_type'] == 'ValidationError'
+        assert 'Request must be JSON' in data['error_message']
 
     def test_create_agent_empty_json(self, authenticated_session):
         """Test creating an agent preset with empty JSON."""
@@ -263,7 +266,9 @@ class TestAgentPresetAPICreate:
         assert response.status_code == 400
         
         data = json.loads(response.data)
-        assert 'Missing required field' in data['error']
+        assert not data['success']
+        assert data['error_type'] == 'ValidationError'
+        assert 'Missing required field' in data['error_message']
 
 
 class TestAgentPresetAPIGet:

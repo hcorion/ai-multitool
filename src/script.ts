@@ -3,6 +3,7 @@ import * as chat from "./chat.js";
 import { InpaintingMaskCanvas } from "./inpainting/inpainting-mask-canvas.js";
 import { getElementByIdSafe } from './dom_utils.js';
 import * as agentPresetUI from './agent-preset-ui.js';
+import { displayError, parseJQueryError, extractErrorMessage } from './error-handler.js';
 
 
 // TypeScript interfaces for the new image API
@@ -44,44 +45,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 $("#loading-spinner").hide();
             },
             error: (xhr: JQuery.jqXHR) => {
-                let errorMessage = "An error occurred while generating the image.";
-
-                // Try to extract detailed error information
-                if (xhr.responseJSON) {
-                    if (xhr.responseJSON.error_message) {
-                        errorMessage = xhr.responseJSON.error_message;
-                    } else if (xhr.responseJSON.error) {
-                        errorMessage = xhr.responseJSON.error;
-                    }
-
-                    // Add additional error details if available
-                    if (xhr.responseJSON.error_type) {
-                        errorMessage += ` (${xhr.responseJSON.error_type})`;
-                    }
-                } else if (xhr.responseText) {
-                    // Try to parse error from response text
-                    try {
-                        const errorData = JSON.parse(xhr.responseText);
-                        if (errorData.error_message) {
-                            errorMessage = errorData.error_message;
-                        } else if (errorData.error) {
-                            errorMessage = errorData.error;
-                        }
-                    } catch (e) {
-                        // If parsing fails, include the raw response text for debugging
-                        errorMessage += ` (Status: ${xhr.status}, Response: ${xhr.responseText.substring(0, 200)})`;
-                    }
-                } else {
-                    errorMessage += ` (HTTP ${xhr.status}: ${xhr.statusText})`;
-                }
-
-                console.error('Image generation error:', {
-                    status: xhr.status,
-                    statusText: xhr.statusText,
-                    responseJSON: xhr.responseJSON,
-                    responseText: xhr.responseText
-                });
-
+                const errorResponse = parseJQueryError(xhr);
+                const errorMessage = extractErrorMessage(errorResponse);
+                
                 renderImageError(errorMessage);
                 $("#loading-spinner").hide();
             }
@@ -1054,7 +1020,8 @@ async function setupInpaintingMode(baseImageUrl: string, maskDataUrl: string, ma
 
 
     } catch (error) {
-        console.error('Error setting up inpainting mode:', error);
+        const errorMessage = extractErrorMessage(error);
+        console.error('Error setting up inpainting mode:', errorMessage, error);
         throw error;
     }
 }
@@ -1448,11 +1415,13 @@ function updateConversationTitle(conversationId: string, newTitle: string): void
                 // Refresh the conversation list display
                 refreshConversationListFromCache();
             } else {
-                console.error("Failed to update title:", response.error);
+                const errorMessage = extractErrorMessage(response);
+                console.error("Failed to update title:", errorMessage);
             }
         },
         error: (xhr: JQueryXHR, status: string, error: string) => {
-            console.error("Error updating conversation title:", error);
+            const errorResponse = parseJQueryError(xhr);
+            console.error("Error updating conversation title:", extractErrorMessage(errorResponse));
         }
     });
 }

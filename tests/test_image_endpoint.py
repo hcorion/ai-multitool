@@ -36,7 +36,9 @@ class TestImageEndpoint:
         
         assert response.status_code == 401
         data = json.loads(response.data)
-        assert data['error'] == 'Not authenticated'
+        assert not data['success']
+        assert data['error_type'] == 'AuthenticationError'
+        assert 'Authentication required' in data['error_message']
     
     @patch('app.generate_openai_image')
     def test_generate_request_success(self, mock_generate, client, authenticated_session):
@@ -142,7 +144,9 @@ class TestImageEndpoint:
         
         assert response.status_code == 400
         data = json.loads(response.data)
-        assert 'error' in data
+        assert not data['success']
+        assert data['error_type'] == 'ValidationError'
+        assert 'error_message' in data
     
     def test_unsupported_provider_operation_combination(self, client, authenticated_session):
         """Test unsupported provider-operation combination."""
@@ -154,7 +158,9 @@ class TestImageEndpoint:
         
         assert response.status_code == 400
         data = json.loads(response.data)
-        assert 'Provider openai does not support operation img2img' in data['error']
+        assert not data['success']
+        assert data['error_type'] == 'ValidationError'
+        assert 'Provider openai does not support operation img2img' in data['error_message']
     
     def test_missing_required_fields(self, client, authenticated_session):
         """Test request with missing required fields."""
@@ -166,7 +172,9 @@ class TestImageEndpoint:
         
         assert response.status_code == 400
         data = json.loads(response.data)
-        assert 'error' in data
+        assert not data['success']
+        assert data['error_type'] == 'ValidationError'
+        assert 'error_message' in data
     
     def test_invalid_dimensions_openai(self, client, authenticated_session):
         """Test invalid dimensions for OpenAI provider."""
