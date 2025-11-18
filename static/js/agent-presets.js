@@ -358,10 +358,10 @@ export function validateAgentPresetForm(formData) {
     else if (formData.instructions.trim().length > 5000) {
         errors.push('Instructions must be 5000 characters or less');
     }
-    if (!['gpt-5', 'gpt-5-mini', 'gpt-5-pro'].includes(formData.model)) {
+    if (!['gpt-5.1', 'gpt-5', 'gpt-5-mini', 'gpt-5-pro'].includes(formData.model)) {
         errors.push('Invalid model selection');
     }
-    if (!['high', 'medium', 'low'].includes(formData.default_reasoning_level)) {
+    if (!['high', 'medium', 'low', 'none'].includes(formData.default_reasoning_level)) {
         errors.push('Invalid reasoning level selection');
     }
     return errors;

@@ -4,22 +4,22 @@ export interface AgentPreset {
     id: string;
     name: string;
     instructions: string;
-    model: 'gpt-5' | 'gpt-5-mini' | 'gpt-5-pro';
-    default_reasoning_level: 'high' | 'medium' | 'low';
+    model: 'gpt-5.1' | 'gpt-5' | 'gpt-5-mini' | 'gpt-5-pro';
+    default_reasoning_level: 'high' | 'medium' | 'low' | 'none';
     created_at: number;
     updated_at: number;
 }
 
 export interface ChatState {
     activeAgentPreset: AgentPreset | null;
-    messageReasoningLevel: 'high' | 'medium' | 'low' | null;
+    messageReasoningLevel: 'high' | 'medium' | 'low' | 'none' | null;
 }
 
 export interface AgentPresetFormData {
     name: string;
     instructions: string;
-    model: 'gpt-5' | 'gpt-5-mini' | 'gpt-5-pro';
-    default_reasoning_level: 'high' | 'medium' | 'low';
+    model: 'gpt-5.1' | 'gpt-5' | 'gpt-5-mini' | 'gpt-5-pro';
+    default_reasoning_level: 'high' | 'medium' | 'low' | 'none';
 }
 
 export interface AgentPresetAPIResponse {
@@ -299,7 +299,7 @@ export function setActiveAgentPreset(preset: AgentPreset | null): void {
 /**
  * Set the message-level reasoning override
  */
-export function setMessageReasoningLevel(level: 'high' | 'medium' | 'low' | null): void {
+export function setMessageReasoningLevel(level: 'high' | 'medium' | 'low' | 'none' | null): void {
     chatState.messageReasoningLevel = level;
     updateReasoningLevelDisplay();
 }
@@ -307,7 +307,7 @@ export function setMessageReasoningLevel(level: 'high' | 'medium' | 'low' | null
 /**
  * Get the effective reasoning level (override or preset default)
  */
-export function getEffectiveReasoningLevel(): 'high' | 'medium' | 'low' {
+export function getEffectiveReasoningLevel(): 'high' | 'medium' | 'low' | 'none' {
     if (chatState.messageReasoningLevel) {
         return chatState.messageReasoningLevel;
     }
@@ -434,11 +434,11 @@ export function validateAgentPresetForm(formData: AgentPresetFormData): string[]
         errors.push('Instructions must be 5000 characters or less');
     }
     
-    if (!['gpt-5', 'gpt-5-mini', 'gpt-5-pro'].includes(formData.model)) {
+    if (!['gpt-5.1', 'gpt-5', 'gpt-5-mini', 'gpt-5-pro'].includes(formData.model)) {
         errors.push('Invalid model selection');
     }
     
-    if (!['high', 'medium', 'low'].includes(formData.default_reasoning_level)) {
+    if (!['high', 'medium', 'low', 'none'].includes(formData.default_reasoning_level)) {
         errors.push('Invalid reasoning level selection');
     }
     

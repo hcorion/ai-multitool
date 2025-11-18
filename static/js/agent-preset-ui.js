@@ -245,7 +245,8 @@ function renderReasoningLevelSelector() {
     const levels = [
         { value: 'high', label: 'High (Detailed Analysis)' },
         { value: 'medium', label: 'Medium (Balanced)' },
-        { value: 'low', label: 'Low (Quick Response)' }
+        { value: 'low', label: 'Low (Quick Response)' },
+        { value: 'none', label: 'None (Quickest Response)' }
     ];
     levels.forEach(level => {
         const option = document.createElement('option');
@@ -356,11 +357,13 @@ function updateReasoningLevelIndicator() {
 function formatReasoningLevelForIndicator(level) {
     switch (level) {
         case 'high':
-            return '🧠 High (Detailed Analysis)';
+            return '🧠High';
         case 'medium':
-            return '⚡ Medium (Balanced)';
+            return '⚡Medium';
         case 'low':
-            return '💨 Low (Quick Response)';
+            return '💨Low';
+        case 'none':
+            return '✖️None';
         default:
             return level;
     }
@@ -507,7 +510,7 @@ function populatePresetForm(preset) {
         if (instructionsField)
             instructionsField.value = '';
         if (modelField)
-            modelField.value = 'gpt-5';
+            modelField.value = 'gpt-5.1';
         if (reasoningField)
             reasoningField.value = 'medium';
     }
@@ -620,7 +623,7 @@ function getFormData() {
     return {
         name: nameField?.value?.trim() || '',
         instructions: instructionsField?.value?.trim() || '',
-        model: modelField?.value || 'gpt-5',
+        model: modelField?.value || 'gpt-5.1',
         default_reasoning_level: reasoningField?.value || 'medium'
     };
 }

@@ -227,6 +227,8 @@ function formatReasoningLevel(level: string): string {
             return '⚡ Medium';
         case 'low':
             return '💨 Low';
+        case 'none':
+            return '❌ None';
         default:
             return level;
     }
@@ -237,6 +239,8 @@ function formatReasoningLevel(level: string): string {
  */
 function formatModelName(model: string): string {
     switch (model) {
+        case 'gpt-5.1':
+            return 'GPT-5.1';
         case 'gpt-5':
             return 'GPT-5';
         case 'gpt-5-mini':

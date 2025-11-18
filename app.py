@@ -311,11 +311,11 @@ def validate_reasoning_data(
         "response_id": str,
     }
 
-    for field, expected_type in expected_fields.items():
-        if field in reasoning_data:
-            if not isinstance(reasoning_data[field], expected_type):
+    for field_name, expected_type in expected_fields.items():
+        if field_name in reasoning_data:
+            if not isinstance(reasoning_data[field_name], expected_type):
                 raise ValueError(
-                    f"Reasoning data field '{field}' must be of type {expected_type}"
+                    f"Reasoning data field '{field_name}' must be of type {expected_type}"
                 )
 
     # Ensure summary_parts contains only strings if present
@@ -365,7 +365,7 @@ class AgentPreset(BaseModel):
     name: str = Field(..., description="User-friendly name for the preset")
     instructions: str = Field(..., description="System instructions for the agent")
     model: str = Field(
-        default="gpt-5", description="Model to use (gpt-5, gpt-5-mini, gpt-5-pro)"
+        default="gpt-5.1", description="Model to use (gpt-5.1, gpt-5, gpt-5-mini, gpt-5-pro)"
     )
     default_reasoning_level: str = Field(
         default="medium", description="Default reasoning level (high, medium, low)"
@@ -377,7 +377,7 @@ class AgentPreset(BaseModel):
     @classmethod
     def validate_model(cls, v: str) -> str:
         """Validate model type."""
-        valid_models = {"gpt-5", "gpt-5-mini", "gpt-5-pro"}
+        valid_models = {"gpt-5.1", "gpt-5", "gpt-5-mini", "gpt-5-pro"}
         if v not in valid_models:
             raise ValueError(f"Model must be one of {valid_models}, got: {v}")
         return v
@@ -426,7 +426,7 @@ class ChatMessage(BaseModel):
         """Validate model type if provided."""
         if v is None:
             return v
-        valid_models = {"gpt-5", "gpt-5-mini", "gpt-5-pro"}
+        valid_models = {"gpt-5.1", "gpt-5", "gpt-5-mini", "gpt-5-pro"}
         if v not in valid_models:
             raise ValueError(f"Model must be one of {valid_models}, got: {v}")
         return v
@@ -437,7 +437,7 @@ class ChatMessage(BaseModel):
         """Validate reasoning level if provided."""
         if v is None:
             return v
-        valid_levels = {"high", "medium", "low"}
+        valid_levels = {"high", "medium", "low", "none"}
         if v not in valid_levels:
             raise ValueError(f"Reasoning level must be one of {valid_levels}, got: {v}")
         return v
@@ -1243,7 +1243,7 @@ code
             id="default",
             name="Default Assistant",
             instructions=default_instructions,
-            model="gpt-5",
+            model="gpt-5.1",
             default_reasoning_level="medium",
             created_at=current_time,
             updated_at=current_time,
@@ -1296,10 +1296,11 @@ class ResponsesAPIClient:
     """Client wrapper for OpenAI Responses API with support for multiple models and reasoning levels."""
 
     # Valid models supported by the Responses API
-    VALID_MODELS = {"gpt-5", "gpt-5-mini", "gpt-5-pro"}
+    VALID_MODELS = {"gpt-5.1", "gpt-5", "gpt-5-mini", "gpt-5-pro"}
 
     # Model knowledge cutoff dates
     MODEL_KNOWLEDGE_CUTOFFS = {
+        "gpt-5.1": "2024-09-30",
         "gpt-5": "2024-09-30",
         "gpt-5-mini": "2024-09-30",
         "gpt-5-pro": "2024-09-30",
@@ -1310,11 +1311,12 @@ class ResponsesAPIClient:
         "high": {"effort": "high", "summary": "detailed"},
         "medium": {"effort": "medium", "summary": "detailed"},
         "low": {"effort": "low", "summary": "detailed"},
+        "none": {"effort": "none"},
     }
 
     def __init__(self, openai_client: openai.OpenAI):
         self.client = openai_client
-        self.default_model = "gpt-5"
+        self.default_model = "gpt-5.1"
         self.default_reasoning_level = "medium"
 
     def _get_model_metadata(self, model: str) -> str:
@@ -1333,12 +1335,12 @@ class ResponsesAPIClient:
 
         # Add metadata at the beginning of instructions after any existing model identification
         lines = instructions.split("\n")
-        first_line = lines[0] if lines else ""
+        first_line = lines[0].lower() if lines else ""
 
         # Check if first line contains specific model identification (like "CodeGPT" or "GPT-5")
         has_model_id = any(
             keyword in first_line
-            for keyword in ["CodeGPT", "GPT-5", "GPT-4", "large language model"]
+            for keyword in ["CodeGPT", "ChatGPT", "GPT-5", "GPT-4", "large language model"]
         )
 
         if has_model_id and len(lines) > 0:
@@ -1582,7 +1584,7 @@ code
         """Process streaming responses using the StreamEventProcessor."""
         try:
             event_processor.process_stream(stream)
-        except Exception as e:
+        except Exception:
             event_processor.event_queue.put(
                 json.dumps(
                     {"type": "error", "message": "Error processing response stream"}
@@ -1616,7 +1618,7 @@ code
                             "type": "response_done",
                             "response_id": getattr(event, "response_id", None),
                         }
-        except Exception as e:
+        except Exception:
             yield {"type": "error", "message": "Error processing response stream"}
 
     def generate_conversation_title(self, user_message: str) -> str:
@@ -1633,6 +1635,7 @@ code
                 input=f"Generate a title for this conversation:\n\nUser message: {truncated_message}",
                 instructions=self._get_title_generation_instructions(),
                 stream=False,
+                text={"verbosity": "low"},
                 reasoning={"effort": "low"},  # Minimal reasoning for cost efficiency
             )
 
@@ -1659,7 +1662,7 @@ code
 
     def _get_title_generation_instructions(self) -> str:
         """Get the system instructions for title generation."""
-        return """You are a title generator for chat conversations. Create a concise, descriptive title (maximum 30 characters) based on the user's message.
+        return """You are a title generator for chat conversations. Create a concise, descriptive title (maximum 25 characters) based on the user's message.
 
 INSTRUCTIONS:
 - Extract the main topic, technology, or subject matter
@@ -2811,7 +2814,7 @@ def generate_image_grid(
         # Create the montage with labels
         try:
             style = wand.font.Font("Roboto-Light.ttf", 65, "black")
-        except:
+        except Exception:
             # Fallback if font is not available
             style = None
 
@@ -4939,7 +4942,7 @@ def manage_agent_presets():
                     "id": preset_id,
                     "name": data["name"].strip(),
                     "instructions": data["instructions"].strip(),
-                    "model": data.get("model", "gpt-5"),
+                    "model": data.get("model", "gpt-5.1"),
                     "default_reasoning_level": data.get(
                         "default_reasoning_level", "medium"
                     ),

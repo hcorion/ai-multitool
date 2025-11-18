@@ -276,7 +276,8 @@ function renderReasoningLevelSelector(): void {
     const levels = [
         { value: 'high', label: 'High (Detailed Analysis)' },
         { value: 'medium', label: 'Medium (Balanced)' },
-        { value: 'low', label: 'Low (Quick Response)' }
+        { value: 'low', label: 'Low (Quick Response)' },
+        { value: 'none', label: 'None (Quickest Response)' }
     ];
     
     levels.forEach(level => {
@@ -326,7 +327,7 @@ async function handlePresetSelection(event: Event): Promise<void> {
  */
 function handleReasoningLevelSelection(event: Event): void {
     const selector = event.target as HTMLSelectElement;
-    const level = selector.value as 'high' | 'medium' | 'low' | '';
+    const level = selector.value as 'high' | 'medium' | 'low' | 'none' | '';
     
     try {
         agentPresets.setMessageReasoningLevel(level || null);
@@ -393,11 +394,13 @@ function updateReasoningLevelIndicator(): void {
 function formatReasoningLevelForIndicator(level: string): string {
     switch (level) {
         case 'high':
-            return '🧠 High (Detailed Analysis)';
+            return '🧠High';
         case 'medium':
-            return '⚡ Medium (Balanced)';
+            return '⚡Medium';
         case 'low':
-            return '💨 Low (Quick Response)';
+            return '💨Low';
+        case 'none':
+            return '✖️None';
         default:
             return level;
     }
@@ -553,7 +556,7 @@ function populatePresetForm(preset?: AgentPreset): void {
     } else {
         if (nameField) nameField.value = '';
         if (instructionsField) instructionsField.value = '';
-        if (modelField) modelField.value = 'gpt-5';
+        if (modelField) modelField.value = 'gpt-5.1';
         if (reasoningField) reasoningField.value = 'medium';
     }
 }
@@ -681,8 +684,8 @@ function getFormData(): AgentPresetFormData {
     return {
         name: nameField?.value?.trim() || '',
         instructions: instructionsField?.value?.trim() || '',
-        model: (modelField?.value as 'gpt-5' | 'gpt-5-mini' | 'gpt-5-pro') || 'gpt-5',
-        default_reasoning_level: (reasoningField?.value as 'high' | 'medium' | 'low') || 'medium'
+        model: (modelField?.value as 'gpt-5.1' | 'gpt-5' | 'gpt-5-mini' | 'gpt-5-pro') || 'gpt-5.1',
+        default_reasoning_level: (reasoningField?.value as 'high' | 'medium' | 'low' | 'none') || 'medium'
     };
 }
 

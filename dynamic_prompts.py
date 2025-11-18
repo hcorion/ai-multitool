@@ -46,7 +46,7 @@ import os
 import random
 import re
 from dataclasses import dataclass
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Optional, Tuple
 
 
 @dataclass
