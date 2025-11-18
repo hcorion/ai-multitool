@@ -77,15 +77,7 @@ os.makedirs("logs", exist_ok=True)
 
 # Optional: Clean up old log files (keep last 30 days)
 def cleanup_old_logs(days_to_keep=30):
-    """
-    Remove log files older than specified days to prevent disk space issues.
-    
-    Args:
-        days_to_keep: Number of days of logs to retain (default: 30)
-    
-    Note:
-        Silently continues if cleanup fails to avoid blocking application startup.
-    """
+    """Remove log files older than specified days."""
     try:
         import glob
 
@@ -145,30 +137,13 @@ with open(SECRET_KEY_FILENAME, "r") as f:
 
 @app.errorhandler(404)
 def resource_not_found(e: Response):
-    """
-    Handle 404 errors with JSON response.
-    
-    Args:
-        e: Flask response object containing error details
-    
-    Returns:
-        JSON error response with 404 status code
-    """
+    """Handle 404 errors with JSON response."""
     return jsonify(error=str(e)), 404
 
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
-    """
-    Handle user login with username storage in session.
-    
-    GET: Renders the login page
-    POST: Processes login form and stores username in session
-    
-    Returns:
-        GET: Rendered login template
-        POST: Redirect to index page after successful login
-    """
+    """Handle user login and store username in session."""
     if request.method == "POST":
         session["username"] = request.form["username"].strip()
         return redirect(url_for("index"))
@@ -177,14 +152,7 @@ def login():
 
 @app.route("/share")
 def share():
-    """
-    Render the share page for viewing shared conversations.
-    
-    Requires user authentication via session.
-    
-    Returns:
-        Rendered share template or redirect to login if not authenticated
-    """
+    """Render share page for viewing shared conversations."""
     if "username" not in session:
         return redirect(url_for("login"))
     return render_template("share.html")
@@ -243,7 +211,7 @@ def save_mask():
 
 @app.route("/logout")
 def logout():
-    """Clear user session and redirect to login page."""
+    """Clear user session and redirect to login."""
     session.pop("username", None)
     return redirect(url_for("login"))
 
@@ -309,7 +277,7 @@ class SavedImageData:
 
 @dataclass
 class CharacterPrompt:
-    """Data class for individual character prompt data."""
+    """Individual character prompt data for NovelAI multi-character system."""
 
     positive_prompt: str
     negative_prompt: str = ""
@@ -317,7 +285,7 @@ class CharacterPrompt:
 
 @dataclass
 class MultiCharacterPromptData:
-    """Data class for multi-character prompt data including main prompts."""
+    """Multi-character prompt data with main and character-specific prompts."""
 
     main_prompt: str
     main_negative_prompt: str = ""
@@ -337,7 +305,7 @@ class ConversationData(BaseModel):
 def validate_reasoning_data(
     reasoning_data: dict[str, Any] | None,
 ) -> dict[str, Any] | None:
-    """Validate reasoning data structure and ensure it contains expected fields."""
+    """Validate reasoning data structure and field types."""
     if reasoning_data is None:
         return None
 

@@ -2,7 +2,10 @@
  * Utility functions for consistent DOM manipulation across the application.
  */
 /**
- * Safely get an element by ID with type checking.
+ * Get element by ID with type checking.
+ * @param elementId - Element ID
+ * @param expectedType - Optional type constructor
+ * @returns Element or null
  */
 export function getElementByIdSafe(elementId, expectedType) {
     const element = document.getElementById(elementId);

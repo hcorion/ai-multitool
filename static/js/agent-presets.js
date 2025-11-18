@@ -10,7 +10,8 @@ const STORAGE_KEYS = {
     PRESET_PREFERENCES: 'ai_multitool_preset_preferences'
 };
 /**
- * Check if user is logged in by looking for user info in the page
+ * Check if user is logged in.
+ * @returns True if logged in
  */
 function isUserLoggedIn() {
     // Check if there's a user info element indicating login status
@@ -18,7 +19,8 @@ function isUserLoggedIn() {
     return userInfo !== null;
 }
 /**
- * Test connectivity to the agent presets endpoint
+ * Test agent presets endpoint connectivity.
+ * @returns Availability status
  */
 export async function testAgentPresetEndpoint() {
     try {
@@ -50,7 +52,8 @@ export async function testAgentPresetEndpoint() {
     }
 }
 /**
- * Load agent presets from the server
+ * Load agent presets from server.
+ * @returns Array of presets
  */
 export async function loadAgentPresets() {
     try {
@@ -136,7 +139,9 @@ export async function loadAgentPresets() {
     }
 }
 /**
- * Create a new agent preset
+ * Create new agent preset.
+ * @param formData - Preset configuration
+ * @returns Created preset
  */
 export async function createAgentPreset(formData) {
     try {
@@ -166,7 +171,10 @@ export async function createAgentPreset(formData) {
     }
 }
 /**
- * Update an existing agent preset
+ * Update existing agent preset.
+ * @param presetId - Preset ID
+ * @param formData - Updated configuration
+ * @returns Updated preset
  */
 export async function updateAgentPreset(presetId, formData) {
     try {

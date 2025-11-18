@@ -3,7 +3,10 @@
  */
 
 /**
- * Safely get an element by ID with type checking.
+ * Get element by ID with type checking.
+ * @param elementId - Element ID
+ * @param expectedType - Optional type constructor
+ * @returns Element or null
  */
 export function getElementByIdSafe<T extends HTMLElement>(
     elementId: string,

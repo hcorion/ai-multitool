@@ -43,7 +43,8 @@ const STORAGE_KEYS = {
 } as const;
 
 /**
- * Check if user is logged in by looking for user info in the page
+ * Check if user is logged in.
+ * @returns True if logged in
  */
 function isUserLoggedIn(): boolean {
     // Check if there's a user info element indicating login status
@@ -52,7 +53,8 @@ function isUserLoggedIn(): boolean {
 }
 
 /**
- * Test connectivity to the agent presets endpoint
+ * Test agent presets endpoint connectivity.
+ * @returns Availability status
  */
 export async function testAgentPresetEndpoint(): Promise<{ available: boolean; error?: string }> {
     try {
@@ -86,7 +88,8 @@ export async function testAgentPresetEndpoint(): Promise<{ available: boolean; e
 }
 
 /**
- * Load agent presets from the server
+ * Load agent presets from server.
+ * @returns Array of presets
  */
 export async function loadAgentPresets(): Promise<AgentPreset[]> {
     try {
@@ -181,7 +184,9 @@ export async function loadAgentPresets(): Promise<AgentPreset[]> {
 }
 
 /**
- * Create a new agent preset
+ * Create new agent preset.
+ * @param formData - Preset configuration
+ * @returns Created preset
  */
 export async function createAgentPreset(formData: AgentPresetFormData): Promise<AgentPreset> {
     try {
@@ -216,7 +221,10 @@ export async function createAgentPreset(formData: AgentPresetFormData): Promise<
 }
 
 /**
- * Update an existing agent preset
+ * Update existing agent preset.
+ * @param presetId - Preset ID
+ * @param formData - Updated configuration
+ * @returns Updated preset
  */
 export async function updateAgentPreset(presetId: string, formData: AgentPresetFormData): Promise<AgentPreset> {
     try {

@@ -1,6 +1,8 @@
 import * as utils from "./utils.js";
 /**
- * Load conversation data for the specified conversation ID
+ * Load conversation data from server.
+ * @param conversationId - Conversation ID to load
+ * @returns Promise with conversation data
  */
 export async function onConversationSelected(conversationId) {
     return new Promise((resolve, reject) => {
@@ -63,13 +65,17 @@ showdown.extension("highlight", function () {
     ];
 });
 /**
- * Check if the chat container is scrolled to or near the bottom
+ * Check if element is scrolled to bottom.
+ * @param element - Element to check
+ * @param threshold - Distance threshold in pixels
+ * @returns True if at bottom
  */
 function isScrolledToBottom(element, threshold = 50) {
     return element.scrollTop + element.clientHeight >= element.scrollHeight - threshold;
 }
 /**
- * Render chat messages with markdown formatting and reasoning buttons
+ * Render chat messages with markdown and syntax highlighting.
+ * @param messages - Messages to render
  */
 export function refreshChatMessages(messages) {
     const chatHistory = document.getElementById("chat-history");
@@ -106,7 +112,9 @@ export function refreshChatMessages(messages) {
     }
 }
 /**
- * Add reasoning inspection button to assistant messages
+ * Add reasoning inspection button to message.
+ * @param messageElement - Message element
+ * @param messageIndex - Message index
  */
 function addReasoningButton(messageElement, messageIndex) {
     try {
@@ -136,7 +144,9 @@ function addReasoningButton(messageElement, messageIndex) {
     }
 }
 /**
- * Add metadata display to assistant messages
+ * Add metadata display to message (model, reasoning level, preset).
+ * @param messageElement - Message element
+ * @param message - Message data
  */
 function addMessageMetadata(messageElement, message) {
     try {
@@ -169,7 +179,9 @@ function addMessageMetadata(messageElement, message) {
     }
 }
 /**
- * Format reasoning level for display
+ * Format reasoning level with emoji.
+ * @param level - Reasoning level
+ * @returns Formatted string
  */
 function formatReasoningLevel(level) {
     switch (level) {
@@ -186,7 +198,9 @@ function formatReasoningLevel(level) {
     }
 }
 /**
- * Format model name for display
+ * Format model name for display.
+ * @param model - Model identifier
+ * @returns Formatted name
  */
 function formatModelName(model) {
     switch (model) {
@@ -203,7 +217,8 @@ function formatModelName(model) {
     }
 }
 /**
- * Display reasoning data modal for the specified message
+ * Show reasoning modal for message.
+ * @param messageIndex - Message index
  */
 function showReasoningModal(messageIndex) {
     // Get current conversation ID - this should be available globally
@@ -329,7 +344,8 @@ function showReasoningModal(messageIndex) {
     });
 }
 /**
- * Render reasoning data content in the modal with proper formatting
+ * Display reasoning data in modal.
+ * @param reasoningData - Reasoning data
  */
 function displayReasoningData(reasoningData) {
     const content = document.getElementById("reasoning-content");
@@ -359,7 +375,9 @@ function displayReasoningData(reasoningData) {
     }
 }
 /**
- * Escape HTML special characters to prevent XSS attacks
+ * Escape HTML to prevent XSS.
+ * @param text - Text to escape
+ * @returns Escaped text
  */
 function escapeHtml(text) {
     const div = document.createElement('div');
@@ -367,7 +385,8 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 /**
- * Display error message in reasoning modal
+ * Show error in reasoning modal.
+ * @param message - Error message
  */
 function showReasoningError(message) {
     console.error(message);
@@ -378,7 +397,7 @@ function showReasoningError(message) {
     error.style.display = "block";
 }
 /**
- * Hide the reasoning inspection modal
+ * Hide reasoning modal.
  */
 export function hideReasoningModal() {
     const modal = document.getElementById("reasoning-modal");
@@ -387,7 +406,7 @@ export function hideReasoningModal() {
     }
 }
 /**
- * Initialize modal tab functionality
+ * Initialize modal tab switching.
  */
 function initializeModalTabs() {
     const tabButtons = document.querySelectorAll('.tab-button');
@@ -402,7 +421,8 @@ function initializeModalTabs() {
     });
 }
 /**
- * Switch between modal tabs
+ * Switch modal tab.
+ * @param tabName - Tab to switch to
  */
 function switchModalTab(tabName) {
     // Update tab buttons
@@ -429,7 +449,7 @@ function switchModalTab(tabName) {
     });
 }
 /**
- * Enable the search tab
+ * Enable search tab.
  */
 function enableSearchTab() {
     const searchTabButton = document.querySelector('.tab-button[data-tab="search"]');
@@ -439,7 +459,7 @@ function enableSearchTab() {
     }
 }
 /**
- * Disable the search tab
+ * Disable search tab.
  */
 function disableSearchTab() {
     const searchTabButton = document.querySelector('.tab-button[data-tab="search"]');
@@ -449,7 +469,8 @@ function disableSearchTab() {
     }
 }
 /**
- * Display web search data in the search tab
+ * Display web search data.
+ * @param searchData - Search activity data
  */
 function displayWebSearchData(searchData) {
     const searchContent = document.getElementById("search-content");
@@ -498,7 +519,9 @@ function displayWebSearchData(searchData) {
     }
 }
 /**
- * Format search status for display
+ * Format search status.
+ * @param status - Status code
+ * @returns Formatted string
  */
 function formatSearchStatus(status) {
     switch (status) {
@@ -515,7 +538,8 @@ function formatSearchStatus(status) {
     }
 }
 /**
- * Handle web search status updates
+ * Handle web search status updates.
+ * @param status - Search status event
  */
 export function handleWebSearchStatus(status) {
     try {
@@ -549,7 +573,8 @@ export function handleWebSearchStatus(status) {
     }
 }
 /**
- * Handle reasoning status updates
+ * Handle reasoning status updates.
+ * @param status - Reasoning status event
  */
 export function handleReasoningStatus(status) {
     try {
@@ -583,7 +608,10 @@ export function handleReasoningStatus(status) {
     }
 }
 /**
- * Update the status display in the chat interface
+ * Update status display.
+ * @param message - Status message
+ * @param isActive - Activity state
+ * @param statusType - Status type
  */
 function updateStatusDisplay(message, isActive, statusType) {
     try {
@@ -624,7 +652,8 @@ function updateStatusDisplay(message, isActive, statusType) {
     }
 }
 /**
- * Clear status display for a specific type
+ * Clear status display.
+ * @param statusType - Status type to clear
  */
 function clearStatusDisplay(statusType) {
     try {

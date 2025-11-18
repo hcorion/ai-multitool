@@ -35,7 +35,9 @@ export interface ReasoningStatus {
 }
 
 /**
- * Load conversation data for the specified conversation ID
+ * Load conversation data from server.
+ * @param conversationId - Conversation ID to load
+ * @returns Promise with conversation data
  */
 export async function onConversationSelected(conversationId: string): Promise<MessageHistory> {
     return new Promise((resolve, reject) => {
@@ -102,14 +104,18 @@ showdown.extension("highlight", function () {
 });
 
 /**
- * Check if the chat container is scrolled to or near the bottom
+ * Check if element is scrolled to bottom.
+ * @param element - Element to check
+ * @param threshold - Distance threshold in pixels
+ * @returns True if at bottom
  */
 function isScrolledToBottom(element: HTMLElement, threshold: number = 50): boolean {
     return element.scrollTop + element.clientHeight >= element.scrollHeight - threshold;
 }
 
 /**
- * Render chat messages with markdown formatting and reasoning buttons
+ * Render chat messages with markdown and syntax highlighting.
+ * @param messages - Messages to render
  */
 export function refreshChatMessages(messages: ChatMessage[]): void {
     const chatHistory = document.getElementById("chat-history") as HTMLDivElement | null;
@@ -153,7 +159,9 @@ export function refreshChatMessages(messages: ChatMessage[]): void {
 }
 
 /**
- * Add reasoning inspection button to assistant messages
+ * Add reasoning inspection button to message.
+ * @param messageElement - Message element
+ * @param messageIndex - Message index
  */
 function addReasoningButton(messageElement: HTMLElement, messageIndex: number): void {
     try {
@@ -188,7 +196,9 @@ function addReasoningButton(messageElement: HTMLElement, messageIndex: number): 
 }
 
 /**
- * Add metadata display to assistant messages
+ * Add metadata display to message (model, reasoning level, preset).
+ * @param messageElement - Message element
+ * @param message - Message data
  */
 function addMessageMetadata(messageElement: HTMLElement, message: ChatMessage): void {
     try {
@@ -226,7 +236,9 @@ function addMessageMetadata(messageElement: HTMLElement, message: ChatMessage): 
 }
 
 /**
- * Format reasoning level for display
+ * Format reasoning level with emoji.
+ * @param level - Reasoning level
+ * @returns Formatted string
  */
 function formatReasoningLevel(level: string): string {
     switch (level) {
@@ -244,7 +256,9 @@ function formatReasoningLevel(level: string): string {
 }
 
 /**
- * Format model name for display
+ * Format model name for display.
+ * @param model - Model identifier
+ * @returns Formatted name
  */
 function formatModelName(model: string): string {
     switch (model) {
@@ -262,7 +276,8 @@ function formatModelName(model: string): string {
 }
 
 /**
- * Display reasoning data modal for the specified message
+ * Show reasoning modal for message.
+ * @param messageIndex - Message index
  */
 function showReasoningModal(messageIndex: number): void {
     // Get current conversation ID - this should be available globally
@@ -395,7 +410,8 @@ function showReasoningModal(messageIndex: number): void {
 }
 
 /**
- * Render reasoning data content in the modal with proper formatting
+ * Display reasoning data in modal.
+ * @param reasoningData - Reasoning data
  */
 function displayReasoningData(reasoningData: any): void {
     const content = document.getElementById("reasoning-content");
@@ -428,7 +444,9 @@ function displayReasoningData(reasoningData: any): void {
 }
 
 /**
- * Escape HTML special characters to prevent XSS attacks
+ * Escape HTML to prevent XSS.
+ * @param text - Text to escape
+ * @returns Escaped text
  */
 function escapeHtml(text: string): string {
     const div = document.createElement('div');
@@ -437,7 +455,8 @@ function escapeHtml(text: string): string {
 }
 
 /**
- * Display error message in reasoning modal
+ * Show error in reasoning modal.
+ * @param message - Error message
  */
 function showReasoningError(message: string): void {
     console.error(message);
@@ -449,7 +468,7 @@ function showReasoningError(message: string): void {
 }
 
 /**
- * Hide the reasoning inspection modal
+ * Hide reasoning modal.
  */
 export function hideReasoningModal(): void {
     const modal = document.getElementById("reasoning-modal");
@@ -459,7 +478,7 @@ export function hideReasoningModal(): void {
 }
 
 /**
- * Initialize modal tab functionality
+ * Initialize modal tab switching.
  */
 function initializeModalTabs(): void {
     const tabButtons = document.querySelectorAll('.tab-button');
@@ -475,7 +494,8 @@ function initializeModalTabs(): void {
 }
 
 /**
- * Switch between modal tabs
+ * Switch modal tab.
+ * @param tabName - Tab to switch to
  */
 function switchModalTab(tabName: 'reasoning' | 'search'): void {
     // Update tab buttons
@@ -502,7 +522,7 @@ function switchModalTab(tabName: 'reasoning' | 'search'): void {
 }
 
 /**
- * Enable the search tab
+ * Enable search tab.
  */
 function enableSearchTab(): void {
     const searchTabButton = document.querySelector('.tab-button[data-tab="search"]') as HTMLButtonElement;
@@ -513,7 +533,7 @@ function enableSearchTab(): void {
 }
 
 /**
- * Disable the search tab
+ * Disable search tab.
  */
 function disableSearchTab(): void {
     const searchTabButton = document.querySelector('.tab-button[data-tab="search"]') as HTMLButtonElement;
@@ -524,7 +544,8 @@ function disableSearchTab(): void {
 }
 
 /**
- * Display web search data in the search tab
+ * Display web search data.
+ * @param searchData - Search activity data
  */
 function displayWebSearchData(searchData: any[]): void {
     const searchContent = document.getElementById("search-content");
@@ -577,7 +598,9 @@ function displayWebSearchData(searchData: any[]): void {
 }
 
 /**
- * Format search status for display
+ * Format search status.
+ * @param status - Status code
+ * @returns Formatted string
  */
 function formatSearchStatus(status: string): string {
     switch (status) {
@@ -595,7 +618,8 @@ function formatSearchStatus(status: string): string {
 }
 
 /**
- * Handle web search status updates
+ * Handle web search status updates.
+ * @param status - Search status event
  */
 export function handleWebSearchStatus(status: WebSearchStatus): void {
     try {
@@ -633,7 +657,8 @@ export function handleWebSearchStatus(status: WebSearchStatus): void {
 }
 
 /**
- * Handle reasoning status updates
+ * Handle reasoning status updates.
+ * @param status - Reasoning status event
  */
 export function handleReasoningStatus(status: ReasoningStatus): void {
     try {
@@ -671,7 +696,10 @@ export function handleReasoningStatus(status: ReasoningStatus): void {
 }
 
 /**
- * Update the status display in the chat interface
+ * Update status display.
+ * @param message - Status message
+ * @param isActive - Activity state
+ * @param statusType - Status type
  */
 function updateStatusDisplay(message: string, isActive: boolean, statusType: 'search' | 'reasoning'): void {
     try {
@@ -716,7 +744,8 @@ function updateStatusDisplay(message: string, isActive: boolean, statusType: 'se
 }
 
 /**
- * Clear status display for a specific type
+ * Clear status display.
+ * @param statusType - Status type to clear
  */
 function clearStatusDisplay(statusType: 'search' | 'reasoning'): void {
     try {
