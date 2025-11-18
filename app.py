@@ -240,6 +240,7 @@ class ConversationStorageError(Exception):
         self.message = message
 
 
+@dataclass
 class GeneratedImageData:
     """Container for generated image data and metadata."""
 
@@ -247,32 +248,15 @@ class GeneratedImageData:
     revised_prompt: str
     prompt: str
     image_name: str
-    metadata: dict[str, str]
-
-    def __init__(
-        self,
-        local_image_path: str,
-        revised_prompt: str,
-        prompt: str,
-        image_name: str,
-        metadata: dict[str, str] | None = None,
-    ):
-        self.local_image_path = local_image_path
-        self.revised_prompt = revised_prompt
-        self.prompt = prompt
-        self.image_name = image_name
-        self.metadata = metadata or {}
+    metadata: dict[str, str] = field(default_factory=dict)
 
 
+@dataclass
 class SavedImageData:
     """Container for saved image file information."""
 
     local_image_path: str
     image_name: str
-
-    def __init__(self, local_image_path: str, image_name: str):
-        self.local_image_path = local_image_path
-        self.image_name = image_name
 
 
 @dataclass
