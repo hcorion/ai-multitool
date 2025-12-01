@@ -232,7 +232,7 @@ class TestResponsesAPIClientReasoning:
         assert reasoning_config["summary"] == "detailed"
 
         # Verify other expected parameters
-        assert call_kwargs["model"] == "gpt-5"
+        assert call_kwargs["model"] == "gpt-5.1"
         assert call_kwargs["input"] == "test input"
         assert call_kwargs["stream"] is True
         assert call_kwargs["store"] is True
@@ -303,7 +303,7 @@ class TestResponsesAPIClientReasoning:
         # Test invalid model
         client.create_response("test input", model="invalid-model")
         call_kwargs = mock_openai_client.responses.create.call_args[1]
-        assert call_kwargs["model"] == "gpt-5"  # Should fall back to default
+        assert call_kwargs["model"] == "gpt-5.1"  # Should fall back to default
 
     def test_reasoning_level_validation(self, mock_openai_client):
         """Test reasoning level validation and configuration."""

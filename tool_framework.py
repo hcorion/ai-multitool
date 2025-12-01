@@ -6,10 +6,12 @@ that can be used by chat agents. It includes:
 - ToolRegistry: Central registry for managing available tools
 - ToolInfo: Metadata about tools
 - ToolStorage: Per-chat persistent storage for tool data
+- ToolExecutor: Execute tool calls with error handling and logging
 """
 
 from __future__ import annotations
 
+import logging
 import os
 import threading
 from abc import ABC, abstractmethod
@@ -17,6 +19,9 @@ from dataclasses import dataclass
 from typing import Any
 
 from file_manager_utils import load_json_file_with_backup, save_json_file_atomic
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -541,3 +546,170 @@ class ToolStorage:
         """
         with self._lock:
             self._save_data({})
+
+
+
+class ToolExecutor:
+    """Execute tool calls from OpenAI responses.
+    
+    This class handles routing tool calls to the appropriate tool implementation,
+    managing per-chat storage, and providing comprehensive error handling.
+    
+    Features:
+    - Routes tool calls to registered tools
+    - Creates per-chat storage for each tool
+    - Comprehensive error handling with structured responses
+    - Logging of all tool execution events
+    - Graceful degradation on errors
+    
+    Example:
+        registry = ToolRegistry()
+        registry.register_tool(CalculatorTool())
+        
+        executor = ToolExecutor(registry)
+        result = executor.execute_tool_call(
+            tool_name='calculator',
+            parameters={'expression': '2 + 2'},
+            username='john',
+            conversation_id='conv_123'
+        )
+        
+        if result['success']:
+            print(f"Result: {result['result']}")
+        else:
+            print(f"Error: {result['error']}")
+    """
+    
+    def __init__(self, tool_registry: ToolRegistry):
+        """Initialize the tool executor.
+        
+        Args:
+            tool_registry: ToolRegistry instance containing registered tools
+        """
+        self.registry = tool_registry
+        logger.info("ToolExecutor initialized")
+    
+    def execute_tool_call(
+        self,
+        tool_name: str,
+        parameters: dict[str, Any],
+        username: str,
+        conversation_id: str
+    ) -> dict[str, Any]:
+        """Execute a tool call and return result.
+        
+        This method handles the complete tool execution flow:
+        1. Validates tool exists in registry
+        2. Creates per-chat storage for the tool
+        3. Executes the tool with error handling
+        4. Logs execution events
+        5. Returns structured result
+        
+        Args:
+            tool_name: Name of the tool to execute
+            parameters: Dictionary of parameters for the tool
+            username: Username who owns the conversation
+            conversation_id: Unique identifier for the conversation
+        
+        Returns:
+            Dictionary containing execution result with the following structure:
+            
+            Success case:
+            {
+                'success': True,
+                'result': <tool-specific result>,
+                ... (other tool-specific fields)
+            }
+            
+            Error cases:
+            {
+                'success': False,
+                'error': 'Error message',
+                'error_code': 'tool_not_found' | 'execution_error' | 'storage_error',
+                'tool_name': <tool name>
+            }
+        
+        Example:
+            result = executor.execute_tool_call(
+                tool_name='calculator',
+                parameters={'expression': '2 + 2'},
+                username='john',
+                conversation_id='conv_123'
+            )
+        """
+        logger.info(
+            f"Executing tool call: tool={tool_name}, user={username}, "
+            f"conversation={conversation_id}, params={parameters}"
+        )
+        
+        try:
+            # Get tool from registry
+            tool = self.registry.get_tool(tool_name)
+            if not tool:
+                error_msg = f"Tool '{tool_name}' not found in registry"
+                logger.error(error_msg)
+                return {
+                    'success': False,
+                    'error': error_msg,
+                    'error_code': 'tool_not_found',
+                    'tool_name': tool_name
+                }
+            
+            # Create storage for this tool in this conversation
+            try:
+                storage = ToolStorage(username, conversation_id, tool_name)
+            except Exception as e:
+                error_msg = f"Failed to create storage for tool '{tool_name}': {str(e)}"
+                logger.error(error_msg, exc_info=True)
+                return {
+                    'success': False,
+                    'error': error_msg,
+                    'error_code': 'storage_error',
+                    'tool_name': tool_name
+                }
+            
+            # Execute tool with error handling
+            try:
+                result = tool.execute(parameters, storage)
+                
+                # Log execution result
+                if result.get('success'):
+                    logger.info(
+                        f"Tool execution succeeded: tool={tool_name}, "
+                        f"user={username}, conversation={conversation_id}"
+                    )
+                else:
+                    logger.warning(
+                        f"Tool execution returned error: tool={tool_name}, "
+                        f"error={result.get('error')}"
+                    )
+                
+                return result
+                
+            except Exception as e:
+                error_msg = f"Tool execution failed: {str(e)}"
+                logger.error(
+                    f"Exception during tool execution: tool={tool_name}, "
+                    f"user={username}, conversation={conversation_id}",
+                    exc_info=True
+                )
+                return {
+                    'success': False,
+                    'error': error_msg,
+                    'error_code': 'execution_error',
+                    'tool_name': tool_name
+                }
+        
+        except Exception as e:
+            # Catch-all for any unexpected errors
+            error_msg = f"Unexpected error during tool execution: {str(e)}"
+            logger.error(
+                f"Unexpected exception in execute_tool_call: tool={tool_name}",
+                exc_info=True
+            )
+            return {
+                'success': False,
+                'error': error_msg,
+                'error_code': 'execution_error',
+                'tool_name': tool_name
+            }

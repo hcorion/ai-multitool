@@ -51,8 +51,9 @@ class TestAgentPresetModel:
             updated_at=current_time
         )
         
-        assert preset.model == 'gpt-5'  # Default value
+        assert preset.model == 'gpt-5.1'  # Default value
         assert preset.default_reasoning_level == 'medium'  # Default value
+        assert preset.enabled_tools == ['web_search', 'calculator']  # Default value
 
     def test_invalid_model_validation(self):
         """Test that invalid model types are rejected."""
@@ -130,7 +131,7 @@ class TestAgentPresetModel:
         # Serialize to JSON
         json_data = original_preset.model_dump()
         assert isinstance(json_data, dict)
-        assert len(json_data) == 7  # All fields present
+        assert len(json_data) == 8  # All fields present (including enabled_tools)
         
         # Deserialize from JSON
         restored_preset = AgentPreset.model_validate(json_data)
@@ -141,6 +142,7 @@ class TestAgentPresetModel:
         assert restored_preset.instructions == original_preset.instructions
         assert restored_preset.model == original_preset.model
         assert restored_preset.default_reasoning_level == original_preset.default_reasoning_level
+        assert restored_preset.enabled_tools == original_preset.enabled_tools
         assert restored_preset.created_at == original_preset.created_at
         assert restored_preset.updated_at == original_preset.updated_at
 

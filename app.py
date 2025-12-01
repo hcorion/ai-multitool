@@ -70,6 +70,8 @@ from image_models import (
     create_success_response,
 )
 from novelai_client import NovelAIAPIError, NovelAIClient, NovelAIClientError
+from tool_framework import ToolExecutor, ToolRegistry
+from tools.calculator_tool import CalculatorTool
 
 # Configure logging to file with dated session logs
 os.makedirs("logs", exist_ok=True)
@@ -365,6 +367,10 @@ class AgentPreset(BaseModel):
     )
     created_at: int = Field(..., description="Unix timestamp of creation")
     updated_at: int = Field(..., description="Unix timestamp of last update")
+    enabled_tools: list[str] = Field(
+        default_factory=lambda: ["web_search", "calculator"],
+        description="List of enabled tool names"
+    )
 
     @field_validator("model")
     @classmethod
@@ -382,6 +388,28 @@ class AgentPreset(BaseModel):
         valid_levels = {"high", "medium", "low"}
         if v not in valid_levels:
             raise ValueError(f"Reasoning level must be one of {valid_levels}, got: {v}")
+        return v
+
+    @field_validator("enabled_tools")
+    @classmethod
+    def validate_enabled_tools(cls, v: list[str]) -> list[str]:
+        """Validate enabled tools list.
+        
+        Ensures:
+        - At least one tool is enabled
+        - No duplicate tool names
+        
+        Note: Tool name validation against the registry is done at runtime
+        when the preset is used, not during model validation. This allows
+        the model to be created before tools are registered.
+        """
+        if not v:
+            raise ValueError("At least one tool must be enabled")
+        
+        # Check for duplicates
+        if len(v) != len(set(v)):
+            raise ValueError("Duplicate tool names are not allowed")
+        
         return v
 
 
@@ -1080,6 +1108,7 @@ code
             instructions=default_instructions,
             model="gpt-5.1",
             default_reasoning_level="medium",
+            enabled_tools=["web_search", "calculator"],
             created_at=current_time,
             updated_at=current_time,
         )
@@ -1149,8 +1178,9 @@ class ResponsesAPIClient:
         "none": {"effort": "none"},
     }
 
-    def __init__(self, openai_client: openai.OpenAI):
+    def __init__(self, openai_client: openai.OpenAI, tool_registry: ToolRegistry | None = None):
         self.client = openai_client
+        self.tool_registry = tool_registry
         self.default_model = "gpt-5.1"
         self.default_reasoning_level = "medium"
 
@@ -1196,6 +1226,7 @@ class ResponsesAPIClient:
         model: str | None = None,
         reasoning_level: str | None = None,
         instructions: str | None = None,
+        enabled_tools: list[str] | None = None,
     ) -> Any:
         """Create a response using the Responses API with model and reasoning level support."""
         try:
@@ -1220,23 +1251,15 @@ code
                 base_instructions, validated_model
             )
 
+            # Build tools array from enabled_tools list
+            tools = self._build_tools_array(enabled_tools or ["web_search"])
+
             params: dict[str, Any] = {
                 "model": validated_model,
                 "input": input_text,
                 "stream": stream,
                 "store": True,  # Store responses for conversation continuity
-                "tools": [
-                    {
-                        "type": "web_search",
-                        "user_location": {
-                            "type": "approximate",
-                            "country": "CA",
-                            "city": "Vancouver",
-                            "region": "Vancouver",
-                            "timezone": "America/Vancouver",
-                        },
-                    }
-                ],
+                "tools": tools,
                 "instructions": enhanced_instructions,
             }
 
@@ -1413,6 +1436,63 @@ code
         logging.debug(f"Using reasoning configuration for level '{level}': {config}")
         return config
 
+    def _build_tools_array(self, enabled_tools: list[str]) -> list[dict[str, Any]]:
+        """Build OpenAI tools array from enabled tool names.
+        
+        Constructs the tools array for the OpenAI API request based on the list
+        of enabled tool names. Handles both built-in OpenAI tools (like web_search)
+        and custom backend tools (like calculator).
+        
+        Args:
+            enabled_tools: List of tool names to enable (e.g., ['web_search', 'calculator'])
+        
+        Returns:
+            List of tool definition dictionaries for the OpenAI API
+        
+        Example:
+            tools = self._build_tools_array(['web_search', 'calculator'])
+            # Returns:
+            # [
+            #     {'type': 'web_search', 'user_location': {...}},
+            #     {'type': 'function', 'function': {...}}
+            # ]
+        """
+        tools = []
+        
+        for tool_name in enabled_tools:
+            if tool_name == "web_search":
+                # Built-in OpenAI tool with location configuration
+                tools.append({
+                    "type": "web_search",
+                    "user_location": {
+                        "type": "approximate",
+                        "country": "CA",
+                        "city": "Vancouver",
+                        "region": "Vancouver",
+                        "timezone": "America/Vancouver",
+                    },
+                })
+                logging.debug(f"Added built-in tool: {tool_name}")
+            else:
+                # Custom tool - get definition from registry
+                if self.tool_registry:
+                    tool = self.tool_registry.get_tool(tool_name)
+                    if tool:
+                        tool_definition = tool.get_openai_tool_definition()
+                        tools.append(tool_definition)
+                        logging.debug(f"Added custom tool: {tool_name}")
+                    else:
+                        logging.warning(
+                            f"Tool '{tool_name}' not found in registry, skipping"
+                        )
+                else:
+                    logging.warning(
+                        f"Tool registry not available, skipping custom tool: {tool_name}"
+                    )
+        
+        logging.debug(f"Built tools array with {len(tools)} tools: {[t.get('type', t.get('function', {}).get('name')) for t in tools]}")
+        return tools
+
     def process_stream_with_processor(
         self, stream: Any, event_processor: "StreamEventProcessor"
     ) -> None:
@@ -1561,8 +1641,17 @@ conversation_manager = ConversationManager(app.static_folder or "static")
 # Initialize the agent preset manager
 agent_preset_manager = AgentPresetManager(app.static_folder or "static")
 
-# Initialize the Responses API client
-responses_client = ResponsesAPIClient(client)
+# Initialize the tool registry and register tools
+tool_registry = ToolRegistry()
+tool_registry.register_tool(CalculatorTool())
+logging.info("Tool registry initialized with calculator tool")
+
+# Initialize the tool executor
+tool_executor = ToolExecutor(tool_registry)
+logging.info("Tool executor initialized")
+
+# Initialize the Responses API client with tool registry
+responses_client = ResponsesAPIClient(client, tool_registry=tool_registry)
 
 
 def upscale_stability_creative(
@@ -3302,11 +3391,13 @@ def converse():
             agent_preset: AgentPreset | None = None,
         ):
             """Start streaming thread using Responses API with comprehensive error handling."""
-            event_processor = StreamEventProcessor(event_queue)
+            event_processor = StreamEventProcessor(event_queue, tool_executor, username, conversation_id)
 
             try:
-                # Create response using Responses API with model, reasoning level, and instructions
+                # Create response using Responses API with model, reasoning level, instructions, and enabled tools
                 instructions = agent_preset.instructions if agent_preset else None
+                enabled_tools = agent_preset.enabled_tools if agent_preset else ["web_search"]
+                
                 stream = responses_client.create_response(
                     input_text=user_input,
                     previous_response_id=previous_response_id,
@@ -3315,6 +3406,7 @@ def converse():
                     model=model,
                     reasoning_level=reasoning_level,
                     instructions=instructions,
+                    enabled_tools=enabled_tools,
                 )
 
                 # Check if we got an error response
@@ -3622,8 +3714,17 @@ def get_message_reasoning(conversation_id: str, message_index: int):
 class StreamEventProcessor:
     """Process streaming responses from the Responses API to replace AssistantEventHandler."""
 
-    def __init__(self, event_queue: Queue[Any]):
+    def __init__(
+        self, 
+        event_queue: Queue[Any],
+        tool_executor: ToolExecutor | None = None,
+        username: str | None = None,
+        conversation_id: str | None = None
+    ):
         self.event_queue = event_queue
+        self.tool_executor = tool_executor
+        self.username = username
+        self.conversation_id = conversation_id
         self.current_response_id: str | None = None
         self.accumulated_text = ""
         self.reasoning_data: dict[str, Any] = {
@@ -3638,6 +3739,8 @@ class StreamEventProcessor:
         self.web_search_events: dict[str, dict[str, Any]] = {}
         self.web_search_output_items: dict[str, dict[str, Any]] = {}
         self.message_output_items: dict[str, dict[str, Any]] = {}
+        # Track tool calls for execution
+        self.tool_calls: dict[str, dict[str, Any]] = {}
 
     def process_stream(self, stream: Any) -> None:
         """Process the entire stream of ResponseStreamEvent objects with comprehensive error handling."""
@@ -3736,6 +3839,10 @@ class StreamEventProcessor:
             self._handle_web_search_call_searching(event)
         elif event_type == "response.web_search_call.completed":
             self._handle_web_search_call_completed(event)
+        elif event_type == "response.function_call_arguments.delta":
+            self._handle_function_call_arguments_delta(event)
+        elif event_type == "response.function_call_arguments.done":
+            self._handle_function_call_arguments_done(event)
         else:
             # Handle other event types if needed
             logging.warning(f"Unhandled event type {event_type}")
@@ -4387,6 +4494,132 @@ class StreamEventProcessor:
             logging.warning(f"Error correlating web search data: {e}")
             # Continue processing - don't block chat functionality
 
+    def _handle_function_call_arguments_delta(self, event: Any) -> None:
+        """Handle response.function_call_arguments.delta event - function call arguments being streamed."""
+        try:
+            # Extract function call metadata
+            item_id = getattr(event, "item_id", None)
+            call_id = getattr(event, "call_id", None)
+            delta = getattr(event, "delta", None)
+            
+            logging.debug(f"Function call arguments delta: item_id={item_id}, call_id={call_id}")
+            
+            if call_id:
+                # Initialize or update tool call data
+                if call_id not in self.tool_calls:
+                    self.tool_calls[call_id] = {
+                        "call_id": call_id,
+                        "item_id": item_id,
+                        "name": None,
+                        "arguments": "",
+                        "status": "in_progress"
+                    }
+                
+                # Accumulate arguments
+                if delta:
+                    self.tool_calls[call_id]["arguments"] += str(delta)
+                
+                # Extract function name if available
+                if hasattr(event, "name") and event.name:
+                    self.tool_calls[call_id]["name"] = event.name
+                    
+        except Exception as e:
+            logging.warning(f"Error processing function call arguments delta: {e}")
+            # Continue processing - don't block chat functionality
+    
+    def _handle_function_call_arguments_done(self, event: Any) -> None:
+        """Handle response.function_call_arguments.done event - function call ready to execute."""
+        try:
+            # Extract function call metadata
+            item_id = getattr(event, "item_id", None)
+            call_id = getattr(event, "call_id", None)
+            name = getattr(event, "name", None)
+            arguments = getattr(event, "arguments", None)
+            
+            logging.info(f"Function call arguments done: name={name}, call_id={call_id}")
+            
+            if call_id and name:
+                # Update tool call data
+                if call_id not in self.tool_calls:
+                    self.tool_calls[call_id] = {
+                        "call_id": call_id,
+                        "item_id": item_id,
+                        "name": name,
+                        "arguments": arguments or "",
+                        "status": "ready"
+                    }
+                else:
+                    self.tool_calls[call_id].update({
+                        "name": name,
+                        "arguments": arguments or self.tool_calls[call_id]["arguments"],
+                        "status": "ready"
+                    })
+                
+                # Execute the tool call
+                self._execute_tool_call(call_id)
+                    
+        except Exception as e:
+            logging.error(f"Error processing function call arguments done: {e}", exc_info=True)
+            # Continue processing - don't block chat functionality
+    
+    def _execute_tool_call(self, call_id: str) -> None:
+        """Execute a tool call and send results back to the API."""
+        try:
+            tool_call = self.tool_calls.get(call_id)
+            if not tool_call:
+                logging.error(f"Tool call {call_id} not found")
+                return
+            
+            tool_name = tool_call["name"]
+            arguments_str = tool_call["arguments"]
+            
+            logging.info(f"Executing tool call: {tool_name} with arguments: {arguments_str}")
+            
+            # Parse arguments JSON
+            try:
+                parameters = json.loads(arguments_str) if arguments_str else {}
+            except json.JSONDecodeError as e:
+                logging.error(f"Failed to parse tool arguments: {e}")
+                tool_call["status"] = "error"
+                tool_call["error"] = f"Invalid arguments: {str(e)}"
+                return
+            
+            # Execute tool if we have executor and conversation context
+            if self.tool_executor and self.username and self.conversation_id:
+                result = self.tool_executor.execute_tool_call(
+                    tool_name=tool_name,
+                    parameters=parameters,
+                    username=self.username,
+                    conversation_id=self.conversation_id
+                )
+                
+                # Update tool call with result
+                tool_call["status"] = "completed" if result.get("success") else "error"
+                tool_call["result"] = result
+                
+                # Send tool execution status to frontend
+                self.event_queue.put(
+                    json.dumps({
+                        "type": "tool_call_completed",
+                        "call_id": call_id,
+                        "tool_name": tool_name,
+                        "success": result.get("success", False),
+                        "result": result
+                    })
+                )
+                
+                logging.info(f"Tool call {call_id} completed: success={result.get('success')}")
+            else:
+                logging.warning(f"Cannot execute tool call {call_id}: missing executor or context")
+                tool_call["status"] = "error"
+                tool_call["error"] = "Tool executor not available"
+                
+        except Exception as e:
+            logging.error(f"Error executing tool call {call_id}: {e}", exc_info=True)
+            if call_id in self.tool_calls:
+                self.tool_calls[call_id]["status"] = "error"
+                self.tool_calls[call_id]["error"] = str(e)
+
     def get_reasoning_data(self) -> dict[str, Any] | None:
         """Get the reasoning data from the processed stream with comprehensive error handling."""
         try:
@@ -4787,6 +5020,7 @@ def manage_agent_presets():
                     "default_reasoning_level": data.get(
                         "default_reasoning_level", "medium"
                     ),
+                    "enabled_tools": data.get("enabled_tools", ["web_search", "calculator"]),
                     "created_at": int(time.time()),
                     "updated_at": int(time.time()),
                 }
@@ -4882,6 +5116,7 @@ def handle_agent_preset(preset_id: str):
                         "default_reasoning_level",
                         existing_preset.default_reasoning_level,
                     ),
+                    "enabled_tools": data.get("enabled_tools", existing_preset.enabled_tools),
                     "created_at": existing_preset.created_at,
                     "updated_at": int(time.time()),
                 }

@@ -40,7 +40,13 @@
   - Add calculation history storage (last 100 entries)
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7_
 
-- [ ]* 3.1 Write unit tests for Calculator tool
+- [x] 3.1 Write unit tests for Calculator tool
+
+
+
+
+
+
   - Test valid expressions: basic arithmetic, functions, parentheses
   - Test invalid expressions: malicious code, undefined functions, syntax errors
   - Test edge cases: division by zero, very large numbers, empty expressions
@@ -48,7 +54,12 @@
   - Test error handling: proper error messages for all failure modes
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7_
 
-- [ ] 4. Create tool executor
+- [x] 4. Create tool executor
+
+
+
+
+
   - Create `ToolExecutor` class for executing tool calls
   - Implement tool call routing to appropriate tool
   - Add comprehensive error handling for tool execution
@@ -64,7 +75,12 @@
   - Test storage integration
   - _Requirements: 1.4, 6.1, 6.2, 6.3, 6.4, 6.5_
 
-- [ ] 5. Update AgentPreset model
+- [x] 5. Update AgentPreset model
+
+
+
+
+
   - Add `enabled_tools` field to `AgentPreset` Pydantic model
   - Set default value to `["web_search", "calculator"]`
   - Add field validator for tool names
@@ -79,7 +95,12 @@
   - Test unknown tool name rejection
   - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5_
 
-- [ ] 6. Extend ResponsesAPIClient for tool support
+- [x] 6. Extend ResponsesAPIClient for tool support
+
+
+
+
+
   - Add `enabled_tools` parameter to `create_response` method
   - Implement `_build_tools_array` method to construct tools from enabled_tools list
   - Handle built-in OpenAI tools (web_search with location config)
@@ -95,7 +116,12 @@
   - Test tools array with unknown tool (should skip)
   - _Requirements: 9.1, 9.2, 9.3, 9.4_
 
-- [ ] 7. Update chat endpoint for tool integration
+- [x] 7. Update chat endpoint for tool integration
+
+
+
+
+
   - Pass `enabled_tools` from agent preset to `ResponsesAPIClient`
   - Initialize tool registry at application startup
   - Register calculator tool in registry
@@ -112,7 +138,9 @@
   - Test chat continues normally after tool errors
   - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 6.1, 6.2, 6.3, 6.4, 6.5_
 
-- [ ] 8. Update TypeScript interfaces for tools
+- [-] 8. Update TypeScript interfaces for tools
+
+
   - Add `enabled_tools: string[]` field to `AgentPreset` interface
   - Update `AgentPresetFormData` interface with enabled_tools
   - Update agent preset API response types
