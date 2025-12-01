@@ -26,7 +26,10 @@
   - Add thread-safe locking using `UserFileManager` pattern
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 7.1, 7.2, 7.3, 7.4, 7.5_
 
-- [-] 3. Implement Calculator tool
+- [x] 3. Implement Calculator tool
+
+
+
 
 
   - Create `CalculatorTool` class extending `BaseTool`
