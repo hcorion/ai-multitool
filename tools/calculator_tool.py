@@ -1,4 +1,5 @@
 import ast
+import math
 import time
 from typing import Any
 
@@ -208,6 +209,9 @@ class CalculatorTool(BaseTool):
                 self._get_safe_functions(),  # Only allowed functions
             )
 
+            # Convert non-finite floats to strings for valid JSON
+            result = self._sanitize_result(result)
+
             # Store in history
             self._store_calculation(storage, expression, result)
 
@@ -280,6 +284,27 @@ class CalculatorTool(BaseTool):
             "sum": sum,
             "pow": pow,
         }
+
+    def _sanitize_result(self, result: Any) -> Any:
+        """Sanitize result for valid JSON serialization.
+
+        Converts non-finite floats (Infinity, -Infinity, NaN) to strings
+        since JSON doesn't support these values.
+
+        Args:
+            result: The calculation result
+
+        Returns:
+            The result, with non-finite floats converted to strings
+        """
+        if isinstance(result, float) and not math.isfinite(result):
+            if math.isnan(result):
+                return "NaN"
+            elif result > 0:
+                return "Infinity"
+            else:
+                return "-Infinity"
+        return result
 
     def _store_calculation(
         self, storage: ToolStorage, expression: str, result: Any
