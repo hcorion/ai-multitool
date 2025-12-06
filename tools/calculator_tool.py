@@ -1,5 +1,6 @@
 import ast
 import math
+from math import sqrt
 import time
 from typing import Any
 
@@ -72,6 +73,7 @@ class CalculatorTool(BaseTool):
         "round",  # Round to n decimal places
         "sum",  # Sum of iterable
         "pow",  # Power function
+        "sqrt",  # Square root function
     }
 
     @property
@@ -283,6 +285,7 @@ class CalculatorTool(BaseTool):
             "round": round,
             "sum": sum,
             "pow": pow,
+            "sqrt": sqrt,
         }
 
     def _sanitize_result(self, result: Any) -> Any:

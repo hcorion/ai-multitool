@@ -4762,7 +4762,7 @@ class StreamEventProcessor:
                 self.tool_calls[item_id]["status"] = "error"
                 self.tool_calls[item_id]["error"] = str(e)
 
-    def _submit_function_outputs_and_continue(self) -> None:
+    def _submit_function_outputs_and_continue(self, max_retries: int = 2) -> None:
         """Submit pending function outputs to the API and continue processing the response."""
         if not self.pending_function_outputs or not self.openai_client:
             return
@@ -4771,48 +4771,68 @@ class StreamEventProcessor:
             logging.error("Cannot submit function outputs: no current response ID")
             return
         
-        try:
-            # Collect all pending outputs
-            function_outputs = self.pending_function_outputs.copy()
-            self.pending_function_outputs.clear()
-            
-            logging.debug(f"Submitting {len(function_outputs)} function output(s) to continue conversation")
-            
-            # Create a new response with the function outputs as input
-            params: dict[str, Any] = {
-                "model": self.model,
-                "input": function_outputs,
-                "previous_response_id": self.current_response_id,
-                "stream": True,
-                "store": True,
-            }
-            
-            # Add tools if available
-            if self.tools:
-                params["tools"] = self.tools
-            
-            # Add instructions if available
-            if self.instructions:
-                params["instructions"] = self.instructions
-            
-            # Make the API call to continue the conversation
-            continuation_stream = self.openai_client.responses.create(**params)
-            
-            # Process the continuation stream
-            for event in continuation_stream:
-                self._handle_stream_event(event)
+        # Collect all pending outputs before retry loop
+        function_outputs = self.pending_function_outputs.copy()
+        self.pending_function_outputs.clear()
+        
+        for attempt in range(max_retries + 1):
+            try:
+                logging.debug(f"Submitting {len(function_outputs)} function output(s) to continue conversation (attempt {attempt + 1})")
                 
-            logging.debug("Function output submission and continuation completed")
-            
-        except Exception as e:
-            logging.error(f"Error submitting function outputs: {e}", exc_info=True)
-            self.event_queue.put(
-                json.dumps({
-                    "type": "error",
-                    "message": "Error processing tool results. Please try again.",
-                    "error_code": "tool_continuation_error"
-                })
-            )
+                # Create a new response with the function outputs as input
+                params: dict[str, Any] = {
+                    "model": self.model,
+                    "input": function_outputs,
+                    "previous_response_id": self.current_response_id,
+                    "stream": True,
+                    "store": True,
+                }
+                
+                # Add tools if available
+                if self.tools:
+                    params["tools"] = self.tools
+                
+                # Add instructions if available
+                if self.instructions:
+                    params["instructions"] = self.instructions
+                
+                # Make the API call to continue the conversation
+                continuation_stream = self.openai_client.responses.create(**params)
+                
+                # Process the continuation stream
+                for event in continuation_stream:
+                    self._handle_stream_event(event)
+                    
+                logging.debug("Function output submission and continuation completed")
+                return  # Success, exit the retry loop
+                
+            except openai.APIError as e:
+                # Transient API errors - retry if we have attempts left
+                if attempt < max_retries:
+                    import time
+                    wait_time = (attempt + 1) * 0.5  # 0.5s, 1s backoff
+                    logging.warning(f"OpenAI API error (attempt {attempt + 1}/{max_retries + 1}), retrying in {wait_time}s: {e}")
+                    time.sleep(wait_time)
+                    continue
+                else:
+                    logging.error(f"Error submitting function outputs after {max_retries + 1} attempts: {e}", exc_info=True)
+                    self.event_queue.put(
+                        json.dumps({
+                            "type": "error",
+                            "message": "OpenAI service temporarily unavailable. Please try again.",
+                            "error_code": "api_error"
+                        })
+                    )
+            except Exception as e:
+                logging.error(f"Error submitting function outputs: {e}", exc_info=True)
+                self.event_queue.put(
+                    json.dumps({
+                        "type": "error",
+                        "message": "Error processing tool results. Please try again.",
+                        "error_code": "tool_continuation_error"
+                    })
+                )
+                break  # Don't retry non-API errors
 
     def get_reasoning_data(self) -> dict[str, Any] | None:
         """Get the reasoning data from the processed stream with comprehensive error handling."""
