@@ -230,17 +230,17 @@ function showReasoningModal(messageIndex) {
     // Show modal with loading state
     const modal = document.getElementById("reasoning-modal");
     const reasoningContent = document.getElementById("reasoning-content");
-    const searchContent = document.getElementById("search-content");
+    const toolsContent = document.getElementById("tools-content");
     const loading = document.getElementById("reasoning-loading");
     const error = document.getElementById("reasoning-error");
-    if (!modal || !reasoningContent || !searchContent || !loading || !error) {
+    if (!modal || !reasoningContent || !toolsContent || !loading || !error) {
         console.error("Reasoning modal elements not found");
         showReasoningError("Modal interface not available");
         return;
     }
     // Reset modal state
     reasoningContent.style.display = "none";
-    searchContent.style.display = "none";
+    toolsContent.style.display = "none";
     error.style.display = "none";
     loading.style.display = "block";
     modal.style.display = "block";
@@ -290,41 +290,42 @@ function showReasoningModal(messageIndex) {
         if (data.error) {
             throw new Error(data.message || data.error);
         }
-        if (data.reasoning && data.reasoning.complete_summary) {
-            displayReasoningData(data.reasoning);
-            reasoningContent.style.display = "block";
-            // Display web search data if available
-            if (data.web_searches && data.web_searches.length > 0) {
-                displayWebSearchData(data.web_searches);
-                enableSearchTab();
-            }
-            else {
-                disableSearchTab();
-            }
-            // Show reasoning tab by default
-            switchModalTab('reasoning');
+        // Check what data is available
+        const hasReasoning = data.reasoning && (data.reasoning.complete_summary || (data.reasoning.summary_parts && data.reasoning.summary_parts.length > 0));
+        const hasToolOutputs = data.tool_outputs && data.tool_outputs.length > 0;
+        const hasWebSearches = data.web_searches && data.web_searches.length > 0;
+        // Need at least some data to display
+        if (!hasReasoning && !hasToolOutputs && !hasWebSearches) {
+            showReasoningError("No reasoning data available for this message");
+            return;
         }
-        else if (data.reasoning && data.reasoning.summary_parts && data.reasoning.summary_parts.length > 0) {
-            // Fallback to summary parts if complete summary is not available
-            const fallbackData = {
-                ...data.reasoning,
-                complete_summary: data.reasoning.summary_parts.join('\n\n')
-            };
-            displayReasoningData(fallbackData);
+        // Display reasoning data if available
+        if (hasReasoning) {
+            const reasoningToDisplay = data.reasoning.complete_summary
+                ? data.reasoning
+                : { ...data.reasoning, complete_summary: data.reasoning.summary_parts.join('\n\n') };
+            displayReasoningData(reasoningToDisplay);
             reasoningContent.style.display = "block";
-            // Display web search data if available
-            if (data.web_searches && data.web_searches.length > 0) {
-                displayWebSearchData(data.web_searches);
-                enableSearchTab();
-            }
-            else {
-                disableSearchTab();
-            }
-            // Show reasoning tab by default
-            switchModalTab('reasoning');
         }
         else {
-            showReasoningError("No reasoning data available for this message");
+            // No reasoning but we have tool data - show placeholder
+            reasoningContent.innerHTML = `<div class="no-reasoning-data">No reasoning data for this message.</div>`;
+            reasoningContent.style.display = "block";
+        }
+        // Display tool outputs if available
+        if (hasToolOutputs || hasWebSearches) {
+            displayToolOutputs(data.tool_outputs || [], data.web_searches || []);
+            enableToolsTab();
+        }
+        else {
+            disableToolsTab();
+        }
+        // Show reasoning tab by default if available, otherwise tools tab
+        if (hasReasoning) {
+            switchModalTab('reasoning');
+        }
+        else if (hasToolOutputs || hasWebSearches) {
+            switchModalTab('tools');
         }
     })
         .catch(err => {
@@ -449,73 +450,134 @@ function switchModalTab(tabName) {
     });
 }
 /**
- * Enable search tab.
+ * Enable tools tab.
  */
-function enableSearchTab() {
-    const searchTabButton = document.querySelector('.tab-button[data-tab="search"]');
-    if (searchTabButton) {
-        searchTabButton.disabled = false;
-        searchTabButton.style.opacity = '1';
+function enableToolsTab() {
+    const toolsTabButton = document.querySelector('.tab-button[data-tab="tools"]');
+    if (toolsTabButton) {
+        toolsTabButton.disabled = false;
+        toolsTabButton.style.opacity = '1';
     }
 }
 /**
- * Disable search tab.
+ * Disable tools tab.
  */
-function disableSearchTab() {
-    const searchTabButton = document.querySelector('.tab-button[data-tab="search"]');
-    if (searchTabButton) {
-        searchTabButton.disabled = true;
-        searchTabButton.style.opacity = '0.5';
+function disableToolsTab() {
+    const toolsTabButton = document.querySelector('.tab-button[data-tab="tools"]');
+    if (toolsTabButton) {
+        toolsTabButton.disabled = true;
+        toolsTabButton.style.opacity = '0.5';
     }
 }
 /**
- * Display web search data.
- * @param searchData - Search activity data
+ * Display tool outputs in the Tools tab.
+ * @param toolOutputs - Tool execution results
+ * @param webSearches - Web search activity (legacy support)
  */
-function displayWebSearchData(searchData) {
-    const searchContent = document.getElementById("search-content");
-    if (!searchContent)
+function displayToolOutputs(toolOutputs, webSearches) {
+    const toolsContent = document.getElementById("tools-content");
+    if (!toolsContent)
         return;
     try {
-        if (!searchData || searchData.length === 0) {
-            searchContent.innerHTML = `
-                <div class="no-search-data">
-                    No web search data available for this message.
+        const hasToolOutputs = toolOutputs && toolOutputs.length > 0;
+        const hasWebSearches = webSearches && webSearches.length > 0;
+        if (!hasToolOutputs && !hasWebSearches) {
+            toolsContent.innerHTML = `
+                <div class="no-tool-data">
+                    No tool activity for this message.
                 </div>
             `;
             return;
         }
-        let searchHtml = `
-            <div class="search-summary">
-                <h3>Web Search Activity</h3>
-            </div>
-        `;
-        searchData.forEach((search, index) => {
-            const query = escapeHtml(search.query || 'Unknown query');
-            const status = search.status || 'unknown';
-            const timestamp = search.timestamp ? new Date(search.timestamp * 1000).toLocaleString() : 'Unknown time';
-            const actionType = search.action_type || 'search';
-            searchHtml += `
-                <div class="search-item">
-                    <div class="search-query">${query}</div>
-                    <div class="search-status ${status}">${formatSearchStatus(status)}</div>
-                    <div class="search-details">
-                        <div>Action: ${escapeHtml(actionType)}</div>
-                        ${search.sources ? `<div>Sources: ${escapeHtml(search.sources.join(', '))}</div>` : ''}
+        let html = `<div class="tools-summary"><h3>Tool Activity</h3></div>`;
+        // Display custom tool outputs
+        if (hasToolOutputs) {
+            toolOutputs.forEach((tool) => {
+                const toolName = escapeHtml(tool.tool_name || 'Unknown tool');
+                const success = tool.success;
+                const timestamp = tool.timestamp ? new Date(tool.timestamp * 1000).toLocaleString() : '';
+                const statusClass = success ? 'success' : 'error';
+                const statusText = success ? 'Success' : 'Error';
+                // Use formatted display strings if available, otherwise fall back to raw data
+                const inputDisplay = tool.input_display !== undefined
+                    ? escapeHtml(tool.input_display)
+                    : escapeHtml(formatToolData(tool.input));
+                const outputDisplay = tool.output_display !== undefined
+                    ? escapeHtml(tool.output_display)
+                    : escapeHtml(formatToolData(tool.output));
+                html += `
+                    <div class="tool-item">
+                        <div class="tool-header">
+                            <span class="tool-name">${toolName}</span>
+                            <span class="tool-status ${statusClass}">${statusText}</span>
+                        </div>
+                        <div class="tool-details">
+                            <div class="tool-section">
+                                <div class="tool-section-label">Input:</div>
+                                <pre class="tool-data">${inputDisplay}</pre>
+                            </div>
+                            <div class="tool-section">
+                                <div class="tool-section-label">Output:</div>
+                                <pre class="tool-data">${outputDisplay}</pre>
+                            </div>
+                        </div>
+                        ${timestamp ? `<div class="tool-timestamp">${timestamp}</div>` : ''}
                     </div>
-                    <div class="search-timestamp">${timestamp}</div>
-                </div>
-            `;
-        });
-        searchContent.innerHTML = searchHtml;
+                `;
+            });
+        }
+        // Display web searches (as a special tool type for backward compatibility)
+        if (hasWebSearches) {
+            webSearches.forEach((search) => {
+                const query = escapeHtml(search.query || 'Unknown query');
+                const status = search.status || 'unknown';
+                const timestamp = search.timestamp ? new Date(search.timestamp * 1000).toLocaleString() : '';
+                const statusClass = status === 'completed' ? 'success' : (status === 'failed' ? 'error' : 'pending');
+                html += `
+                    <div class="tool-item">
+                        <div class="tool-header">
+                            <span class="tool-name">Web Search</span>
+                            <span class="tool-status ${statusClass}">${formatSearchStatus(status)}</span>
+                        </div>
+                        <div class="tool-details">
+                            <div class="tool-section">
+                                <div class="tool-section-label">Query:</div>
+                                <pre class="tool-data">${query}</pre>
+                            </div>
+                        </div>
+                        ${timestamp ? `<div class="tool-timestamp">${timestamp}</div>` : ''}
+                    </div>
+                `;
+            });
+        }
+        toolsContent.innerHTML = html;
     }
     catch (error) {
-        console.error("Error displaying web search data:", error);
-        searchContent.innerHTML = `
+        console.error("Error displaying tool outputs:", error);
+        toolsContent.innerHTML = `
             <div class="error-message">
-                Failed to display web search data
+                Failed to display tool data
             </div>
         `;
+    }
+}
+/**
+ * Format tool data for display.
+ * @param data - Tool input or output data
+ * @returns Formatted string
+ */
+function formatToolData(data) {
+    if (data === null || data === undefined) {
+        return 'N/A';
+    }
+    if (typeof data === 'string') {
+        return data;
+    }
+    try {
+        return JSON.stringify(data, null, 2);
+    }
+    catch {
+        return String(data);
     }
 }
 /**

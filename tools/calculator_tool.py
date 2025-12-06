@@ -332,3 +332,31 @@ class CalculatorTool(BaseTool):
 
         # Save updated history
         storage.set("history", history)
+
+    def format_input_for_display(self, parameters: dict[str, Any]) -> str:
+        """Format calculator input for display.
+
+        Shows just the expression without JSON wrapper.
+
+        Args:
+            parameters: Dictionary containing 'expression' key
+
+        Returns:
+            The expression string
+        """
+        return parameters.get("expression", "")
+
+    def format_output_for_display(self, result: dict[str, Any]) -> str:
+        """Format calculator output for display.
+
+        Shows just the result or error message.
+
+        Args:
+            result: Dictionary containing execution result
+
+        Returns:
+            The result value or error message
+        """
+        if result.get("success"):
+            return str(result.get("result", ""))
+        return f"Error: {result.get('error', 'Unknown error')}"

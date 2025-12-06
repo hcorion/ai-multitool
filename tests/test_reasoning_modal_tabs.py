@@ -52,7 +52,7 @@ class TestReasoningModalTabs:
                     <div class="modal-body">
                         <div class="modal-tabs">
                             <button class="tab-button active" data-tab="reasoning">Reasoning</button>
-                            <button class="tab-button" data-tab="search">Web Searches</button>
+                            <button class="tab-button" data-tab="tools">Tools</button>
                         </div>
                         <div id="reasoning-loading" class="loading-message">
                             Loading process data...
@@ -61,7 +61,7 @@ class TestReasoningModalTabs:
                         </div>
                         <div id="reasoning-content" class="tab-content" data-tab="reasoning" style="display: none;">
                         </div>
-                        <div id="search-content" class="tab-content" data-tab="search" style="display: none;">
+                        <div id="tools-content" class="tab-content" data-tab="tools" style="display: none;">
                         </div>
                     </div>
                 </div>
@@ -87,19 +87,19 @@ class TestReasoningModalTabs:
             
             # Test that tab buttons exist
             reasoning_tab = driver.find_element(By.CSS_SELECTOR, '.tab-button[data-tab="reasoning"]')
-            search_tab = driver.find_element(By.CSS_SELECTOR, '.tab-button[data-tab="search"]')
+            tools_tab = driver.find_element(By.CSS_SELECTOR, '.tab-button[data-tab="tools"]')
             assert reasoning_tab is not None
-            assert search_tab is not None
+            assert tools_tab is not None
             
             # Test that tab content areas exist
             reasoning_content = driver.find_element(By.ID, "reasoning-content")
-            search_content = driver.find_element(By.ID, "search-content")
+            tools_content = driver.find_element(By.ID, "tools-content")
             assert reasoning_content is not None
-            assert search_content is not None
+            assert tools_content is not None
             
             # Test that reasoning tab is active by default
             assert "active" in reasoning_tab.get_attribute("class")
-            assert "active" not in search_tab.get_attribute("class")
+            assert "active" not in tools_tab.get_attribute("class")
             
             # Test that modal is initially hidden
             assert modal.value_of_css_property("display") == "none"
@@ -129,7 +129,7 @@ class TestReasoningModalTabs:
                     <div class="modal-body">
                         <div class="modal-tabs">
                             <button class="tab-button active" data-tab="reasoning">Reasoning</button>
-                            <button class="tab-button" data-tab="search">Web Searches</button>
+                            <button class="tab-button" data-tab="tools">Tools</button>
                         </div>
                         <div id="reasoning-content" class="tab-content" data-tab="reasoning" style="display: block;">
                             <div class="reasoning-summary">
@@ -137,10 +137,10 @@ class TestReasoningModalTabs:
                                 <div class="reasoning-text">Test reasoning content</div>
                             </div>
                         </div>
-                        <div id="search-content" class="tab-content" data-tab="search" style="display: none;">
-                            <div class="search-summary">
-                                <h3>Web Search Activity</h3>
-                                <div class="search-item">Test search content</div>
+                        <div id="tools-content" class="tab-content" data-tab="tools" style="display: none;">
+                            <div class="tools-summary">
+                                <h3>Tool Activity</h3>
+                                <div class="tool-item">Test tool content</div>
                             </div>
                         </div>
                     </div>
@@ -187,25 +187,25 @@ class TestReasoningModalTabs:
                         
                         // Test initial state
                         const reasoningTab = document.querySelector('.tab-button[data-tab="reasoning"]');
-                        const searchTab = document.querySelector('.tab-button[data-tab="search"]');
+                        const toolsTab = document.querySelector('.tab-button[data-tab="tools"]');
                         const reasoningContent = document.getElementById('reasoning-content');
-                        const searchContent = document.getElementById('search-content');
+                        const toolsContent = document.getElementById('tools-content');
                         
                         const initialState = {
                             reasoningTabActive: reasoningTab.classList.contains('active'),
-                            searchTabActive: searchTab.classList.contains('active'),
+                            toolsTabActive: toolsTab.classList.contains('active'),
                             reasoningContentVisible: reasoningContent.style.display === 'block',
-                            searchContentVisible: searchContent.style.display !== 'none'
+                            toolsContentVisible: toolsContent.style.display !== 'none'
                         };
                         
-                        // Switch to search tab
-                        switchModalTab('search');
+                        // Switch to tools tab
+                        switchModalTab('tools');
                         
                         const afterSwitchState = {
                             reasoningTabActive: reasoningTab.classList.contains('active'),
-                            searchTabActive: searchTab.classList.contains('active'),
+                            toolsTabActive: toolsTab.classList.contains('active'),
                             reasoningContentVisible: reasoningContent.style.display !== 'none',
-                            searchContentVisible: searchContent.style.display === 'block'
+                            toolsContentVisible: toolsContent.style.display === 'block'
                         };
                         
                         // Switch back to reasoning tab
@@ -213,9 +213,9 @@ class TestReasoningModalTabs:
                         
                         const finalState = {
                             reasoningTabActive: reasoningTab.classList.contains('active'),
-                            searchTabActive: searchTab.classList.contains('active'),
+                            toolsTabActive: toolsTab.classList.contains('active'),
                             reasoningContentVisible: reasoningContent.style.display === 'block',
-                            searchContentVisible: searchContent.style.display !== 'none'
+                            toolsContentVisible: toolsContent.style.display !== 'none'
                         };
                         
                         resolve({
@@ -235,30 +235,30 @@ class TestReasoningModalTabs:
             # Verify initial state (reasoning tab active)
             initial = result['initialState']
             assert initial['reasoningTabActive'], "Reasoning tab should be active initially"
-            assert not initial['searchTabActive'], "Search tab should not be active initially"
+            assert not initial['toolsTabActive'], "Tools tab should not be active initially"
             assert initial['reasoningContentVisible'], "Reasoning content should be visible initially"
-            assert not initial['searchContentVisible'], "Search content should not be visible initially"
+            assert not initial['toolsContentVisible'], "Tools content should not be visible initially"
             
-            # Verify state after switching to search tab
+            # Verify state after switching to tools tab
             after_switch = result['afterSwitchState']
             assert not after_switch['reasoningTabActive'], "Reasoning tab should not be active after switch"
-            assert after_switch['searchTabActive'], "Search tab should be active after switch"
+            assert after_switch['toolsTabActive'], "Tools tab should be active after switch"
             assert not after_switch['reasoningContentVisible'], "Reasoning content should not be visible after switch"
-            assert after_switch['searchContentVisible'], "Search content should be visible after switch"
+            assert after_switch['toolsContentVisible'], "Tools content should be visible after switch"
             
             # Verify final state (back to reasoning tab)
             final = result['finalState']
             assert final['reasoningTabActive'], "Reasoning tab should be active in final state"
-            assert not final['searchTabActive'], "Search tab should not be active in final state"
+            assert not final['toolsTabActive'], "Tools tab should not be active in final state"
             assert final['reasoningContentVisible'], "Reasoning content should be visible in final state"
-            assert not final['searchContentVisible'], "Search content should not be visible in final state"
+            assert not final['toolsContentVisible'], "Tools content should not be visible in final state"
             
         finally:
             if os.path.exists("test_tab_switching.html"):
                 os.remove("test_tab_switching.html")
 
-    def test_web_search_data_display(self, driver):
-        """Test that web search data is properly displayed."""
+    def test_tool_outputs_display(self, driver):
+        """Test that tool outputs are properly displayed."""
         test_html = """
         <!DOCTYPE html>
         <html>
@@ -267,19 +267,19 @@ class TestReasoningModalTabs:
             <link rel="stylesheet" href="/static/css/style.css">
         </head>
         <body>
-            <div id="search-content" class="tab-content" data-tab="search">
+            <div id="tools-content" class="tab-content" data-tab="tools">
             </div>
         </body>
         </html>
         """
         
-        with open("test_search_display.html", "w") as f:
+        with open("test_tools_display.html", "w") as f:
             f.write(test_html)
         
         try:
-            driver.get(f"file://{os.path.abspath('test_search_display.html')}")
+            driver.get(f"file://{os.path.abspath('test_tools_display.html')}")
             
-            # Test web search data display functionality
+            # Test tool outputs display functionality
             result = driver.execute_script("""
                 return new Promise((resolve) => {
                     try {
@@ -290,7 +290,22 @@ class TestReasoningModalTabs:
                             return div.innerHTML;
                         }
                         
-                        // Function to format search status (from chat.ts)
+                        // Function to format tool data
+                        function formatToolData(data) {
+                            if (data === null || data === undefined) {
+                                return 'N/A';
+                            }
+                            if (typeof data === 'string') {
+                                return data;
+                            }
+                            try {
+                                return JSON.stringify(data, null, 2);
+                            } catch {
+                                return String(data);
+                            }
+                        }
+                        
+                        // Function to format search status (for backward compatibility)
                         function formatSearchStatus(status) {
                             switch (status) {
                                 case 'completed':
@@ -306,97 +321,135 @@ class TestReasoningModalTabs:
                             }
                         }
                         
-                        // Function to display web search data (from chat.ts)
-                        function displayWebSearchData(searchData) {
-                            const searchContent = document.getElementById("search-content");
-                            if (!searchContent) return false;
+                        // Function to display tool outputs (from chat.ts)
+                        function displayToolOutputs(toolOutputs, webSearches) {
+                            const toolsContent = document.getElementById("tools-content");
+                            if (!toolsContent) return false;
 
                             try {
-                                if (!searchData || searchData.length === 0) {
-                                    searchContent.innerHTML = `
-                                        <div class="no-search-data">
-                                            No web search data available for this message.
+                                const hasToolOutputs = toolOutputs && toolOutputs.length > 0;
+                                const hasWebSearches = webSearches && webSearches.length > 0;
+
+                                if (!hasToolOutputs && !hasWebSearches) {
+                                    toolsContent.innerHTML = `
+                                        <div class="no-tool-data">
+                                            No tool activity for this message.
                                         </div>
                                     `;
                                     return true;
                                 }
 
-                                let searchHtml = `
-                                    <div class="search-summary">
-                                        <h3>Web Search Activity</h3>
-                                    </div>
-                                `;
+                                let html = `<div class="tools-summary"><h3>Tool Activity</h3></div>`;
 
-                                searchData.forEach((search, index) => {
-                                    const query = escapeHtml(search.query || 'Unknown query');
-                                    const status = search.status || 'unknown';
-                                    const timestamp = search.timestamp ? new Date(search.timestamp * 1000).toLocaleString() : 'Unknown time';
-                                    const actionType = search.action_type || 'search';
+                                // Display custom tool outputs
+                                if (hasToolOutputs) {
+                                    toolOutputs.forEach((tool) => {
+                                        const toolName = escapeHtml(tool.tool_name || 'Unknown tool');
+                                        const success = tool.success;
+                                        const timestamp = tool.timestamp ? new Date(tool.timestamp * 1000).toLocaleString() : '';
+                                        const statusClass = success ? 'success' : 'error';
+                                        const statusText = success ? 'Success' : 'Error';
 
-                                    searchHtml += `
-                                        <div class="search-item">
-                                            <div class="search-query">${query}</div>
-                                            <div class="search-status ${status}">${formatSearchStatus(status)}</div>
-                                            <div class="search-details">
-                                                <div>Action: ${escapeHtml(actionType)}</div>
-                                                ${search.sources ? `<div>Sources: ${escapeHtml(search.sources.join(', '))}</div>` : ''}
+                                        html += `
+                                            <div class="tool-item">
+                                                <div class="tool-header">
+                                                    <span class="tool-name">${toolName}</span>
+                                                    <span class="tool-status ${statusClass}">${statusText}</span>
+                                                </div>
+                                                <div class="tool-details">
+                                                    <div class="tool-section">
+                                                        <div class="tool-section-label">Input:</div>
+                                                        <pre class="tool-data">${escapeHtml(formatToolData(tool.input))}</pre>
+                                                    </div>
+                                                    <div class="tool-section">
+                                                        <div class="tool-section-label">Output:</div>
+                                                        <pre class="tool-data">${escapeHtml(formatToolData(tool.output))}</pre>
+                                                    </div>
+                                                </div>
+                                                ${timestamp ? `<div class="tool-timestamp">${timestamp}</div>` : ''}
                                             </div>
-                                            <div class="search-timestamp">${timestamp}</div>
-                                        </div>
-                                    `;
-                                });
+                                        `;
+                                    });
+                                }
 
-                                searchContent.innerHTML = searchHtml;
+                                // Display web searches (as a special tool type)
+                                if (hasWebSearches) {
+                                    webSearches.forEach((search) => {
+                                        const query = escapeHtml(search.query || 'Unknown query');
+                                        const status = search.status || 'unknown';
+                                        const timestamp = search.timestamp ? new Date(search.timestamp * 1000).toLocaleString() : '';
+                                        const statusClass = status === 'completed' ? 'success' : (status === 'failed' ? 'error' : 'pending');
+
+                                        html += `
+                                            <div class="tool-item">
+                                                <div class="tool-header">
+                                                    <span class="tool-name">Web Search</span>
+                                                    <span class="tool-status ${statusClass}">${formatSearchStatus(status)}</span>
+                                                </div>
+                                                <div class="tool-details">
+                                                    <div class="tool-section">
+                                                        <div class="tool-section-label">Query:</div>
+                                                        <pre class="tool-data">${query}</pre>
+                                                    </div>
+                                                </div>
+                                                ${timestamp ? `<div class="tool-timestamp">${timestamp}</div>` : ''}
+                                            </div>
+                                        `;
+                                    });
+                                }
+
+                                toolsContent.innerHTML = html;
                                 return true;
                             } catch (error) {
-                                console.error("Error displaying web search data:", error);
-                                searchContent.innerHTML = `
+                                console.error("Error displaying tool outputs:", error);
+                                toolsContent.innerHTML = `
                                     <div class="error-message">
-                                        Failed to display web search data
+                                        Failed to display tool data
                                     </div>
                                 `;
                                 return false;
                             }
                         }
                         
-                        // Test with sample search data
-                        const sampleSearchData = [
+                        // Test with sample tool outputs (calculator example)
+                        const sampleToolOutputs = [
                             {
-                                query: "weather in New York",
-                                status: "completed",
-                                timestamp: 1704067200,
-                                action_type: "search",
-                                sources: ["weather.com", "noaa.gov"]
+                                tool_name: "calculator",
+                                input: { expression: "2 + 2" },
+                                output: { success: true, result: 4, expression: "2 + 2" },
+                                success: true,
+                                timestamp: 1704067200
                             },
                             {
-                                query: "current temperature NYC",
-                                status: "in_progress",
-                                timestamp: 1704067260,
-                                action_type: "search"
+                                tool_name: "calculator",
+                                input: { expression: "pow(2, 8)" },
+                                output: { success: true, result: 256, expression: "pow(2, 8)" },
+                                success: true,
+                                timestamp: 1704067260
                             }
                         ];
                         
-                        const displayResult = displayWebSearchData(sampleSearchData);
+                        const displayResult = displayToolOutputs(sampleToolOutputs, []);
                         
                         // Check if content was properly generated
-                        const searchContent = document.getElementById("search-content");
-                        const hasSearchSummary = searchContent.querySelector('.search-summary') !== null;
-                        const searchItems = searchContent.querySelectorAll('.search-item');
-                        const hasCorrectItemCount = searchItems.length === 2;
+                        const toolsContent = document.getElementById("tools-content");
+                        const hasToolsSummary = toolsContent.querySelector('.tools-summary') !== null;
+                        const toolItems = toolsContent.querySelectorAll('.tool-item');
+                        const hasCorrectItemCount = toolItems.length === 2;
                         
-                        // Check first search item content
-                        const firstItem = searchItems[0];
-                        const firstQuery = firstItem.querySelector('.search-query').textContent;
-                        const firstStatus = firstItem.querySelector('.search-status').textContent;
+                        // Check first tool item content
+                        const firstItem = toolItems[0];
+                        const firstToolName = firstItem.querySelector('.tool-name').textContent;
+                        const firstStatus = firstItem.querySelector('.tool-status').textContent;
                         
                         resolve({
                             success: true,
                             displayResult: displayResult,
-                            hasSearchSummary: hasSearchSummary,
+                            hasToolsSummary: hasToolsSummary,
                             hasCorrectItemCount: hasCorrectItemCount,
-                            firstQuery: firstQuery,
+                            firstToolName: firstToolName,
                             firstStatus: firstStatus,
-                            totalItems: searchItems.length
+                            totalItems: toolItems.length
                         });
                     } catch (error) {
                         resolve({ success: false, error: error.message });
@@ -404,14 +457,14 @@ class TestReasoningModalTabs:
                 });
             """)
             
-            assert result['success'], f"Web search display test failed: {result.get('error', 'Unknown error')}"
-            assert result['displayResult'], "displayWebSearchData should return true on success"
-            assert result['hasSearchSummary'], "Should have search summary section"
-            assert result['hasCorrectItemCount'], "Should have correct number of search items"
-            assert result['firstQuery'] == "weather in New York", "First search query should match"
-            assert result['firstStatus'] == "Completed", "First search status should be formatted correctly"
-            assert result['totalItems'] == 2, "Should have 2 search items"
+            assert result['success'], f"Tool outputs display test failed: {result.get('error', 'Unknown error')}"
+            assert result['displayResult'], "displayToolOutputs should return true on success"
+            assert result['hasToolsSummary'], "Should have tools summary section"
+            assert result['hasCorrectItemCount'], "Should have correct number of tool items"
+            assert result['firstToolName'] == "calculator", "First tool name should match"
+            assert result['firstStatus'] == "Success", "First tool status should be formatted correctly"
+            assert result['totalItems'] == 2, "Should have 2 tool items"
             
         finally:
-            if os.path.exists("test_search_display.html"):
-                os.remove("test_search_display.html")
+            if os.path.exists("test_tools_display.html"):
+                os.remove("test_tools_display.html")

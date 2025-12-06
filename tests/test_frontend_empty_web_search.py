@@ -1,4 +1,4 @@
-"""Test frontend handling of empty web search data."""
+"""Test frontend handling of empty tool data."""
 
 import os
 import pytest
@@ -7,8 +7,8 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 
 
-class TestFrontendEmptyWebSearch:
-    """Test frontend handling when web search data is empty."""
+class TestFrontendEmptyToolData:
+    """Test frontend handling when tool data is empty."""
 
     @pytest.fixture
     def driver(self):
@@ -23,8 +23,8 @@ class TestFrontendEmptyWebSearch:
         yield driver
         driver.quit()
 
-    def test_modal_with_empty_web_search_data(self, driver):
-        """Test that modal handles empty web search data gracefully."""
+    def test_modal_with_empty_tool_data(self, driver):
+        """Test that modal handles empty tool data gracefully."""
         test_html = """
         <!DOCTYPE html>
         <html>
@@ -42,17 +42,17 @@ class TestFrontendEmptyWebSearch:
                     <div class="modal-body">
                         <div class="modal-tabs">
                             <button class="tab-button active" data-tab="reasoning">Reasoning</button>
-                            <button class="tab-button" data-tab="search" disabled style="opacity: 0.5;">Web Searches</button>
+                            <button class="tab-button" data-tab="tools" disabled style="opacity: 0.5;">Tools</button>
                         </div>
                         <div id="reasoning-content" class="tab-content" data-tab="reasoning" style="display: block;">
                             <div class="reasoning-summary">
                                 <h3>AI Reasoning Process</h3>
-                                <div class="reasoning-text">This is test reasoning content without web searches.</div>
+                                <div class="reasoning-text">This is test reasoning content without tool usage.</div>
                             </div>
                         </div>
-                        <div id="search-content" class="tab-content" data-tab="search" style="display: none;">
-                            <div class="no-search-data">
-                                No web search data available for this message.
+                        <div id="tools-content" class="tab-content" data-tab="tools" style="display: none;">
+                            <div class="no-tool-data">
+                                No tool activity for this message.
                             </div>
                         </div>
                     </div>
@@ -62,41 +62,41 @@ class TestFrontendEmptyWebSearch:
         </html>
         """
         
-        with open("test_empty_search.html", "w") as f:
+        with open("test_empty_tools.html", "w") as f:
             f.write(test_html)
         
         try:
-            driver.get(f"file://{os.path.abspath('test_empty_search.html')}")
+            driver.get(f"file://{os.path.abspath('test_empty_tools.html')}")
             
-            # Test that reasoning tab is active and search tab is disabled
+            # Test that reasoning tab is active and tools tab is disabled
             reasoning_tab = driver.find_element(By.CSS_SELECTOR, '.tab-button[data-tab="reasoning"]')
-            search_tab = driver.find_element(By.CSS_SELECTOR, '.tab-button[data-tab="search"]')
+            tools_tab = driver.find_element(By.CSS_SELECTOR, '.tab-button[data-tab="tools"]')
             
             assert "active" in reasoning_tab.get_attribute("class")
             assert reasoning_tab.is_enabled()
             
-            assert "active" not in search_tab.get_attribute("class")
-            assert not search_tab.is_enabled()
+            assert "active" not in tools_tab.get_attribute("class")
+            assert not tools_tab.is_enabled()
             
-            # Test that reasoning content is visible and search content is hidden
+            # Test that reasoning content is visible and tools content is hidden
             reasoning_content = driver.find_element(By.ID, "reasoning-content")
-            search_content = driver.find_element(By.ID, "search-content")
+            tools_content = driver.find_element(By.ID, "tools-content")
             
             assert reasoning_content.is_displayed()
-            assert not search_content.is_displayed()
+            assert not tools_content.is_displayed()
             
-            # Test that no-search-data message is present (even if hidden)
-            no_search_message = driver.find_element(By.CLASS_NAME, "no-search-data")
+            # Test that no-tool-data message is present (even if hidden)
+            no_tool_message = driver.find_element(By.CLASS_NAME, "no-tool-data")
             # Use get_attribute to get the text content even if element is hidden
-            message_text = driver.execute_script("return arguments[0].textContent;", no_search_message)
-            assert "No web search data available" in message_text
+            message_text = driver.execute_script("return arguments[0].textContent;", no_tool_message)
+            assert "No tool activity" in message_text
             
         finally:
-            if os.path.exists("test_empty_search.html"):
-                os.remove("test_empty_search.html")
+            if os.path.exists("test_empty_tools.html"):
+                os.remove("test_empty_tools.html")
 
-    def test_modal_with_web_search_data(self, driver):
-        """Test that modal displays web search data when available."""
+    def test_modal_with_tool_data(self, driver):
+        """Test that modal displays tool data when available."""
         test_html = """
         <!DOCTYPE html>
         <html>
@@ -114,26 +114,34 @@ class TestFrontendEmptyWebSearch:
                     <div class="modal-body">
                         <div class="modal-tabs">
                             <button class="tab-button active" data-tab="reasoning">Reasoning</button>
-                            <button class="tab-button" data-tab="search">Web Searches</button>
+                            <button class="tab-button" data-tab="tools">Tools</button>
                         </div>
                         <div id="reasoning-content" class="tab-content" data-tab="reasoning" style="display: block;">
                             <div class="reasoning-summary">
                                 <h3>AI Reasoning Process</h3>
-                                <div class="reasoning-text">This reasoning involved web searches.</div>
+                                <div class="reasoning-text">This reasoning involved tool usage.</div>
                             </div>
                         </div>
-                        <div id="search-content" class="tab-content" data-tab="search" style="display: none;">
-                            <div class="search-summary">
-                                <h3>Web Search Activity</h3>
+                        <div id="tools-content" class="tab-content" data-tab="tools" style="display: none;">
+                            <div class="tools-summary">
+                                <h3>Tool Activity</h3>
                             </div>
-                            <div class="search-item">
-                                <div class="search-query">test weather query</div>
-                                <div class="search-status completed">Completed</div>
-                                <div class="search-details">
-                                    <div>Action: search</div>
-                                    <div>Sources: weather.com, noaa.gov</div>
+                            <div class="tool-item">
+                                <div class="tool-header">
+                                    <span class="tool-name">calculator</span>
+                                    <span class="tool-status success">Success</span>
                                 </div>
-                                <div class="search-timestamp">1/1/2024, 12:00:00 PM</div>
+                                <div class="tool-details">
+                                    <div class="tool-section">
+                                        <div class="tool-section-label">Input:</div>
+                                        <pre class="tool-data">{"expression": "2 + 2"}</pre>
+                                    </div>
+                                    <div class="tool-section">
+                                        <div class="tool-section-label">Output:</div>
+                                        <pre class="tool-data">{"success": true, "result": 4}</pre>
+                                    </div>
+                                </div>
+                                <div class="tool-timestamp">1/1/2024, 12:00:00 PM</div>
                             </div>
                         </div>
                     </div>
@@ -143,62 +151,62 @@ class TestFrontendEmptyWebSearch:
         </html>
         """
         
-        with open("test_with_search.html", "w") as f:
+        with open("test_with_tools.html", "w") as f:
             f.write(test_html)
         
         try:
-            driver.get(f"file://{os.path.abspath('test_with_search.html')}")
+            driver.get(f"file://{os.path.abspath('test_with_tools.html')}")
             
             # Test that both tabs are enabled
             reasoning_tab = driver.find_element(By.CSS_SELECTOR, '.tab-button[data-tab="reasoning"]')
-            search_tab = driver.find_element(By.CSS_SELECTOR, '.tab-button[data-tab="search"]')
+            tools_tab = driver.find_element(By.CSS_SELECTOR, '.tab-button[data-tab="tools"]')
             
             assert reasoning_tab.is_enabled()
-            assert search_tab.is_enabled()
+            assert tools_tab.is_enabled()
             
             # Test tab switching functionality
             result = driver.execute_script("""
                 return new Promise((resolve) => {
                     try {
                         const reasoningTab = document.querySelector('.tab-button[data-tab="reasoning"]');
-                        const searchTab = document.querySelector('.tab-button[data-tab="search"]');
+                        const toolsTab = document.querySelector('.tab-button[data-tab="tools"]');
                         const reasoningContent = document.getElementById('reasoning-content');
-                        const searchContent = document.getElementById('search-content');
+                        const toolsContent = document.getElementById('tools-content');
                         
                         // Initial state
                         const initialState = {
                             reasoningActive: reasoningTab.classList.contains('active'),
-                            searchActive: searchTab.classList.contains('active'),
+                            toolsActive: toolsTab.classList.contains('active'),
                             reasoningVisible: reasoningContent.style.display !== 'none',
-                            searchVisible: searchContent.style.display !== 'none'
+                            toolsVisible: toolsContent.style.display !== 'none'
                         };
                         
-                        // Click search tab
-                        searchTab.click();
+                        // Click tools tab
+                        toolsTab.click();
                         
                         // Simulate tab switching logic
                         reasoningTab.classList.remove('active');
-                        searchTab.classList.add('active');
+                        toolsTab.classList.add('active');
                         reasoningContent.style.display = 'none';
-                        searchContent.style.display = 'block';
+                        toolsContent.style.display = 'block';
                         
                         const afterClickState = {
                             reasoningActive: reasoningTab.classList.contains('active'),
-                            searchActive: searchTab.classList.contains('active'),
+                            toolsActive: toolsTab.classList.contains('active'),
                             reasoningVisible: reasoningContent.style.display !== 'none',
-                            searchVisible: searchContent.style.display !== 'none'
+                            toolsVisible: toolsContent.style.display !== 'none'
                         };
                         
-                        // Check search content
-                        const searchQuery = document.querySelector('.search-query').textContent;
-                        const searchStatus = document.querySelector('.search-status').textContent;
+                        // Check tool content
+                        const toolName = document.querySelector('.tool-name').textContent;
+                        const toolStatus = document.querySelector('.tool-status').textContent;
                         
                         resolve({
                             success: true,
                             initialState: initialState,
                             afterClickState: afterClickState,
-                            searchQuery: searchQuery,
-                            searchStatus: searchStatus
+                            toolName: toolName,
+                            toolStatus: toolStatus
                         });
                     } catch (error) {
                         resolve({ success: false, error: error.message });
@@ -211,21 +219,21 @@ class TestFrontendEmptyWebSearch:
             # Verify initial state
             initial = result['initialState']
             assert initial['reasoningActive'], "Reasoning tab should be active initially"
-            assert not initial['searchActive'], "Search tab should not be active initially"
+            assert not initial['toolsActive'], "Tools tab should not be active initially"
             assert initial['reasoningVisible'], "Reasoning content should be visible initially"
-            assert not initial['searchVisible'], "Search content should not be visible initially"
+            assert not initial['toolsVisible'], "Tools content should not be visible initially"
             
-            # Verify state after clicking search tab
+            # Verify state after clicking tools tab
             after_click = result['afterClickState']
             assert not after_click['reasoningActive'], "Reasoning tab should not be active after click"
-            assert after_click['searchActive'], "Search tab should be active after click"
+            assert after_click['toolsActive'], "Tools tab should be active after click"
             assert not after_click['reasoningVisible'], "Reasoning content should not be visible after click"
-            assert after_click['searchVisible'], "Search content should be visible after click"
+            assert after_click['toolsVisible'], "Tools content should be visible after click"
             
-            # Verify search content
-            assert result['searchQuery'] == "test weather query"
-            assert result['searchStatus'] == "Completed"
+            # Verify tool content
+            assert result['toolName'] == "calculator"
+            assert result['toolStatus'] == "Success"
             
         finally:
-            if os.path.exists("test_with_search.html"):
-                os.remove("test_with_search.html")
+            if os.path.exists("test_with_tools.html"):
+                os.remove("test_with_tools.html")

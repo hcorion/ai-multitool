@@ -1738,50 +1738,91 @@ button#send-chat:hover {
   padding-bottom: 10px;
 }
 
-.search-item {
+.tools-summary {
+  margin-bottom: 15px;
+}
+.tools-summary h3 {
+  margin: 0;
+  font-size: 1.1em;
+  color: #fff;
+  border-bottom: 1px solid #666666;
+  padding-bottom: 10px;
+}
+
+.tool-item {
   margin-bottom: 20px;
   padding: 15px;
   background-color: rgba(255, 255, 255, 0.02);
   border: 1px solid #666666;
   border-radius: 6px;
 }
-.search-item .search-query {
+.tool-item .tool-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.tool-item .tool-name {
   font-weight: 600;
   color: #fff;
-  margin-bottom: 8px;
   font-size: 0.95em;
 }
-.search-item .search-status {
+.tool-item .tool-status {
   display: inline-block;
-  padding: 4px 8px;
+  padding: 4px 10px;
   border-radius: 12px;
   font-size: 0.8em;
   font-weight: 500;
-  margin-bottom: 8px;
 }
-.search-item .search-status.completed {
+.tool-item .tool-status.success {
   background-color: rgba(76, 175, 80, 0.2);
   color: #4caf50;
 }
-.search-item .search-status.in-progress {
-  background-color: rgba(255, 193, 7, 0.2);
-  color: #ffc107;
-}
-.search-item .search-status.searching {
-  background-color: rgba(33, 150, 243, 0.2);
-  color: #2196f3;
-}
-.search-item .search-status.failed {
+.tool-item .tool-status.error {
   background-color: rgba(244, 67, 54, 0.2);
   color: #f44336;
 }
-.search-item .search-timestamp {
+.tool-item .tool-status.pending {
+  background-color: rgba(255, 193, 7, 0.2);
+  color: #ffc107;
+}
+.tool-item .tool-details {
+  margin-top: 10px;
+}
+.tool-item .tool-section {
+  margin-bottom: 10px;
+}
+.tool-item .tool-section:last-child {
+  margin-bottom: 0;
+}
+.tool-item .tool-section-label {
+  font-size: 0.85em;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+.tool-item .tool-data {
+  background-color: rgba(0, 0, 0, 0.3);
+  padding: 10px;
+  border-radius: 4px;
+  font-family: "Consolas", "Monaco", monospace;
+  font-size: 0.85em;
+  color: rgba(255, 255, 255, 0.9);
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 150px;
+  overflow-y: auto;
+}
+.tool-item .tool-timestamp {
   font-size: 0.85em;
   color: rgba(255, 255, 255, 0.6);
-  margin-top: 8px;
+  margin-top: 10px;
+  text-align: right;
 }
 
-.no-search-data {
+.no-tool-data,
+.no-reasoning-data {
   text-align: center;
   padding: 40px 20px;
   color: rgba(255, 255, 255, 0.6);

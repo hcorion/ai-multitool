@@ -359,6 +359,24 @@ class TestEdgeCases:
         assert result['success'] is True
         assert result['result'] == 42
 
+    def test_positive_infinity(self, calculator, storage):
+        """Test expression producing positive infinity returns string."""
+        result = calculator.execute({'expression': '1e308 * 10'}, storage)
+        assert result['success'] is True
+        assert result['result'] == 'Infinity'
+
+    def test_negative_infinity(self, calculator, storage):
+        """Test expression producing negative infinity returns string."""
+        result = calculator.execute({'expression': 'min(-1e308, -1e309)'}, storage)
+        assert result['success'] is True
+        assert result['result'] == '-Infinity'
+
+    def test_negative_infinity_via_multiplication(self, calculator, storage):
+        """Test negative infinity via multiplication returns string."""
+        result = calculator.execute({'expression': '-1e308 * 10'}, storage)
+        assert result['success'] is True
+        assert result['result'] == '-Infinity'
+
 
 class TestStorageOperations:
     """Test storage operations and history tracking."""

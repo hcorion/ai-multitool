@@ -220,6 +220,46 @@ class BaseTool(ABC):
         """
         return []
 
+    def format_input_for_display(self, parameters: dict[str, Any]) -> str:
+        """Format input parameters for display in the UI.
+        
+        Override this method to provide a cleaner, more readable representation
+        of the tool's input parameters instead of raw JSON.
+        
+        Args:
+            parameters: Dictionary of input parameters
+        
+        Returns:
+            Formatted string for display. Default returns JSON representation.
+        
+        Example:
+            def format_input_for_display(self, parameters: dict[str, Any]) -> str:
+                return parameters.get('expression', '')
+        """
+        import json
+        return json.dumps(parameters, indent=2)
+
+    def format_output_for_display(self, result: dict[str, Any]) -> str:
+        """Format output result for display in the UI.
+        
+        Override this method to provide a cleaner, more readable representation
+        of the tool's output instead of raw JSON.
+        
+        Args:
+            result: Dictionary containing the execution result
+        
+        Returns:
+            Formatted string for display. Default returns JSON representation.
+        
+        Example:
+            def format_output_for_display(self, result: dict[str, Any]) -> str:
+                if result.get('success'):
+                    return str(result.get('result', ''))
+                return f"Error: {result.get('error', 'Unknown error')}"
+        """
+        import json
+        return json.dumps(result, indent=2)
+
 
 class ToolRegistry:
     """Registry for managing available tools.

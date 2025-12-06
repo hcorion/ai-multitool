@@ -1617,57 +1617,105 @@ button#send-chat {
     }
 }
 
-.search-item {
+// Tool output styles
+.tools-summary {
+    margin-bottom: 15px;
+    
+    h3 {
+        margin: 0;
+        font-size: 1.1em;
+        color: $text-color;
+        border-bottom: 1px solid $border-color;
+        padding-bottom: 10px;
+    }
+}
+
+.tool-item {
     margin-bottom: 20px;
     padding: 15px;
     background-color: rgba(255, 255, 255, 0.02);
     border: 1px solid $border-color;
     border-radius: 6px;
     
-    .search-query {
+    .tool-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
+    }
+    
+    .tool-name {
         font-weight: 600;
         color: $text-color;
-        margin-bottom: 8px;
         font-size: 0.95em;
     }
     
-    .search-status {
+    .tool-status {
         display: inline-block;
-        padding: 4px 8px;
+        padding: 4px 10px;
         border-radius: 12px;
         font-size: 0.8em;
         font-weight: 500;
-        margin-bottom: 8px;
         
-        &.completed {
+        &.success {
             background-color: rgba(76, 175, 80, 0.2);
             color: #4caf50;
         }
         
-        &.in-progress {
-            background-color: rgba(255, 193, 7, 0.2);
-            color: #ffc107;
-        }
-        
-        &.searching {
-            background-color: rgba(33, 150, 243, 0.2);
-            color: #2196f3;
-        }
-        
-        &.failed {
+        &.error {
             background-color: rgba(244, 67, 54, 0.2);
             color: #f44336;
         }
+        
+        &.pending {
+            background-color: rgba(255, 193, 7, 0.2);
+            color: #ffc107;
+        }
     }
     
-    .search-timestamp {
+    .tool-details {
+        margin-top: 10px;
+    }
+    
+    .tool-section {
+        margin-bottom: 10px;
+        
+        &:last-child {
+            margin-bottom: 0;
+        }
+    }
+    
+    .tool-section-label {
+        font-size: 0.85em;
+        color: rgba(255, 255, 255, 0.7);
+        margin-bottom: 4px;
+        font-weight: 500;
+    }
+    
+    .tool-data {
+        background-color: rgba(0, 0, 0, 0.3);
+        padding: 10px;
+        border-radius: 4px;
+        font-family: 'Consolas', 'Monaco', monospace;
+        font-size: 0.85em;
+        color: rgba(255, 255, 255, 0.9);
+        margin: 0;
+        white-space: pre-wrap;
+        word-break: break-word;
+        max-height: 150px;
+        overflow-y: auto;
+    }
+    
+    .tool-timestamp {
         font-size: 0.85em;
         color: rgba(255, 255, 255, 0.6);
-        margin-top: 8px;
+        margin-top: 10px;
+        text-align: right;
     }
 }
 
-.no-search-data {
+.no-tool-data,
+.no-reasoning-data {
     text-align: center;
     padding: 40px 20px;
     color: rgba(255, 255, 255, 0.6);

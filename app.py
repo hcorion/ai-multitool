@@ -333,6 +333,22 @@ def validate_reasoning_data(
             if "item_id" in search and not isinstance(search["item_id"], str):
                 raise ValueError("Web search item_id must be a string")
 
+    # Validate tool_outputs field if present
+    if "tool_outputs" in reasoning_data:
+        tool_outputs = reasoning_data["tool_outputs"]
+        if not isinstance(tool_outputs, list):
+            raise ValueError("tool_outputs must be a list")
+
+        for tool_output in tool_outputs:
+            if not isinstance(tool_output, dict):
+                raise ValueError("Each tool output must be a dictionary")
+
+            # Validate tool output fields
+            if "tool_name" in tool_output and not isinstance(
+                tool_output["tool_name"], str
+            ):
+                raise ValueError("Tool output tool_name must be a string")
+
     # Validate message_data field if present
     if "message_data" in reasoning_data:
         message_data = reasoning_data["message_data"]
@@ -3704,6 +3720,11 @@ def get_message_reasoning(conversation_id: str, message_index: int):
         if web_searches and isinstance(web_searches, list) and len(web_searches) > 0:
             response_data["web_searches"] = web_searches
 
+        # Include tool outputs if available
+        tool_outputs = reasoning_data.get("tool_outputs", [])
+        if tool_outputs and isinstance(tool_outputs, list) and len(tool_outputs) > 0:
+            response_data["tool_outputs"] = tool_outputs
+
         # Include message data if available (for citations)
         message_data = reasoning_data.get("message_data")
         if message_data:
@@ -3883,7 +3904,16 @@ class StreamEventProcessor:
 
     def _handle_response_created(self, event: Any) -> None:
         """Handle response.created event - response has been created."""
-        self.accumulated_text = ""
+        # Check if this is a continuation (tool_outputs already has data)
+        is_continuation = len(self.reasoning_data.get("tool_outputs", [])) > 0
+        
+        # Preserve tool_outputs from previous response (for continuation after tool calls)
+        preserved_tool_outputs = self.reasoning_data.get("tool_outputs", [])
+        
+        # For continuations, also preserve accumulated text
+        if not is_continuation:
+            self.accumulated_text = ""
+        
         # Reset reasoning data for new response
         self.reasoning_data = {
             "summary_parts": [],
@@ -3891,6 +3921,7 @@ class StreamEventProcessor:
             "timestamp": 0,
             "response_id": "",
             "web_searches": [],
+            "tool_outputs": preserved_tool_outputs,  # Preserve tool outputs across continuations
             "message_data": None,
         }
 
@@ -3905,7 +3936,9 @@ class StreamEventProcessor:
         elif hasattr(event, "id"):
             self.current_response_id = event.id
 
-        self.event_queue.put(json.dumps({"type": "text_created", "text": ""}))
+        # Only send text_created for the initial response, not continuations
+        if not is_continuation:
+            self.event_queue.put(json.dumps({"type": "text_created", "text": ""}))
 
     def _handle_response_in_progress(self, event: Any) -> None:
         """Handle response.in_progress event - response is being generated."""
@@ -4678,6 +4711,25 @@ class StreamEventProcessor:
                 tool_call["status"] = "completed" if result.get("success") else "error"
                 tool_call["result"] = result
                 
+                # Get the tool instance for formatting
+                tool_instance = self.tool_executor.registry.get_tool(tool_name)
+                
+                # Store tool output in reasoning_data for display in modal
+                tool_output_record = {
+                    "tool_name": tool_name,
+                    "input": parameters,
+                    "output": result,
+                    "success": result.get("success", False),
+                    "timestamp": int(time.time()),
+                }
+                
+                # Add formatted display strings if tool provides them
+                if tool_instance:
+                    tool_output_record["input_display"] = tool_instance.format_input_for_display(parameters)
+                    tool_output_record["output_display"] = tool_instance.format_output_for_display(result)
+                
+                self.reasoning_data["tool_outputs"].append(tool_output_record)
+                
                 # Store function output for submission back to API
                 if call_id:
                     self.pending_function_outputs.append({
@@ -4773,6 +4825,7 @@ class StreamEventProcessor:
                 self.reasoning_data.get("complete_summary")
                 or self.reasoning_data.get("summary_parts")
                 or self.reasoning_data.get("web_searches")
+                or self.reasoning_data.get("tool_outputs")
                 or self.reasoning_data.get("message_data")
             ):
                 # Validate the reasoning data before returning
