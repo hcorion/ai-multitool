@@ -8,6 +8,7 @@ export interface AgentPreset {
     default_reasoning_level: 'high' | 'medium' | 'low' | 'none';
     created_at: number;
     updated_at: number;
+    enabled_tools: string[];
 }
 
 export interface ChatState {
@@ -20,6 +21,7 @@ export interface AgentPresetFormData {
     instructions: string;
     model: 'gpt-5.1' | 'gpt-5' | 'gpt-5-mini' | 'gpt-5-pro';
     default_reasoning_level: 'high' | 'medium' | 'low' | 'none';
+    enabled_tools: string[];
 }
 
 export interface AgentPresetAPIResponse {

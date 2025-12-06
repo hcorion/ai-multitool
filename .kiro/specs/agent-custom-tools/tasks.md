@@ -138,7 +138,10 @@
   - Test chat continues normally after tool errors
   - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 6.1, 6.2, 6.3, 6.4, 6.5_
 
-- [-] 8. Update TypeScript interfaces for tools
+- [x] 8. Update TypeScript interfaces for tools
+
+
+
 
 
   - Add `enabled_tools: string[]` field to `AgentPreset` interface
@@ -146,7 +149,13 @@
   - Update agent preset API response types
   - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5_
 
-- [ ] 9. Implement frontend tool configuration UI
+- [x] 9. Implement frontend tool configuration UI
+
+
+
+
+
+
   - Add tool configuration section to agent preset modal
   - Render built-in tools section with web_search checkbox
   - Render custom tools section with calculator checkbox
@@ -163,7 +172,12 @@
   - Test at least one tool must be enabled validation
   - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5_
 
-- [ ] 10. Add tool configuration styling
+- [x] 10. Add tool configuration styling
+
+
+
+
+
   - Style tool configuration section in agent preset modal
   - Add visual distinction between built-in and custom tools
   - Style tool checkboxes and labels

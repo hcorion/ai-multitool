@@ -70,22 +70,20 @@ class BaseTool(ABC):
             def get_openai_tool_definition(self) -> dict[str, Any]:
                 return {
                     "type": "function",
-                    "function": {
-                        "name": "calculator",
-                        "description": "Evaluates mathematical expressions...",
-                        "parameters": {
-                            "type": "object",
-                            "properties": {
-                                "expression": {
-                                    "type": "string",
-                                    "description": "A valid mathematical expression..."
-                                }
-                            },
-                            "required": ["expression"],
-                            "additionalProperties": False
+                    "name": "calculator",
+                    "description": "Evaluates mathematical expressions...",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "expression": {
+                                "type": "string",
+                                "description": "A valid mathematical expression..."
+                            }
                         },
-                        "strict": True
-                    }
+                        "required": ["expression"],
+                        "additionalProperties": False
+                    },
+                    "strict": True
                 }
             
             def execute(
@@ -137,29 +135,30 @@ class BaseTool(ABC):
         - Use enums where appropriate to constrain values
         
         Returns:
-            Dictionary containing the OpenAI function definition with:
+            Dictionary containing the OpenAI function definition with flat structure:
             - type: "function"
-            - function: Object with name, description, parameters, and strict=true
+            - name: Function name
+            - description: Function description
+            - parameters: JSON schema for parameters
+            - strict: True for strict validation
         
         Example:
             {
                 "type": "function",
-                "function": {
-                    "name": "calculator",
-                    "description": "Evaluates mathematical expressions...",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "expression": {
-                                "type": "string",
-                                "description": "A valid mathematical expression..."
-                            }
-                        },
-                        "required": ["expression"],
-                        "additionalProperties": False
+                "name": "calculator",
+                "description": "Evaluates mathematical expressions...",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "expression": {
+                            "type": "string",
+                            "description": "A valid mathematical expression..."
+                        }
                     },
-                    "strict": True
-                }
+                    "required": ["expression"],
+                    "additionalProperties": False
+                },
+                "strict": True
             }
         """
         pass

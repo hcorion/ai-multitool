@@ -96,38 +96,38 @@ class CalculatorTool(BaseTool):
         - Detailed descriptions with examples
         - Edge cases documented
         - Additional properties disabled
+        
+        Note: Uses flat structure for Responses API (not nested under 'function' key)
         """
         return {
             "type": "function",
-            "function": {
-                "name": "calculator",
-                "description": (
-                    "Evaluates mathematical expressions and returns the numeric result. "
-                    "Use this when the user asks for calculations, math operations, or numeric computations. "
-                    "Supports basic arithmetic operators (+, -, *, /, **, %) and mathematical functions "
-                    "(abs, min, max, round, sum, pow). "
-                    "Returns an error for invalid expressions or unsafe operations."
-                ),
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "expression": {
-                            "type": "string",
-                            "description": (
-                                "A valid mathematical expression to evaluate. "
-                                "Examples: '2 + 2' (addition), 'pow(2, 8)' (exponentiation), "
-                                "'abs(-5)' (absolute value), 'max(10, 20, 30)' (maximum), "
-                                "'(5 + 3) * 2' (with parentheses). "
-                                "Do not include variable assignments or code statements - "
-                                "only mathematical expressions."
-                            ),
-                        }
-                    },
-                    "required": ["expression"],
-                    "additionalProperties": False,
+            "name": "calculator",
+            "description": (
+                "Evaluates mathematical expressions and returns the numeric result. "
+                "Use this when the user asks for calculations, math operations, or numeric computations. "
+                "Supports basic arithmetic operators (+, -, *, /, **, %) and mathematical functions "
+                "(abs, min, max, round, sum, pow). "
+                "Returns an error for invalid expressions or unsafe operations."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "expression": {
+                        "type": "string",
+                        "description": (
+                            "A valid mathematical expression to evaluate. "
+                            "Examples: '2 + 2' (addition), 'pow(2, 8)' (exponentiation), "
+                            "'abs(-5)' (absolute value), 'max(10, 20, 30)' (maximum), "
+                            "'(5 + 3) * 2' (with parentheses). "
+                            "Do not include variable assignments or code statements - "
+                            "only mathematical expressions."
+                        ),
+                    }
                 },
-                "strict": True,
+                "required": ["expression"],
+                "additionalProperties": False,
             },
+            "strict": True,
         }
 
     def validate_parameters(self, parameters: dict[str, Any]) -> list[str]:

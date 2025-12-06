@@ -22,22 +22,20 @@ class MockTool(BaseTool):
     def get_openai_tool_definition(self) -> dict:
         return {
             "type": "function",
-            "function": {
-                "name": "mock_tool",
-                "description": "A mock tool for testing",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "test_param": {
-                            "type": "string",
-                            "description": "A test parameter"
-                        }
-                    },
-                    "required": ["test_param"],
-                    "additionalProperties": False
+            "name": "mock_tool",
+            "description": "A mock tool for testing",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "test_param": {
+                        "type": "string",
+                        "description": "A test parameter"
+                    }
                 },
-                "strict": True
-            }
+                "required": ["test_param"],
+                "additionalProperties": False
+            },
+            "strict": True
         }
     
     def execute(self, parameters: dict, storage) -> dict:
@@ -85,8 +83,8 @@ class TestBaseTool:
         
         definition = tool.get_openai_tool_definition()
         assert definition["type"] == "function"
-        assert definition["function"]["name"] == "mock_tool"
-        assert definition["function"]["strict"] is True
+        assert definition["name"] == "mock_tool"
+        assert definition["strict"] is True
         
         result = tool.execute({"test_param": "value"}, None)
         assert result["success"] is True
@@ -642,16 +640,14 @@ class TestToolExecutor:
             def get_openai_tool_definition(self) -> dict:
                 return {
                     "type": "function",
-                    "function": {
-                        "name": "storage_tool",
-                        "description": "Test storage",
-                        "parameters": {
-                            "type": "object",
-                            "properties": {},
-                            "additionalProperties": False
-                        },
-                        "strict": True
-                    }
+                    "name": "storage_tool",
+                    "description": "Test storage",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": False
+                    },
+                    "strict": True
                 }
             
             def execute(self, parameters: dict, storage: ToolStorage) -> dict:
@@ -704,16 +700,14 @@ class TestToolExecutor:
             def get_openai_tool_definition(self) -> dict:
                 return {
                     "type": "function",
-                    "function": {
-                        "name": "failing_tool",
-                        "description": "Test failure",
-                        "parameters": {
-                            "type": "object",
-                            "properties": {},
-                            "additionalProperties": False
-                        },
-                        "strict": True
-                    }
+                    "name": "failing_tool",
+                    "description": "Test failure",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": False
+                    },
+                    "strict": True
                 }
             
             def execute(self, parameters: dict, storage) -> dict:
@@ -762,22 +756,20 @@ class TestToolExecutor:
             def get_openai_tool_definition(self) -> dict:
                 return {
                     "type": "function",
-                    "function": {
-                        "name": "validating_tool",
-                        "description": "Test validation",
-                        "parameters": {
-                            "type": "object",
-                            "properties": {
-                                "value": {
-                                    "type": "number",
-                                    "description": "A number"
-                                }
-                            },
-                            "required": ["value"],
-                            "additionalProperties": False
+                    "name": "validating_tool",
+                    "description": "Test validation",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "value": {
+                                "type": "number",
+                                "description": "A number"
+                            }
                         },
-                        "strict": True
-                    }
+                        "required": ["value"],
+                        "additionalProperties": False
+                    },
+                    "strict": True
                 }
             
             def execute(self, parameters: dict, storage) -> dict:
@@ -833,16 +825,14 @@ class TestToolExecutor:
             def get_openai_tool_definition(self) -> dict:
                 return {
                     "type": "function",
-                    "function": {
-                        "name": "tool1",
-                        "description": "Test tool 1",
-                        "parameters": {
-                            "type": "object",
-                            "properties": {},
-                            "additionalProperties": False
-                        },
-                        "strict": True
-                    }
+                    "name": "tool1",
+                    "description": "Test tool 1",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": False
+                    },
+                    "strict": True
                 }
             
             def execute(self, parameters: dict, storage: ToolStorage) -> dict:
@@ -865,16 +855,14 @@ class TestToolExecutor:
             def get_openai_tool_definition(self) -> dict:
                 return {
                     "type": "function",
-                    "function": {
-                        "name": "tool2",
-                        "description": "Test tool 2",
-                        "parameters": {
-                            "type": "object",
-                            "properties": {},
-                            "additionalProperties": False
-                        },
-                        "strict": True
-                    }
+                    "name": "tool2",
+                    "description": "Test tool 2",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": False
+                    },
+                    "strict": True
                 }
             
             def execute(self, parameters: dict, storage: ToolStorage) -> dict:

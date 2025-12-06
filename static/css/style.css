@@ -1162,7 +1162,7 @@ button#send-chat:hover {
   display: block;
   margin-top: 5px;
   font-size: 12px;
-  color: white;
+  color: hsl(0, 0%, 120%);
 }
 .agent-preset-form .form-row {
   display: flex;
@@ -1382,7 +1382,7 @@ button#send-chat:hover {
 }
 .preset-info .preset-details {
   font-size: 14px;
-  color: white;
+  color: hsl(0, 0%, 120%);
   margin-bottom: 5px;
 }
 .preset-info .preset-details .preset-model {
@@ -1393,7 +1393,7 @@ button#send-chat:hover {
 }
 .preset-info .preset-instructions {
   font-size: 13px;
-  color: white;
+  color: hsl(0, 0%, 115%);
   max-width: 400px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1451,14 +1451,14 @@ button#send-chat:hover {
 .empty-message {
   text-align: center;
   padding: 40px 20px;
-  color: white;
+  color: hsl(0, 0%, 130%);
   font-style: italic;
 }
 
 .loading-message {
   text-align: center;
   padding: 20px;
-  color: white;
+  color: hsl(0, 0%, 120%);
 }
 
 /* Example CSS for grid navigation buttons inside the modal */
@@ -2483,6 +2483,201 @@ painting Section Styles */
 .advanced-input-container input[type=text]:disabled {
   background-color: rgba(102, 102, 102, 0.2);
   cursor: not-allowed;
+}
+
+.tool-configuration {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #666666;
+}
+.tool-configuration > label {
+  display: block;
+  font-weight: 600;
+  font-size: 15px;
+  color: #fff;
+  margin-bottom: 8px;
+}
+.tool-configuration .tool-category {
+  margin-bottom: 24px;
+  padding: 16px;
+  background-color: rgba(18, 18, 18, 0.3);
+  border-radius: 8px;
+  border: 1px solid rgba(102, 102, 102, 0.5);
+  transition: all 0.2s ease;
+}
+.tool-configuration .tool-category:hover {
+  border-color: rgba(102, 102, 102, 0.8);
+  background-color: rgba(18, 18, 18, 0.4);
+}
+.tool-configuration .tool-category:last-child {
+  margin-bottom: 0;
+}
+.tool-configuration .tool-category .tool-category-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(102, 102, 102, 0.3);
+}
+.tool-configuration .tool-category .tool-option {
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: 10px;
+  padding: 12px;
+  border-radius: 6px;
+  background-color: rgba(51, 51, 51, 0.3);
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
+}
+.tool-configuration .tool-category .tool-option:last-child {
+  margin-bottom: 0;
+}
+.tool-configuration .tool-category .tool-option:hover {
+  background-color: rgba(10, 132, 255, 0.08);
+  border-color: rgba(10, 132, 255, 0.2);
+  transform: translateX(2px);
+}
+.tool-configuration .tool-category .tool-option:focus-within {
+  background-color: rgba(10, 132, 255, 0.1);
+  border-color: rgba(10, 132, 255, 0.3);
+  box-shadow: 0 0 0 2px rgba(10, 132, 255, 0.1);
+}
+.tool-configuration .tool-category .tool-option input[type=checkbox] {
+  width: auto;
+  margin-right: 12px;
+  margin-top: 4px;
+  cursor: pointer;
+  flex-shrink: 0;
+  accent-color: #0a84ff;
+}
+.tool-configuration .tool-category .tool-option input[type=checkbox]:focus {
+  outline: 2px solid rgba(10, 132, 255, 0.5);
+  outline-offset: 2px;
+}
+.tool-configuration .tool-category .tool-option input[type=checkbox]:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.tool-configuration .tool-category .tool-option .tool-label {
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
+  flex-grow: 1;
+  user-select: none;
+}
+.tool-configuration .tool-category .tool-option .tool-label .tool-name {
+  font-weight: 600;
+  font-size: 15px;
+  color: #fff;
+  margin-bottom: 4px;
+  transition: color 0.2s ease;
+}
+.tool-configuration .tool-category .tool-option .tool-label .tool-description {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.65);
+  line-height: 1.5;
+  transition: color 0.2s ease;
+}
+.tool-configuration .tool-category .tool-option:hover .tool-label .tool-name {
+  color: hsl(0, 0%, 110%);
+}
+.tool-configuration .tool-category .tool-option:hover .tool-label .tool-description {
+  color: rgba(255, 255, 255, 0.75);
+}
+.tool-configuration .tool-category:first-child {
+  border-left: 3px solid rgba(33, 150, 243, 0.6);
+}
+.tool-configuration .tool-category:first-child .tool-category-title {
+  color: rgba(33, 150, 243, 0.9);
+}
+.tool-configuration .tool-category:first-child .tool-option:hover {
+  background-color: rgba(33, 150, 243, 0.08);
+  border-color: rgba(33, 150, 243, 0.2);
+}
+.tool-configuration .tool-category:last-child {
+  border-left: 3px solid rgba(156, 39, 176, 0.6);
+}
+.tool-configuration .tool-category:last-child .tool-category-title {
+  color: rgba(156, 39, 176, 0.9);
+}
+.tool-configuration .tool-category:last-child .tool-option:hover {
+  background-color: rgba(156, 39, 176, 0.08);
+  border-color: rgba(156, 39, 176, 0.2);
+}
+
+@media (max-width: 768px) {
+  .tool-configuration .tool-category {
+    padding: 12px;
+  }
+  .tool-configuration .tool-category .tool-option {
+    padding: 10px;
+  }
+  .tool-configuration .tool-category .tool-option input[type=checkbox] {
+    margin-right: 10px;
+  }
+  .tool-configuration .tool-category .tool-option .tool-label .tool-name {
+    font-size: 14px;
+  }
+  .tool-configuration .tool-category .tool-option .tool-label .tool-description {
+    font-size: 12px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tool-configuration .tool-category .tool-option {
+    transition: none;
+  }
+  .tool-configuration .tool-category .tool-option:hover {
+    transform: none;
+  }
+}
+.agent-preset-form .form-group {
+  margin-bottom: 20px;
+}
+.agent-preset-form .form-group label {
+  font-weight: 500;
+  margin-bottom: 8px;
+  color: #fff;
+}
+.agent-preset-form .form-group .form-input,
+.agent-preset-form .form-group .form-textarea,
+.agent-preset-form .form-group .form-select {
+  width: 100%;
+  padding: 10px;
+  background-color: #333;
+  border: 1px solid #666666;
+  border-radius: 6px;
+  color: #fff;
+  font-family: "Roboto", sans-serif;
+  font-size: 14px;
+}
+.agent-preset-form .form-group .form-input:focus,
+.agent-preset-form .form-group .form-textarea:focus,
+.agent-preset-form .form-group .form-select:focus {
+  outline: none;
+  border-color: #0a84ff;
+}
+.agent-preset-form .form-group .form-textarea {
+  resize: vertical;
+  min-height: 100px;
+}
+.agent-preset-form .form-group .form-help {
+  display: block;
+  font-size: 12px;
+  color: #999;
+  margin-top: 4px;
+}
+.agent-preset-form .form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+@media (max-width: 768px) {
+  .agent-preset-form .form-row {
+    grid-template-columns: 1fr;
+  }
 }
 
 /*# sourceMappingURL=style.css.map */

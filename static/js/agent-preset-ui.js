@@ -503,6 +503,8 @@ function populatePresetForm(preset) {
             modelField.value = preset.model;
         if (reasoningField)
             reasoningField.value = preset.default_reasoning_level;
+        // Populate tool checkboxes
+        populateToolCheckboxes(preset.enabled_tools || ['web_search', 'calculator']);
     }
     else {
         if (nameField)
@@ -513,7 +515,27 @@ function populatePresetForm(preset) {
             modelField.value = 'gpt-5.1';
         if (reasoningField)
             reasoningField.value = 'medium';
+        // Set default tools for new presets
+        populateToolCheckboxes(['web_search', 'calculator']);
     }
+}
+/**
+ * Populate tool checkboxes based on enabled tools list
+ */
+function populateToolCheckboxes(enabledTools) {
+    // Get all tool checkboxes
+    const toolCheckboxes = document.querySelectorAll('input[name="tool"]');
+    // Uncheck all first
+    toolCheckboxes.forEach(checkbox => {
+        checkbox.checked = false;
+    });
+    // Check the enabled tools
+    enabledTools.forEach(toolName => {
+        const checkbox = document.getElementById(`tool-${toolName}`);
+        if (checkbox) {
+            checkbox.checked = true;
+        }
+    });
 }
 /**
  * Handle preset save (create or update)
@@ -620,11 +642,18 @@ function getFormData() {
     const instructionsField = document.getElementById('preset-instructions');
     const modelField = document.getElementById('preset-model');
     const reasoningField = document.getElementById('preset-reasoning-level');
+    // Get enabled tools from checkboxes
+    const enabledTools = [];
+    const toolCheckboxes = document.querySelectorAll('input[name="tool"]:checked');
+    toolCheckboxes.forEach(checkbox => {
+        enabledTools.push(checkbox.value);
+    });
     return {
         name: nameField?.value?.trim() || '',
         instructions: instructionsField?.value?.trim() || '',
         model: modelField?.value || 'gpt-5.1',
-        default_reasoning_level: reasoningField?.value || 'medium'
+        default_reasoning_level: reasoningField?.value || 'medium',
+        enabled_tools: enabledTools
     };
 }
 /**

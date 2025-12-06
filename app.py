@@ -1490,7 +1490,7 @@ code
                         f"Tool registry not available, skipping custom tool: {tool_name}"
                     )
         
-        logging.debug(f"Built tools array with {len(tools)} tools: {[t.get('type', t.get('function', {}).get('name')) for t in tools]}")
+        logging.debug(f"Built tools array with {len(tools)} tools: {[t.get('name', t.get('type')) for t in tools]}")
         return tools
 
     def process_stream_with_processor(
@@ -3391,12 +3391,25 @@ def converse():
             agent_preset: AgentPreset | None = None,
         ):
             """Start streaming thread using Responses API with comprehensive error handling."""
-            event_processor = StreamEventProcessor(event_queue, tool_executor, username, conversation_id)
-
             try:
                 # Create response using Responses API with model, reasoning level, instructions, and enabled tools
                 instructions = agent_preset.instructions if agent_preset else None
                 enabled_tools = agent_preset.enabled_tools if agent_preset else ["web_search"]
+                
+                # Build tools array for the event processor
+                tools = responses_client._build_tools_array(enabled_tools)
+                
+                # Create event processor with all needed context for tool execution
+                event_processor = StreamEventProcessor(
+                    event_queue=event_queue,
+                    tool_executor=tool_executor,
+                    username=username,
+                    conversation_id=conversation_id,
+                    openai_client=responses_client.client,
+                    model=model or "gpt-5.1",
+                    tools=tools,
+                    instructions=instructions,
+                )
                 
                 stream = responses_client.create_response(
                     input_text=user_input,
@@ -3719,12 +3732,20 @@ class StreamEventProcessor:
         event_queue: Queue[Any],
         tool_executor: ToolExecutor | None = None,
         username: str | None = None,
-        conversation_id: str | None = None
+        conversation_id: str | None = None,
+        openai_client: Any = None,
+        model: str | None = None,
+        tools: list[dict[str, Any]] | None = None,
+        instructions: str | None = None,
     ):
         self.event_queue = event_queue
         self.tool_executor = tool_executor
         self.username = username
         self.conversation_id = conversation_id
+        self.openai_client = openai_client
+        self.model = model or "gpt-5.1"
+        self.tools = tools or []
+        self.instructions = instructions
         self.current_response_id: str | None = None
         self.accumulated_text = ""
         self.reasoning_data: dict[str, Any] = {
@@ -3741,12 +3762,20 @@ class StreamEventProcessor:
         self.message_output_items: dict[str, dict[str, Any]] = {}
         # Track tool calls for execution
         self.tool_calls: dict[str, dict[str, Any]] = {}
+        # Track pending function outputs to submit
+        self.pending_function_outputs: list[dict[str, Any]] = []
 
     def process_stream(self, stream: Any) -> None:
         """Process the entire stream of ResponseStreamEvent objects with comprehensive error handling."""
         try:
             for event in stream:
                 self._handle_stream_event(event)
+            
+            # After processing the stream, check if we have pending function outputs
+            # If so, submit them and continue processing
+            while self.pending_function_outputs and self.openai_client:
+                self._submit_function_outputs_and_continue()
+                
         except ConnectionError as e:
             logging.error(f"Connection error during stream processing: {e}")
             self.event_queue.put(
@@ -3803,7 +3832,7 @@ class StreamEventProcessor:
 
         event_type = event.type
 
-        # Debug: Log all event types to see what we're receiving
+        # Log event types at debug level
         logging.debug(f"Received event type: {event_type}")
 
         # Handle actual Responses API event types
@@ -3886,16 +3915,13 @@ class StreamEventProcessor:
     def _handle_output_item_added(self, event: Any) -> None:
         """Handle response.output_item.added event - new output item added."""
         try:
-            # Extract output item from event
-            if hasattr(event, "output_item") and event.output_item is not None:
-                output_item = event.output_item
-
-                # Debug: Log output item details
+            # Try to get the item - it might be under 'item' instead of 'output_item'
+            output_item = getattr(event, "output_item", None) or getattr(event, "item", None)
+            
+            if output_item is not None:
                 item_type = getattr(output_item, "type", "unknown")
                 item_id = getattr(output_item, "id", "unknown")
-                logging.debug(
-                    f"Processing output item added: type={item_type}, id={item_id}"
-                )
+                logging.debug(f"Output item added: type={item_type}, id={item_id}")
 
                 # Process web search output items
                 if (
@@ -3909,6 +3935,10 @@ class StreamEventProcessor:
                 elif hasattr(output_item, "type") and output_item.type == "message":
                     logging.debug(f"Found message output item: {item_id}")
                     self._process_message_output_item(output_item)
+
+                # Process function call output items
+                elif hasattr(output_item, "type") and output_item.type == "function_call":
+                    self._process_function_call_output_item(output_item)
                 else:
                     logging.debug(f"Unhandled output item type: {item_type}")
 
@@ -3995,6 +4025,10 @@ class StreamEventProcessor:
                 elif hasattr(output_item, "type") and output_item.type == "message":
                     logging.debug(f"Found completed message output item: {item_id}")
                     self._process_message_output_item(output_item, is_done=True)
+                
+                # Process completed function call output items
+                elif hasattr(output_item, "type") and output_item.type == "function_call":
+                    self._process_function_call_output_item(output_item)
                 else:
                     logging.debug(f"Unhandled completed output item type: {item_type}")
 
@@ -4494,21 +4528,62 @@ class StreamEventProcessor:
             logging.warning(f"Error correlating web search data: {e}")
             # Continue processing - don't block chat functionality
 
+    def _process_function_call_output_item(self, output_item: Any) -> None:
+        """Process function call output items from response.output_item.added event."""
+        try:
+            # Extract function call data from ResponseFunctionToolCall object
+            item_id = getattr(output_item, "id", None)
+            call_id = getattr(output_item, "call_id", None)
+            name = getattr(output_item, "name", None)
+            arguments = getattr(output_item, "arguments", None)
+            status = getattr(output_item, "status", None)
+            
+            logging.debug(f"Function call output item: id={item_id}, call_id={call_id}, name={name}, status={status}")
+            
+            if name:
+                tool_call_data = {
+                    "item_id": item_id,
+                    "call_id": call_id,
+                    "name": name,
+                    "arguments": arguments or "",
+                    "status": status or "in_progress"
+                }
+                
+                # Store by item_id if available
+                if item_id:
+                    self.tool_calls[item_id] = tool_call_data
+                
+                # Also store by call_id since arguments events use item_id which might be call_id
+                if call_id:
+                    self.tool_calls[call_id] = tool_call_data
+                
+                # Send status update to frontend
+                self.event_queue.put(
+                    json.dumps({
+                        "type": "tool_call_started",
+                        "item_id": item_id or call_id,
+                        "tool_name": name,
+                        "status": "in_progress"
+                    })
+                )
+                
+        except Exception as e:
+            logging.warning(f"Error processing function call output item: {e}")
+            # Continue processing - don't block chat functionality
+
     def _handle_function_call_arguments_delta(self, event: Any) -> None:
         """Handle response.function_call_arguments.delta event - function call arguments being streamed."""
         try:
-            # Extract function call metadata
+            # Extract function call metadata (use item_id as the unique identifier)
             item_id = getattr(event, "item_id", None)
-            call_id = getattr(event, "call_id", None)
             delta = getattr(event, "delta", None)
             
-            logging.debug(f"Function call arguments delta: item_id={item_id}, call_id={call_id}")
+            logging.debug(f"Function call arguments delta: item_id={item_id}, delta_length={len(delta) if delta else 0}")
             
-            if call_id:
+            if item_id:
                 # Initialize or update tool call data
-                if call_id not in self.tool_calls:
-                    self.tool_calls[call_id] = {
-                        "call_id": call_id,
+                if item_id not in self.tool_calls:
+                    self.tool_calls[item_id] = {
                         "item_id": item_id,
                         "name": None,
                         "arguments": "",
@@ -4517,11 +4592,7 @@ class StreamEventProcessor:
                 
                 # Accumulate arguments
                 if delta:
-                    self.tool_calls[call_id]["arguments"] += str(delta)
-                
-                # Extract function name if available
-                if hasattr(event, "name") and event.name:
-                    self.tool_calls[call_id]["name"] = event.name
+                    self.tool_calls[item_id]["arguments"] += str(delta)
                     
         except Exception as e:
             logging.warning(f"Error processing function call arguments delta: {e}")
@@ -4530,50 +4601,53 @@ class StreamEventProcessor:
     def _handle_function_call_arguments_done(self, event: Any) -> None:
         """Handle response.function_call_arguments.done event - function call ready to execute."""
         try:
-            # Extract function call metadata
+            # Extract function call metadata (use item_id as the unique identifier)
             item_id = getattr(event, "item_id", None)
-            call_id = getattr(event, "call_id", None)
             name = getattr(event, "name", None)
             arguments = getattr(event, "arguments", None)
             
-            logging.info(f"Function call arguments done: name={name}, call_id={call_id}")
+            # If name not in event, get it from stored tool call (set by output_item.added)
+            if not name and item_id and item_id in self.tool_calls:
+                name = self.tool_calls[item_id].get("name")
             
-            if call_id and name:
+            logging.debug(f"Function call arguments done: name={name}, item_id={item_id}")
+            
+            if item_id and name:
                 # Update tool call data
-                if call_id not in self.tool_calls:
-                    self.tool_calls[call_id] = {
-                        "call_id": call_id,
+                if item_id not in self.tool_calls:
+                    self.tool_calls[item_id] = {
                         "item_id": item_id,
                         "name": name,
                         "arguments": arguments or "",
                         "status": "ready"
                     }
                 else:
-                    self.tool_calls[call_id].update({
+                    self.tool_calls[item_id].update({
                         "name": name,
-                        "arguments": arguments or self.tool_calls[call_id]["arguments"],
+                        "arguments": arguments or self.tool_calls[item_id]["arguments"],
                         "status": "ready"
                     })
                 
                 # Execute the tool call
-                self._execute_tool_call(call_id)
+                self._execute_tool_call(item_id)
                     
         except Exception as e:
             logging.error(f"Error processing function call arguments done: {e}", exc_info=True)
             # Continue processing - don't block chat functionality
     
-    def _execute_tool_call(self, call_id: str) -> None:
-        """Execute a tool call and send results back to the API."""
+    def _execute_tool_call(self, item_id: str) -> None:
+        """Execute a tool call and store result for submission back to API."""
         try:
-            tool_call = self.tool_calls.get(call_id)
+            tool_call = self.tool_calls.get(item_id)
             if not tool_call:
-                logging.error(f"Tool call {call_id} not found")
+                logging.error(f"Tool call {item_id} not found")
                 return
             
             tool_name = tool_call["name"]
+            call_id = tool_call.get("call_id")
             arguments_str = tool_call["arguments"]
             
-            logging.info(f"Executing tool call: {tool_name} with arguments: {arguments_str}")
+            logging.debug(f"Executing tool call: {tool_name} (call_id={call_id})")
             
             # Parse arguments JSON
             try:
@@ -4582,6 +4656,13 @@ class StreamEventProcessor:
                 logging.error(f"Failed to parse tool arguments: {e}")
                 tool_call["status"] = "error"
                 tool_call["error"] = f"Invalid arguments: {str(e)}"
+                # Still need to submit error back to API
+                if call_id:
+                    self.pending_function_outputs.append({
+                        "type": "function_call_output",
+                        "call_id": call_id,
+                        "output": json.dumps({"error": f"Invalid arguments: {str(e)}"})
+                    })
                 return
             
             # Execute tool if we have executor and conversation context
@@ -4597,28 +4678,89 @@ class StreamEventProcessor:
                 tool_call["status"] = "completed" if result.get("success") else "error"
                 tool_call["result"] = result
                 
+                # Store function output for submission back to API
+                if call_id:
+                    self.pending_function_outputs.append({
+                        "type": "function_call_output",
+                        "call_id": call_id,
+                        "output": json.dumps(result)
+                    })
+                    logging.debug(f"Stored function output for call_id={call_id}")
+                
                 # Send tool execution status to frontend
                 self.event_queue.put(
                     json.dumps({
                         "type": "tool_call_completed",
-                        "call_id": call_id,
+                        "item_id": item_id,
                         "tool_name": tool_name,
                         "success": result.get("success", False),
                         "result": result
                     })
                 )
                 
-                logging.info(f"Tool call {call_id} completed: success={result.get('success')}")
+                logging.debug(f"Tool call {item_id} completed: success={result.get('success')}")
             else:
-                logging.warning(f"Cannot execute tool call {call_id}: missing executor or context")
+                logging.warning(f"Cannot execute tool call {item_id}: missing executor or context")
                 tool_call["status"] = "error"
                 tool_call["error"] = "Tool executor not available"
                 
         except Exception as e:
-            logging.error(f"Error executing tool call {call_id}: {e}", exc_info=True)
-            if call_id in self.tool_calls:
-                self.tool_calls[call_id]["status"] = "error"
-                self.tool_calls[call_id]["error"] = str(e)
+            logging.error(f"Error executing tool call {item_id}: {e}", exc_info=True)
+            if item_id in self.tool_calls:
+                self.tool_calls[item_id]["status"] = "error"
+                self.tool_calls[item_id]["error"] = str(e)
+
+    def _submit_function_outputs_and_continue(self) -> None:
+        """Submit pending function outputs to the API and continue processing the response."""
+        if not self.pending_function_outputs or not self.openai_client:
+            return
+        
+        if not self.current_response_id:
+            logging.error("Cannot submit function outputs: no current response ID")
+            return
+        
+        try:
+            # Collect all pending outputs
+            function_outputs = self.pending_function_outputs.copy()
+            self.pending_function_outputs.clear()
+            
+            logging.debug(f"Submitting {len(function_outputs)} function output(s) to continue conversation")
+            
+            # Create a new response with the function outputs as input
+            params: dict[str, Any] = {
+                "model": self.model,
+                "input": function_outputs,
+                "previous_response_id": self.current_response_id,
+                "stream": True,
+                "store": True,
+            }
+            
+            # Add tools if available
+            if self.tools:
+                params["tools"] = self.tools
+            
+            # Add instructions if available
+            if self.instructions:
+                params["instructions"] = self.instructions
+            
+            # Make the API call to continue the conversation
+            continuation_stream = self.openai_client.responses.create(**params)
+            
+            # Process the continuation stream
+            for event in continuation_stream:
+                self._handle_stream_event(event)
+                
+            logging.debug("Function output submission and continuation completed")
+            
+        except Exception as e:
+            logging.error(f"Error submitting function outputs: {e}", exc_info=True)
+            self.event_queue.put(
+                json.dumps({
+                    "type": "error",
+                    "message": "Error processing tool results. Please try again.",
+                    "error_code": "tool_continuation_error"
+                })
+            )
 
     def get_reasoning_data(self) -> dict[str, Any] | None:
         """Get the reasoning data from the processed stream with comprehensive error handling."""

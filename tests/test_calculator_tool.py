@@ -65,15 +65,12 @@ class TestCalculatorToolBasics:
         definition = calculator.get_openai_tool_definition()
         
         assert definition['type'] == 'function'
-        assert 'function' in definition
+        assert definition['name'] == 'calculator'
+        assert definition['strict'] is True
+        assert 'description' in definition
+        assert 'parameters' in definition
         
-        func = definition['function']
-        assert func['name'] == 'calculator'
-        assert func['strict'] is True
-        assert 'description' in func
-        assert 'parameters' in func
-        
-        params = func['parameters']
+        params = definition['parameters']
         assert params['type'] == 'object'
         assert 'expression' in params['properties']
         assert 'expression' in params['required']

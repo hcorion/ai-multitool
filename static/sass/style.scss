@@ -972,7 +972,7 @@ button#send-chat {
             display: block;
             margin-top: 5px;
             font-size: 12px;
-            color: lighten($text-color, 20%);
+            color: color.adjust($text-color, $lightness: 20%);
         }
     }
 
@@ -1025,7 +1025,7 @@ button#send-chat {
     transition: all 0.2s ease;
 
     &:hover {
-        background-color: lighten($tab-bg-color, 5%);
+        background-color: color.adjust($tab-bg-color, $lightness: 5%);
         border-color: $text-color;
     }
 }
@@ -1192,11 +1192,11 @@ button#send-chat {
     margin-bottom: 10px;
     border: 1px solid $border-color;
     border-radius: 6px;
-    background-color: lighten($tab-bg-color, 2%);
+    background-color: color.adjust($tab-bg-color, $lightness: 2%);
     transition: background-color 0.2s ease;
 
     &:hover {
-        background-color: lighten($tab-bg-color, 5%);
+        background-color: color.adjust($tab-bg-color, $lightness: 5%);
     }
 
     &.active-preset {
@@ -1218,7 +1218,7 @@ button#send-chat {
 
     .preset-details {
         font-size: 14px;
-        color: lighten($text-color, 20%);
+        color: color.adjust($text-color, $lightness: 20%);
         margin-bottom: 5px;
 
         .preset-model {
@@ -1232,7 +1232,7 @@ button#send-chat {
 
     .preset-instructions {
         font-size: 13px;
-        color: lighten($text-color, 15%);
+        color: color.adjust($text-color, $lightness: 15%);
         max-width: 400px;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -1304,14 +1304,14 @@ button#send-chat {
 .empty-message {
     text-align: center;
     padding: 40px 20px;
-    color: lighten($text-color, 30%);
+    color: color.adjust($text-color, $lightness: 30%);
     font-style: italic;
 }
 
 .loading-message {
     text-align: center;
     padding: 20px;
-    color: lighten($text-color, 20%);
+    color: color.adjust($text-color, $lightness: 20%);
 }
 
 /* Example CSS for grid navigation buttons inside the modal */
@@ -2478,6 +2478,248 @@ painting Section Styles */
         &:disabled {
             background-color: rgba($color: $border-color, $alpha: 0.2);
             cursor: not-allowed;
+        }
+    }
+}
+// Tool Configuration Styles
+.tool-configuration {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid $border-color;
+    
+    > label {
+        display: block;
+        font-weight: 600;
+        font-size: 15px;
+        color: $text-color;
+        margin-bottom: 8px;
+    }
+    
+    .tool-category {
+        margin-bottom: 24px;
+        padding: 16px;
+        background-color: rgba($color: $background-color, $alpha: 0.3);
+        border-radius: 8px;
+        border: 1px solid rgba($color: $border-color, $alpha: 0.5);
+        transition: all 0.2s ease;
+        
+        &:hover {
+            border-color: rgba($color: $border-color, $alpha: 0.8);
+            background-color: rgba($color: $background-color, $alpha: 0.4);
+        }
+        
+        &:last-child {
+            margin-bottom: 0;
+        }
+        
+        .tool-category-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: rgba($color: $text-color, $alpha: 0.7);
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid rgba($color: $border-color, $alpha: 0.3);
+        }
+        
+        .tool-option {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 10px;
+            padding: 12px;
+            border-radius: 6px;
+            background-color: rgba($color: $input-bg-color, $alpha: 0.3);
+            border: 1px solid transparent;
+            transition: all 0.2s ease;
+            
+            &:last-child {
+                margin-bottom: 0;
+            }
+            
+            &:hover {
+                background-color: rgba($color: $submit-btn-color, $alpha: 0.08);
+                border-color: rgba($color: $submit-btn-color, $alpha: 0.2);
+                transform: translateX(2px);
+            }
+            
+            &:focus-within {
+                background-color: rgba($color: $submit-btn-color, $alpha: 0.1);
+                border-color: rgba($color: $submit-btn-color, $alpha: 0.3);
+                box-shadow: 0 0 0 2px rgba($color: $submit-btn-color, $alpha: 0.1);
+            }
+            
+            input[type="checkbox"] {
+                width: auto;
+                margin-right: 12px;
+                margin-top: 4px;
+                cursor: pointer;
+                flex-shrink: 0;
+                accent-color: $submit-btn-color;
+                
+                &:focus {
+                    outline: 2px solid rgba($color: $submit-btn-color, $alpha: 0.5);
+                    outline-offset: 2px;
+                }
+                
+                &:disabled {
+                    cursor: not-allowed;
+                    opacity: 0.5;
+                }
+            }
+            
+            .tool-label {
+                display: flex;
+                flex-direction: column;
+                cursor: pointer;
+                flex-grow: 1;
+                user-select: none;
+                
+                .tool-name {
+                    font-weight: 600;
+                    font-size: 15px;
+                    color: $text-color;
+                    margin-bottom: 4px;
+                    transition: color 0.2s ease;
+                }
+                
+                .tool-description {
+                    font-size: 13px;
+                    color: rgba($color: $text-color, $alpha: 0.65);
+                    line-height: 1.5;
+                    transition: color 0.2s ease;
+                }
+            }
+            
+            // Enhanced hover state for label
+            &:hover .tool-label {
+                .tool-name {
+                    color: color.adjust($text-color, $lightness: 10%);
+                }
+                
+                .tool-description {
+                    color: rgba($color: $text-color, $alpha: 0.75);
+                }
+            }
+        }
+        
+        // Built-in tools category styling
+        &:first-child {
+            border-left: 3px solid rgba($color: #2196f3, $alpha: 0.6);
+            
+            .tool-category-title {
+                color: rgba($color: #2196f3, $alpha: 0.9);
+            }
+            
+            .tool-option:hover {
+                background-color: rgba($color: #2196f3, $alpha: 0.08);
+                border-color: rgba($color: #2196f3, $alpha: 0.2);
+            }
+        }
+        
+        // Custom tools category styling
+        &:last-child {
+            border-left: 3px solid rgba($color: #9c27b0, $alpha: 0.6);
+            
+            .tool-category-title {
+                color: rgba($color: #9c27b0, $alpha: 0.9);
+            }
+            
+            .tool-option:hover {
+                background-color: rgba($color: #9c27b0, $alpha: 0.08);
+                border-color: rgba($color: #9c27b0, $alpha: 0.2);
+            }
+        }
+    }
+}
+
+// Responsive design for tool configuration
+@media (max-width: 768px) {
+    .tool-configuration {
+        .tool-category {
+            padding: 12px;
+            
+            .tool-option {
+                padding: 10px;
+                
+                input[type="checkbox"] {
+                    margin-right: 10px;
+                }
+                
+                .tool-label {
+                    .tool-name {
+                        font-size: 14px;
+                    }
+                    
+                    .tool-description {
+                        font-size: 12px;
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Accessibility improvements
+@media (prefers-reduced-motion: reduce) {
+    .tool-configuration .tool-category .tool-option {
+        transition: none;
+        
+        &:hover {
+            transform: none;
+        }
+    }
+}
+
+// Form styling for agent preset modal
+.agent-preset-form {
+    .form-group {
+        margin-bottom: 20px;
+        
+        label {
+            font-weight: 500;
+            margin-bottom: 8px;
+            color: $text-color;
+        }
+        
+        .form-input,
+        .form-textarea,
+        .form-select {
+            width: 100%;
+            padding: 10px;
+            background-color: $input-bg-color;
+            border: 1px solid $border-color;
+            border-radius: 6px;
+            color: $text-color;
+            font-family: 'Roboto', sans-serif;
+            font-size: 14px;
+            
+            &:focus {
+                outline: none;
+                border-color: $submit-btn-color;
+            }
+        }
+        
+        .form-textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+        
+        .form-help {
+            display: block;
+            font-size: 12px;
+            color: #999;
+            margin-top: 4px;
+        }
+    }
+    
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        
+        @media (max-width: 768px) {
+            grid-template-columns: 1fr;
         }
     }
 }

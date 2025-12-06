@@ -24,22 +24,20 @@ class MockCalculatorTool(BaseTool):
     def get_openai_tool_definition(self) -> dict:
         return {
             "type": "function",
-            "function": {
-                "name": "calculator",
-                "description": "Evaluates mathematical expressions",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "expression": {
-                            "type": "string",
-                            "description": "A valid mathematical expression"
-                        }
-                    },
-                    "required": ["expression"],
-                    "additionalProperties": False
+            "name": "calculator",
+            "description": "Evaluates mathematical expressions",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "expression": {
+                        "type": "string",
+                        "description": "A valid mathematical expression"
+                    }
                 },
-                "strict": True
-            }
+                "required": ["expression"],
+                "additionalProperties": False
+            },
+            "strict": True
         }
     
     def execute(self, parameters: dict, storage) -> dict:
@@ -80,8 +78,8 @@ class TestResponsesAPIClientToolIntegration:
         
         assert len(tools) == 1
         assert tools[0]["type"] == "function"
-        assert tools[0]["function"]["name"] == "calculator"
-        assert tools[0]["function"]["strict"] is True
+        assert tools[0]["name"] == "calculator"
+        assert tools[0]["strict"] is True
     
     def test_build_tools_array_both_tools(self, mock_openai_client, tool_registry):
         """Test building tools array with both web_search and calculator."""
@@ -99,7 +97,7 @@ class TestResponsesAPIClientToolIntegration:
         # Check calculator
         calculator = next((t for t in tools if t.get("type") == "function"), None)
         assert calculator is not None
-        assert calculator["function"]["name"] == "calculator"
+        assert calculator["name"] == "calculator"
     
     def test_build_tools_array_empty_list(self, mock_openai_client, tool_registry):
         """Test building tools array with empty list."""
@@ -160,7 +158,7 @@ class TestResponsesAPIClientToolIntegration:
         # Check calculator
         calculator = next((t for t in tools if t.get("type") == "function"), None)
         assert calculator is not None
-        assert calculator["function"]["name"] == "calculator"
+        assert calculator["name"] == "calculator"
     
     def test_create_response_default_tools(self, mock_openai_client):
         """Test create_response uses default tools when enabled_tools is None."""

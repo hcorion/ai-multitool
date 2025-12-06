@@ -409,6 +409,33 @@
                             <small class="form-help">Default reasoning intensity for this preset</small>
                         </div>
                     </div>
+
+                    <div class="form-group tool-configuration">
+                        <label>Available Tools:</label>
+                        <small class="form-help">Select which tools this agent can access</small>
+                        
+                        <div class="tool-category">
+                            <h4 class="tool-category-title">Built-in Tools</h4>
+                            <div class="tool-option">
+                                <input type="checkbox" id="tool-web_search" name="tool" value="web_search" checked>
+                                <label for="tool-web_search" class="tool-label">
+                                    <span class="tool-name">Web Search</span>
+                                    <span class="tool-description">Search the internet for current information</span>
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="tool-category">
+                            <h4 class="tool-category-title">Custom Tools</h4>
+                            <div class="tool-option">
+                                <input type="checkbox" id="tool-calculator" name="tool" value="calculator" checked>
+                                <label for="tool-calculator" class="tool-label">
+                                    <span class="tool-name">Calculator</span>
+                                    <span class="tool-description">Evaluate mathematical expressions safely</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
                 </form>
             </div>
             <div class="modal-footer">

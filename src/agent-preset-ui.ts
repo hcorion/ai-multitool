@@ -553,12 +553,39 @@ function populatePresetForm(preset?: AgentPreset): void {
         if (instructionsField) instructionsField.value = preset.instructions;
         if (modelField) modelField.value = preset.model;
         if (reasoningField) reasoningField.value = preset.default_reasoning_level;
+        
+        // Populate tool checkboxes
+        populateToolCheckboxes(preset.enabled_tools || ['web_search', 'calculator']);
     } else {
         if (nameField) nameField.value = '';
         if (instructionsField) instructionsField.value = '';
         if (modelField) modelField.value = 'gpt-5.1';
         if (reasoningField) reasoningField.value = 'medium';
+        
+        // Set default tools for new presets
+        populateToolCheckboxes(['web_search', 'calculator']);
     }
+}
+
+/**
+ * Populate tool checkboxes based on enabled tools list
+ */
+function populateToolCheckboxes(enabledTools: string[]): void {
+    // Get all tool checkboxes
+    const toolCheckboxes = document.querySelectorAll('input[name="tool"]') as NodeListOf<HTMLInputElement>;
+    
+    // Uncheck all first
+    toolCheckboxes.forEach(checkbox => {
+        checkbox.checked = false;
+    });
+    
+    // Check the enabled tools
+    enabledTools.forEach(toolName => {
+        const checkbox = document.getElementById(`tool-${toolName}`) as HTMLInputElement;
+        if (checkbox) {
+            checkbox.checked = true;
+        }
+    });
 }
 
 /**
@@ -681,11 +708,19 @@ function getFormData(): AgentPresetFormData {
     const modelField = document.getElementById('preset-model') as HTMLSelectElement;
     const reasoningField = document.getElementById('preset-reasoning-level') as HTMLSelectElement;
     
+    // Get enabled tools from checkboxes
+    const enabledTools: string[] = [];
+    const toolCheckboxes = document.querySelectorAll('input[name="tool"]:checked') as NodeListOf<HTMLInputElement>;
+    toolCheckboxes.forEach(checkbox => {
+        enabledTools.push(checkbox.value);
+    });
+    
     return {
         name: nameField?.value?.trim() || '',
         instructions: instructionsField?.value?.trim() || '',
         model: (modelField?.value as 'gpt-5.1' | 'gpt-5' | 'gpt-5-mini' | 'gpt-5-pro') || 'gpt-5.1',
-        default_reasoning_level: (reasoningField?.value as 'high' | 'medium' | 'low' | 'none') || 'medium'
+        default_reasoning_level: (reasoningField?.value as 'high' | 'medium' | 'low' | 'none') || 'medium',
+        enabled_tools: enabledTools
     };
 }
 
