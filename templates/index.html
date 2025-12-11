@@ -258,7 +258,10 @@
                 <h2>Dynamic Prompts</h2>
                 <p>Manage your prompt files for dynamic prompt generation. Reference files using __filename__ syntax.
                 </p>
-                <button id="create-prompt-file-btn" class="primary-button">Create New File</button>
+                <div class="prompt-header-buttons">
+                    <button id="test-prompt-btn" class="secondary-button">Test Prompt</button>
+                    <button id="create-prompt-file-btn" class="primary-button">Create New File</button>
+                </div>
             </div>
 
             <div class="prompt-files-list">
@@ -299,6 +302,42 @@
                 <div class="modal-footer">
                     <button id="prompt-file-save" class="primary-button">Save</button>
                     <button id="prompt-file-cancel" class="secondary-button">Cancel</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Test Prompt Modal -->
+        <div id="test-prompt-modal" class="modal prompt-file-modal" style="display: none;">
+            <div class="modal-content prompt-modal-content">
+                <div class="modal-header">
+                    <h3>Test Dynamic Prompt</h3>
+                    <span class="close" id="test-prompt-modal-close">&times;</span>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="test-prompt-seed">Seed (optional):</label>
+                        <input type="number" id="test-prompt-seed" placeholder="Random if empty" class="form-input" min="0">
+                        <small class="form-help">Leave empty for random seed</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="test-prompt-input">Prompt:</label>
+                        <textarea id="test-prompt-input" rows="4" class="form-textarea"
+                            placeholder="A __colors__ cat in __styles__ style"></textarea>
+                        <small class="form-help">Use __filename__ syntax to reference your prompt files</small>
+                    </div>
+                    <div class="form-group">
+                        <label>Result:</label>
+                        <div id="test-prompt-result" class="test-prompt-result">
+                            <span class="placeholder-text">Click "Run" to see the result</span>
+                        </div>
+                        <div id="test-prompt-seed-used" class="form-help" style="display: none;">
+                            Seed used: <span id="test-prompt-seed-value"></span>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="test-prompt-run" class="primary-button">Run</button>
+                    <button id="test-prompt-close" class="secondary-button">Close</button>
                 </div>
             </div>
         </div>

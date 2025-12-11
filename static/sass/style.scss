@@ -1975,8 +1975,14 @@ button#send-chat {
         font-size: 1.1rem;
     }
 
-    .primary-button {
-        background-color: $submit-btn-color;
+    .prompt-header-buttons {
+        display: flex;
+        justify-content: center;
+        gap: 12px;
+    }
+
+    .primary-button,
+    .secondary-button {
         color: $text-color;
         border: none;
         padding: 12px 24px;
@@ -1985,10 +1991,54 @@ button#send-chat {
         font-size: 1rem;
         font-weight: 500;
         transition: background-color 0.2s ease;
+    }
+
+    .primary-button {
+        background-color: $submit-btn-color;
 
         &:hover {
             background-color: $submit-btn-hover-color;
         }
+    }
+
+    .secondary-button {
+        background-color: rgba($color: $input-bg-color, $alpha: 0.8);
+        border: 1px solid $border-color;
+
+        &:hover {
+            background-color: rgba($color: $input-bg-color, $alpha: 1);
+        }
+    }
+}
+
+// Test Prompt Result Styling
+.test-prompt-result {
+    background-color: rgba($color: $background-color, $alpha: 0.4);
+    border: 1px solid rgba($color: $border-color, $alpha: 0.5);
+    border-radius: 6px;
+    padding: 15px;
+    min-height: 60px;
+    font-family: monospace;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    word-wrap: break-word;
+    white-space: pre-wrap;
+
+    .placeholder-text {
+        color: rgba($color: $text-color, $alpha: 0.5);
+        font-style: italic;
+    }
+
+    .loading-text {
+        color: rgba($color: $text-color, $alpha: 0.7);
+    }
+
+    .result-text {
+        color: $text-color;
+    }
+
+    .error-text {
+        color: #ff6b6b;
     }
 }
 

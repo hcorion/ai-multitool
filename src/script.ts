@@ -120,6 +120,12 @@ document.addEventListener("DOMContentLoaded", () => {
     addEventListenerToElement("prompt-file-cancel", "click", hidePromptFileModal);
     addEventListenerToElement("prompt-file-save", "click", savePromptFile);
 
+    // Test Prompt modal event listeners
+    addEventListenerToElement("test-prompt-btn", "click", showTestPromptModal);
+    addEventListenerToElement("test-prompt-modal-close", "click", hideTestPromptModal);
+    addEventListenerToElement("test-prompt-close", "click", hideTestPromptModal);
+    addEventListenerToElement("test-prompt-run", "click", runTestPrompt);
+
     // Add input listener for real-time validation and help updates
     const contentTextarea = document.getElementById("prompt-file-content") as HTMLTextAreaElement;
     if (contentTextarea) {
@@ -2532,6 +2538,83 @@ async function deletePromptFile(fileName: string): Promise<void> {
 // Advanced options functionality - using existing implementations
 
 // Grid generation is now handled by the unified backend endpoint
+
+// Test Prompt Modal Functions
+function showTestPromptModal(): void {
+    const modal = document.getElementById("test-prompt-modal") as HTMLElement;
+    const seedInput = document.getElementById("test-prompt-seed") as HTMLInputElement;
+    const promptInput = document.getElementById("test-prompt-input") as HTMLTextAreaElement;
+    const resultDiv = document.getElementById("test-prompt-result") as HTMLElement;
+    const seedUsedDiv = document.getElementById("test-prompt-seed-used") as HTMLElement;
+
+    // Reset the modal
+    seedInput.value = "";
+    promptInput.value = "";
+    resultDiv.innerHTML = '<span class="placeholder-text">Click "Run" to see the result</span>';
+    seedUsedDiv.style.display = "none";
+
+    modal.style.display = "flex";
+    promptInput.focus();
+}
+
+function hideTestPromptModal(): void {
+    const modal = document.getElementById("test-prompt-modal") as HTMLElement;
+    modal.style.display = "none";
+}
+
+async function runTestPrompt(): Promise<void> {
+    const seedInput = document.getElementById("test-prompt-seed") as HTMLInputElement;
+    const promptInput = document.getElementById("test-prompt-input") as HTMLTextAreaElement;
+    const resultDiv = document.getElementById("test-prompt-result") as HTMLElement;
+    const seedUsedDiv = document.getElementById("test-prompt-seed-used") as HTMLElement;
+    const seedValueSpan = document.getElementById("test-prompt-seed-value") as HTMLElement;
+    const runButton = document.getElementById("test-prompt-run") as HTMLButtonElement;
+
+    const prompt = promptInput.value.trim();
+    if (!prompt) {
+        resultDiv.innerHTML = '<span class="error-text">Please enter a prompt to test</span>';
+        return;
+    }
+
+    // Disable button during request
+    runButton.disabled = true;
+    runButton.textContent = "Running...";
+    resultDiv.innerHTML = '<span class="loading-text">Processing...</span>';
+
+    try {
+        const requestBody: { prompt: string; seed?: number } = { prompt };
+
+        const seedValue = seedInput.value.trim();
+        if (seedValue) {
+            requestBody.seed = parseInt(seedValue, 10);
+        }
+
+        const response = await fetch("/prompt-test", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(requestBody),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            // Error response uses error_message field from error_handlers.py
+            throw new Error(data.error_message || data.error || `HTTP ${response.status}`);
+        }
+
+        // Display result
+        resultDiv.innerHTML = `<span class="result-text">${escapeHtml(data.result)}</span>`;
+        seedValueSpan.textContent = data.seed.toString();
+        seedUsedDiv.style.display = "block";
+    } catch (error) {
+        console.error("Error testing prompt:", error);
+        resultDiv.innerHTML = `<span class="error-text">Error: ${escapeHtml(String(error))}</span>`;
+        seedUsedDiv.style.display = "none";
+    } finally {
+        runButton.disabled = false;
+        runButton.textContent = "Run";
+    }
+}
 
 // Make prompt file functions globally accessible
 (window as any).editPromptFile = editPromptFile;

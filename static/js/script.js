@@ -86,6 +86,11 @@ document.addEventListener("DOMContentLoaded", () => {
     addEventListenerToElement("prompt-modal-close", "click", hidePromptFileModal);
     addEventListenerToElement("prompt-file-cancel", "click", hidePromptFileModal);
     addEventListenerToElement("prompt-file-save", "click", savePromptFile);
+    // Test Prompt modal event listeners
+    addEventListenerToElement("test-prompt-btn", "click", showTestPromptModal);
+    addEventListenerToElement("test-prompt-modal-close", "click", hideTestPromptModal);
+    addEventListenerToElement("test-prompt-close", "click", hideTestPromptModal);
+    addEventListenerToElement("test-prompt-run", "click", runTestPrompt);
     // Add input listener for real-time validation and help updates
     const contentTextarea = document.getElementById("prompt-file-content");
     if (contentTextarea) {
@@ -2157,6 +2162,72 @@ async function deletePromptFile(fileName) {
 }
 // Advanced options functionality - using existing implementations
 // Grid generation is now handled by the unified backend endpoint
+// Test Prompt Modal Functions
+function showTestPromptModal() {
+    const modal = document.getElementById("test-prompt-modal");
+    const seedInput = document.getElementById("test-prompt-seed");
+    const promptInput = document.getElementById("test-prompt-input");
+    const resultDiv = document.getElementById("test-prompt-result");
+    const seedUsedDiv = document.getElementById("test-prompt-seed-used");
+    // Reset the modal
+    seedInput.value = "";
+    promptInput.value = "";
+    resultDiv.innerHTML = '<span class="placeholder-text">Click "Run" to see the result</span>';
+    seedUsedDiv.style.display = "none";
+    modal.style.display = "flex";
+    promptInput.focus();
+}
+function hideTestPromptModal() {
+    const modal = document.getElementById("test-prompt-modal");
+    modal.style.display = "none";
+}
+async function runTestPrompt() {
+    const seedInput = document.getElementById("test-prompt-seed");
+    const promptInput = document.getElementById("test-prompt-input");
+    const resultDiv = document.getElementById("test-prompt-result");
+    const seedUsedDiv = document.getElementById("test-prompt-seed-used");
+    const seedValueSpan = document.getElementById("test-prompt-seed-value");
+    const runButton = document.getElementById("test-prompt-run");
+    const prompt = promptInput.value.trim();
+    if (!prompt) {
+        resultDiv.innerHTML = '<span class="error-text">Please enter a prompt to test</span>';
+        return;
+    }
+    // Disable button during request
+    runButton.disabled = true;
+    runButton.textContent = "Running...";
+    resultDiv.innerHTML = '<span class="loading-text">Processing...</span>';
+    try {
+        const requestBody = { prompt };
+        const seedValue = seedInput.value.trim();
+        if (seedValue) {
+            requestBody.seed = parseInt(seedValue, 10);
+        }
+        const response = await fetch("/prompt-test", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(requestBody),
+        });
+        const data = await response.json();
+        if (!response.ok) {
+            // Error response uses error_message field from error_handlers.py
+            throw new Error(data.error_message || data.error || `HTTP ${response.status}`);
+        }
+        // Display result
+        resultDiv.innerHTML = `<span class="result-text">${escapeHtml(data.result)}</span>`;
+        seedValueSpan.textContent = data.seed.toString();
+        seedUsedDiv.style.display = "block";
+    }
+    catch (error) {
+        console.error("Error testing prompt:", error);
+        resultDiv.innerHTML = `<span class="error-text">Error: ${escapeHtml(String(error))}</span>`;
+        seedUsedDiv.style.display = "none";
+    }
+    finally {
+        runButton.disabled = false;
+        runButton.textContent = "Run";
+    }
+}
 // Make prompt file functions globally accessible
 window.editPromptFile = editPromptFile;
 window.deletePromptFile = deletePromptFile;

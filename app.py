@@ -5175,6 +5175,53 @@ def delete_prompt_file(filename: str):
         return create_internal_error(error=e, message="Failed to delete file")
 
 
+@app.route("/prompt-test", methods=["POST"])
+def test_prompt():
+    """Test dynamic prompt processing with optional seed and prompt text."""
+    if "username" not in session:
+        return create_authentication_error()
+
+    if not app.static_folder:
+        return create_internal_error(message="Static folder not configured")
+
+    try:
+        data = request.get_json()
+        if not data:
+            return create_validation_error("No data provided")
+
+        prompt = data.get("prompt", "").strip()
+        seed = data.get("seed")
+
+        if not prompt:
+            return create_validation_error("Prompt text is required", field="prompt")
+
+        # Use provided seed or generate random one
+        if seed is not None:
+            try:
+                seed = int(seed)
+            except (ValueError, TypeError):
+                return create_validation_error(
+                    "Seed must be a valid integer", field="seed"
+                )
+        else:
+            seed = random.randint(0, 2**32 - 1)
+
+        username = session["username"]
+        followup_state = init_followup_state()
+
+        result = make_prompt_dynamic(
+            prompt, username, app.static_folder, seed, None, followup_state
+        )
+
+        return jsonify({"success": True, "result": result, "seed": seed})
+
+    except ValueError as e:
+        # Handle dynamic prompt errors (e.g., missing file)
+        return create_validation_error(str(e), field="prompt")
+    except Exception as e:
+        return create_internal_error(error=e, message="Failed to process prompt")
+
+
 @app.route("/agents", methods=["GET", "POST"])
 def manage_agent_presets():
     """Handle agent preset CRUD operations."""
