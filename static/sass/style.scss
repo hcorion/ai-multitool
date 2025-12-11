@@ -2821,3 +2821,504 @@ painting Section Styles */
         }
     }
 }
+
+// Vibe Selection Modal Styles
+.vibe-modal-content {
+    max-width: 900px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+
+    .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 20px;
+        border-bottom: 1px solid $border-color;
+
+        h2 {
+            margin: 0;
+            color: $text-color;
+        }
+
+        .close {
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            color: $text-color;
+
+            &:hover {
+                color: $submit-btn-hover-color;
+            }
+        }
+    }
+
+    .modal-body {
+        padding: 20px;
+    }
+
+    .modal-footer {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        padding: 20px;
+        border-top: 1px solid $border-color;
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.95rem;
+
+            &.btn-primary {
+                background-color: $submit-btn-color;
+                color: $text-color;
+
+                &:hover:not(:disabled) {
+                    background-color: $submit-btn-hover-color;
+                }
+
+                &:disabled {
+                    background-color: rgba($submit-btn-color, 0.5);
+                    cursor: not-allowed;
+                }
+            }
+
+            &.btn-secondary {
+                background-color: rgba($border-color, 0.3);
+                color: $text-color;
+
+                &:hover {
+                    background-color: rgba($border-color, 0.5);
+                }
+            }
+        }
+    }
+}
+
+.vibe-selection-info {
+    margin-bottom: 20px;
+    padding: 15px;
+    background-color: rgba($border-color, 0.1);
+    border-radius: 4px;
+
+    p {
+        margin: 0 0 10px 0;
+        color: $text-color;
+    }
+
+    .selected-vibes-count {
+        font-weight: bold;
+        color: $submit-btn-color;
+    }
+}
+
+.vibe-collections-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+    max-height: 400px;
+    overflow-y: auto;
+    padding: 10px;
+    border: 1px solid rgba($border-color, 0.3);
+    border-radius: 4px;
+
+    .no-vibes-message {
+        grid-column: 1 / -1;
+        text-align: center;
+        padding: 40px;
+        color: rgba($text-color, 0.7);
+        font-style: italic;
+    }
+}
+
+.vibe-collection-item {
+    border: 2px solid transparent;
+    border-radius: 8px;
+    padding: 10px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background-color: rgba($border-color, 0.1);
+
+    &:hover {
+        border-color: rgba($submit-btn-color, 0.5);
+        background-color: rgba($border-color, 0.2);
+    }
+
+    &.selected {
+        border-color: $submit-btn-color;
+        background-color: rgba($submit-btn-color, 0.1);
+    }
+
+    &.incompatible {
+        opacity: 0.7;
+        
+        &:hover {
+            border-color: rgba(#ff6b6b, 0.5);
+        }
+    }
+
+    .vibe-collection-preview {
+        position: relative;
+        margin-bottom: 10px;
+
+        .vibe-thumbnail {
+            width: 100%;
+            height: 120px;
+            object-fit: cover;
+            border-radius: 4px;
+        }
+
+        .vibe-collection-overlay {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+
+            &.compatible {
+                background-color: rgba(#4caf50, 0.8);
+                color: white;
+            }
+
+            &.incompatible {
+                background-color: rgba(#ff9800, 0.8);
+                color: white;
+            }
+        }
+    }
+
+    .vibe-collection-info {
+        .vibe-collection-name {
+            margin: 0 0 5px 0;
+            font-size: 0.9rem;
+            font-weight: bold;
+            color: $text-color;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .vibe-collection-model,
+        .vibe-collection-date {
+            margin: 0 0 3px 0;
+            font-size: 0.8rem;
+            color: rgba($text-color, 0.7);
+        }
+
+        .compatibility-warning {
+            margin: 5px 0 0 0;
+            font-size: 0.75rem;
+            color: #ff9800;
+            font-weight: bold;
+        }
+    }
+}
+
+.vibe-selection-controls {
+    border: 1px solid rgba($border-color, 0.3);
+    border-radius: 8px;
+    padding: 20px;
+    margin-top: 20px;
+    background-color: rgba($border-color, 0.05);
+
+    h3 {
+        margin: 0 0 15px 0;
+        color: $text-color;
+    }
+
+    .vibe-preview-section {
+        margin-bottom: 20px;
+
+        .vibe-preview-image {
+            width: 150px;
+            height: 200px;
+            object-fit: cover;
+            border-radius: 4px;
+            border: 1px solid rgba($border-color, 0.3);
+        }
+    }
+
+    .vibe-strength-controls {
+        .strength-control {
+            margin-bottom: 20px;
+
+            label {
+                display: block;
+                margin-bottom: 8px;
+                font-weight: bold;
+                color: $text-color;
+            }
+
+            input[type="range"] {
+                width: 100%;
+                margin-bottom: 5px;
+            }
+
+            .discrete-slider {
+                position: relative;
+                margin-bottom: 10px;
+
+                input[type="range"] {
+                    width: 100%;
+                }
+
+                .slider-labels {
+                    display: flex;
+                    justify-content: space-between;
+                    font-size: 0.8rem;
+                    color: rgba($text-color, 0.7);
+                    margin-top: 5px;
+
+                    span {
+                        flex: 1;
+                        text-align: center;
+                    }
+                }
+            }
+
+            span {
+                font-weight: bold;
+                color: $submit-btn-color;
+            }
+        }
+    }
+}
+
+.vibe-validation-messages {
+    margin-top: 15px;
+
+    .validation-message {
+        padding: 8px 12px;
+        border-radius: 4px;
+        margin-bottom: 8px;
+        font-size: 0.9rem;
+
+        &.validation-info {
+            background-color: rgba(#2196f3, 0.1);
+            border-left: 4px solid #2196f3;
+            color: #2196f3;
+        }
+
+        &.validation-success {
+            background-color: rgba(#4caf50, 0.1);
+            border-left: 4px solid #4caf50;
+            color: #4caf50;
+        }
+
+        &.validation-warning {
+            background-color: rgba(#ff9800, 0.1);
+            border-left: 4px solid #ff9800;
+            color: #ff9800;
+        }
+
+        &.validation-error {
+            background-color: rgba(#f44336, 0.1);
+            border-left: 4px solid #f44336;
+            color: #f44336;
+        }
+    }
+}
+// Vibe Panel Styles
+.vibe-add-section {
+    margin: 15px 0;
+    padding: 10px;
+    background-color: rgba($input-bg-color, 0.5);
+    border-radius: 6px;
+    border: 1px dashed $border-color;
+
+    .vibe-add-button {
+        background-color: $submit-btn-color;
+        color: $text-color;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        transition: background-color 0.2s ease;
+
+        &:hover {
+            background-color: $submit-btn-hover-color;
+        }
+    }
+
+    .vibe-help-text {
+        margin-left: 10px;
+        font-size: 12px;
+        color: rgba($text-color, 0.7);
+    }
+}
+
+.vibe-panel {
+    margin: 15px 0;
+    padding: 15px;
+    background-color: rgba($input-bg-color, 0.3);
+    border-radius: 8px;
+    border: 1px solid $border-color;
+
+    .vibe-panel-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid rgba($border-color, 0.3);
+
+        h3 {
+            margin: 0;
+            font-size: 16px;
+            color: $text-color;
+        }
+
+        .vibe-count {
+            font-size: 12px;
+            color: rgba($text-color, 0.7);
+            background-color: rgba($submit-btn-color, 0.2);
+            padding: 4px 8px;
+            border-radius: 12px;
+        }
+    }
+
+    .vibe-list {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .vibe-item {
+        background-color: rgba($input-bg-color, 0.6);
+        border-radius: 8px;
+        padding: 12px;
+        border: 1px solid rgba($border-color, 0.5);
+
+        .vibe-item-content {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .vibe-thumbnail-container {
+            flex-shrink: 0;
+            width: 60px;
+            height: 60px;
+            border-radius: 6px;
+            overflow: hidden;
+            background-color: rgba($background-color, 0.5);
+
+            .vibe-thumbnail {
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+                border-radius: 6px;
+            }
+        }
+
+        .vibe-info {
+            flex-grow: 1;
+            min-width: 0;
+
+            .vibe-name {
+                margin: 0 0 8px 0;
+                font-size: 14px;
+                font-weight: 500;
+                color: $text-color;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            .vibe-controls {
+                display: flex;
+                gap: 15px;
+                align-items: center;
+
+                .vibe-strength-control {
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                    font-size: 12px;
+
+                    label {
+                        margin: 0;
+                        color: rgba($text-color, 0.8);
+                        white-space: nowrap;
+                        width: auto;
+                        display: inline;
+                    }
+
+                    .encoding-strength-select {
+                        width: 60px;
+                        padding: 2px 4px;
+                        font-size: 11px;
+                        background-color: $input-bg-color;
+                        color: $text-color;
+                        border: 1px solid $border-color;
+                        border-radius: 4px;
+                        margin: 0;
+                    }
+
+                    .reference-strength-slider {
+                        width: 80px;
+                        margin: 0;
+                        accent-color: $submit-btn-color;
+                    }
+
+                    .reference-strength-value {
+                        font-size: 11px;
+                        color: rgba($text-color, 0.9);
+                        min-width: 30px;
+                        text-align: center;
+                    }
+                }
+            }
+        }
+
+        .vibe-actions {
+            flex-shrink: 0;
+
+            .vibe-remove-btn {
+                background-color: transparent;
+                color: rgba($text-color, 0.6);
+                border: none;
+                font-size: 18px;
+                font-weight: bold;
+                cursor: pointer;
+                padding: 4px 8px;
+                border-radius: 4px;
+                transition: all 0.2s ease;
+
+                &:hover {
+                    background-color: rgba(#f44336, 0.2);
+                    color: #f44336;
+                }
+            }
+        }
+    }
+}
+
+// Responsive adjustments for vibe panel
+@media (max-width: 768px) {
+    .vibe-panel {
+        .vibe-item {
+            .vibe-item-content {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 8px;
+            }
+
+            .vibe-info .vibe-controls {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 8px;
+            }
+        }
+    }
+}

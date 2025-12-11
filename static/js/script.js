@@ -4,6 +4,7 @@ import { InpaintingMaskCanvas } from "./inpainting/inpainting-mask-canvas.js";
 import { getElementByIdSafe } from './dom_utils.js';
 import * as agentPresetUI from './agent-preset-ui.js';
 import { parseJQueryError, extractErrorMessage } from './error-handler.js';
+import { vibePanel } from './vibe-panel.js';
 document.addEventListener("DOMContentLoaded", () => {
     $("#loading-spinner").hide();
     $("#prompt-form").on("submit", (event) => {
@@ -224,6 +225,7 @@ function providerChanged() {
         $(".novelai").hide();
         $(".openai").show();
         hideCharacterPromptInterface();
+        vibePanel.hide();
         const sizeSelect = getElementByIdSafe("size", HTMLSelectElement);
         if (sizeSelect)
             sizeSelect.selectedIndex = 0;
@@ -233,6 +235,7 @@ function providerChanged() {
         $(".novelai").hide();
         $(".stabilityai").show();
         hideCharacterPromptInterface();
+        vibePanel.hide();
         modelChanged(selection.value);
     }
     else if (selection.value == "novelai") {
@@ -240,6 +243,7 @@ function providerChanged() {
         $(".stabilityai").hide();
         $(".novelai").show();
         showCharacterPromptInterface();
+        vibePanel.show();
         // This is ugly, but index #3 is where the novelai size options start
         const sizeSelect = getElementByIdSafe("size", HTMLSelectElement);
         if (sizeSelect)

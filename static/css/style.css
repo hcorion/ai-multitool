@@ -2762,4 +2762,429 @@ painting Section Styles */
   }
 }
 
+.vibe-modal-content {
+  max-width: 900px;
+  width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+.vibe-modal-content .modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid #666666;
+}
+.vibe-modal-content .modal-header h2 {
+  margin: 0;
+  color: #fff;
+}
+.vibe-modal-content .modal-header .close {
+  font-size: 28px;
+  font-weight: bold;
+  cursor: pointer;
+  color: #fff;
+}
+.vibe-modal-content .modal-header .close:hover {
+  color: #006edc;
+}
+.vibe-modal-content .modal-body {
+  padding: 20px;
+}
+.vibe-modal-content .modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 20px;
+  border-top: 1px solid #666666;
+}
+.vibe-modal-content .modal-footer .btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.95rem;
+}
+.vibe-modal-content .modal-footer .btn.btn-primary {
+  background-color: #0a84ff;
+  color: #fff;
+}
+.vibe-modal-content .modal-footer .btn.btn-primary:hover:not(:disabled) {
+  background-color: #006edc;
+}
+.vibe-modal-content .modal-footer .btn.btn-primary:disabled {
+  background-color: rgba(10, 132, 255, 0.5);
+  cursor: not-allowed;
+}
+.vibe-modal-content .modal-footer .btn.btn-secondary {
+  background-color: rgba(102, 102, 102, 0.3);
+  color: #fff;
+}
+.vibe-modal-content .modal-footer .btn.btn-secondary:hover {
+  background-color: rgba(102, 102, 102, 0.5);
+}
+
+.vibe-selection-info {
+  margin-bottom: 20px;
+  padding: 15px;
+  background-color: rgba(102, 102, 102, 0.1);
+  border-radius: 4px;
+}
+.vibe-selection-info p {
+  margin: 0 0 10px 0;
+  color: #fff;
+}
+.vibe-selection-info .selected-vibes-count {
+  font-weight: bold;
+  color: #0a84ff;
+}
+
+.vibe-collections-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 15px;
+  margin-bottom: 20px;
+  max-height: 400px;
+  overflow-y: auto;
+  padding: 10px;
+  border: 1px solid rgba(102, 102, 102, 0.3);
+  border-radius: 4px;
+}
+.vibe-collections-grid .no-vibes-message {
+  grid-column: 1/-1;
+  text-align: center;
+  padding: 40px;
+  color: rgba(255, 255, 255, 0.7);
+  font-style: italic;
+}
+
+.vibe-collection-item {
+  border: 2px solid transparent;
+  border-radius: 8px;
+  padding: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background-color: rgba(102, 102, 102, 0.1);
+}
+.vibe-collection-item:hover {
+  border-color: rgba(10, 132, 255, 0.5);
+  background-color: rgba(102, 102, 102, 0.2);
+}
+.vibe-collection-item.selected {
+  border-color: #0a84ff;
+  background-color: rgba(10, 132, 255, 0.1);
+}
+.vibe-collection-item.incompatible {
+  opacity: 0.7;
+}
+.vibe-collection-item.incompatible:hover {
+  border-color: rgba(255, 107, 107, 0.5);
+}
+.vibe-collection-item .vibe-collection-preview {
+  position: relative;
+  margin-bottom: 10px;
+}
+.vibe-collection-item .vibe-collection-preview .vibe-thumbnail {
+  width: 100%;
+  height: 120px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+.vibe-collection-item .vibe-collection-preview .vibe-collection-overlay {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+}
+.vibe-collection-item .vibe-collection-preview .vibe-collection-overlay.compatible {
+  background-color: rgba(76, 175, 80, 0.8);
+  color: white;
+}
+.vibe-collection-item .vibe-collection-preview .vibe-collection-overlay.incompatible {
+  background-color: rgba(255, 152, 0, 0.8);
+  color: white;
+}
+.vibe-collection-item .vibe-collection-info .vibe-collection-name {
+  margin: 0 0 5px 0;
+  font-size: 0.9rem;
+  font-weight: bold;
+  color: #fff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vibe-collection-item .vibe-collection-info .vibe-collection-model,
+.vibe-collection-item .vibe-collection-info .vibe-collection-date {
+  margin: 0 0 3px 0;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+.vibe-collection-item .vibe-collection-info .compatibility-warning {
+  margin: 5px 0 0 0;
+  font-size: 0.75rem;
+  color: #ff9800;
+  font-weight: bold;
+}
+
+.vibe-selection-controls {
+  border: 1px solid rgba(102, 102, 102, 0.3);
+  border-radius: 8px;
+  padding: 20px;
+  margin-top: 20px;
+  background-color: rgba(102, 102, 102, 0.05);
+}
+.vibe-selection-controls h3 {
+  margin: 0 0 15px 0;
+  color: #fff;
+}
+.vibe-selection-controls .vibe-preview-section {
+  margin-bottom: 20px;
+}
+.vibe-selection-controls .vibe-preview-section .vibe-preview-image {
+  width: 150px;
+  height: 200px;
+  object-fit: cover;
+  border-radius: 4px;
+  border: 1px solid rgba(102, 102, 102, 0.3);
+}
+.vibe-selection-controls .vibe-strength-controls .strength-control {
+  margin-bottom: 20px;
+}
+.vibe-selection-controls .vibe-strength-controls .strength-control label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: bold;
+  color: #fff;
+}
+.vibe-selection-controls .vibe-strength-controls .strength-control input[type=range] {
+  width: 100%;
+  margin-bottom: 5px;
+}
+.vibe-selection-controls .vibe-strength-controls .strength-control .discrete-slider {
+  position: relative;
+  margin-bottom: 10px;
+}
+.vibe-selection-controls .vibe-strength-controls .strength-control .discrete-slider input[type=range] {
+  width: 100%;
+}
+.vibe-selection-controls .vibe-strength-controls .strength-control .discrete-slider .slider-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.7);
+  margin-top: 5px;
+}
+.vibe-selection-controls .vibe-strength-controls .strength-control .discrete-slider .slider-labels span {
+  flex: 1;
+  text-align: center;
+}
+.vibe-selection-controls .vibe-strength-controls .strength-control span {
+  font-weight: bold;
+  color: #0a84ff;
+}
+
+.vibe-validation-messages {
+  margin-top: 15px;
+}
+.vibe-validation-messages .validation-message {
+  padding: 8px 12px;
+  border-radius: 4px;
+  margin-bottom: 8px;
+  font-size: 0.9rem;
+}
+.vibe-validation-messages .validation-message.validation-info {
+  background-color: rgba(33, 150, 243, 0.1);
+  border-left: 4px solid #2196f3;
+  color: #2196f3;
+}
+.vibe-validation-messages .validation-message.validation-success {
+  background-color: rgba(76, 175, 80, 0.1);
+  border-left: 4px solid #4caf50;
+  color: #4caf50;
+}
+.vibe-validation-messages .validation-message.validation-warning {
+  background-color: rgba(255, 152, 0, 0.1);
+  border-left: 4px solid #ff9800;
+  color: #ff9800;
+}
+.vibe-validation-messages .validation-message.validation-error {
+  background-color: rgba(244, 67, 54, 0.1);
+  border-left: 4px solid #f44336;
+  color: #f44336;
+}
+
+.vibe-add-section {
+  margin: 15px 0;
+  padding: 10px;
+  background-color: rgba(51, 51, 51, 0.5);
+  border-radius: 6px;
+  border: 1px dashed #666666;
+}
+.vibe-add-section .vibe-add-button {
+  background-color: #0a84ff;
+  color: #fff;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background-color 0.2s ease;
+}
+.vibe-add-section .vibe-add-button:hover {
+  background-color: #006edc;
+}
+.vibe-add-section .vibe-help-text {
+  margin-left: 10px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.vibe-panel {
+  margin: 15px 0;
+  padding: 15px;
+  background-color: rgba(51, 51, 51, 0.3);
+  border-radius: 8px;
+  border: 1px solid #666666;
+}
+.vibe-panel .vibe-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(102, 102, 102, 0.3);
+}
+.vibe-panel .vibe-panel-header h3 {
+  margin: 0;
+  font-size: 16px;
+  color: #fff;
+}
+.vibe-panel .vibe-panel-header .vibe-count {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  background-color: rgba(10, 132, 255, 0.2);
+  padding: 4px 8px;
+  border-radius: 12px;
+}
+.vibe-panel .vibe-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.vibe-panel .vibe-item {
+  background-color: rgba(51, 51, 51, 0.6);
+  border-radius: 8px;
+  padding: 12px;
+  border: 1px solid rgba(102, 102, 102, 0.5);
+}
+.vibe-panel .vibe-item .vibe-item-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.vibe-panel .vibe-item .vibe-thumbnail-container {
+  flex-shrink: 0;
+  width: 60px;
+  height: 60px;
+  border-radius: 6px;
+  overflow: hidden;
+  background-color: rgba(18, 18, 18, 0.5);
+}
+.vibe-panel .vibe-item .vibe-thumbnail-container .vibe-thumbnail {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 6px;
+}
+.vibe-panel .vibe-item .vibe-info {
+  flex-grow: 1;
+  min-width: 0;
+}
+.vibe-panel .vibe-item .vibe-info .vibe-name {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.vibe-panel .vibe-item .vibe-info .vibe-controls {
+  display: flex;
+  gap: 15px;
+  align-items: center;
+}
+.vibe-panel .vibe-item .vibe-info .vibe-controls .vibe-strength-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+.vibe-panel .vibe-item .vibe-info .vibe-controls .vibe-strength-control label {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.8);
+  white-space: nowrap;
+  width: auto;
+  display: inline;
+}
+.vibe-panel .vibe-item .vibe-info .vibe-controls .vibe-strength-control .encoding-strength-select {
+  width: 60px;
+  padding: 2px 4px;
+  font-size: 11px;
+  background-color: #333;
+  color: #fff;
+  border: 1px solid #666666;
+  border-radius: 4px;
+  margin: 0;
+}
+.vibe-panel .vibe-item .vibe-info .vibe-controls .vibe-strength-control .reference-strength-slider {
+  width: 80px;
+  margin: 0;
+  accent-color: #0a84ff;
+}
+.vibe-panel .vibe-item .vibe-info .vibe-controls .vibe-strength-control .reference-strength-value {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.9);
+  min-width: 30px;
+  text-align: center;
+}
+.vibe-panel .vibe-item .vibe-actions {
+  flex-shrink: 0;
+}
+.vibe-panel .vibe-item .vibe-actions .vibe-remove-btn {
+  background-color: transparent;
+  color: rgba(255, 255, 255, 0.6);
+  border: none;
+  font-size: 18px;
+  font-weight: bold;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+.vibe-panel .vibe-item .vibe-actions .vibe-remove-btn:hover {
+  background-color: rgba(244, 67, 54, 0.2);
+  color: #f44336;
+}
+
+@media (max-width: 768px) {
+  .vibe-panel .vibe-item .vibe-item-content {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .vibe-panel .vibe-item .vibe-info .vibe-controls {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+}
+
 /*# sourceMappingURL=style.css.map */
