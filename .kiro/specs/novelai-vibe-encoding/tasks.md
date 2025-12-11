@@ -23,7 +23,9 @@
   - **Property 3: GUID uniqueness**
   - **Validates: Requirements 1.5**
 
-- [-] 2. Extend NovelAI client with vibe encoding support
+- [x] 2. Extend NovelAI client with vibe encoding support
+
+
 
 
 
@@ -32,11 +34,15 @@
   - Create VibeReference Pydantic model for generation parameters
   - _Requirements: 1.3, 3.4, 3.5_
 
-- [ ] 2.1 Write property test for encoding strength coverage
+- [x] 2.1 Write property test for encoding strength coverage
+
+
   - **Property 1: Encoding strength coverage**
   - **Validates: Requirements 1.3**
 
-- [ ] 2.2 Write property test for vibe parameter structure
+- [x] 2.2 Write property test for vibe parameter structure
+
+
   - **Property 9: Vibe parameter structure**
   - **Validates: Requirements 3.4, 3.5**
 

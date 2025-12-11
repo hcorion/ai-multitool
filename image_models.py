@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
+from pydantic import BaseModel, Field, field_validator
 from dynamic_prompts import GridDynamicPromptInfo
 
 
@@ -45,6 +46,20 @@ class OpenAIModel(str, Enum):
     """OpenAI model options."""
 
     GPT_IMAGE_1 = "gpt-image-1"
+
+
+class VibeReference(BaseModel):
+    """Reference to a vibe for image generation."""
+    
+    encoded_data: str = Field(..., description="Base64 encoded vibe data")
+    reference_strength: float = Field(..., ge=0.0, le=1.0, description="Reference strength 0.0-1.0")
+    
+    @field_validator("encoded_data")
+    @classmethod
+    def validate_encoded_data(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("Encoded data cannot be empty")
+        return v
 
 
 @dataclass

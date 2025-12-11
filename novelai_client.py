@@ -17,6 +17,11 @@ from typing import Any
 import requests
 from PIL import Image as PILImage
 
+# Import VibeReference from image_models to avoid circular imports
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from image_models import VibeReference
+
 
 class NovelAIModel(str, Enum):
     """Available NovelAI models for image generation."""
@@ -248,6 +253,49 @@ class NovelAIClient:
         except Exception as e:
             raise NovelAIClientError(f"Network error: {str(e)}")
 
+    def encode_vibe(
+        self, 
+        image_bytes: bytes, 
+        information_extracted: float,
+        model: str
+    ) -> str:
+        """
+        Encode image to vibe representation.
+        
+        Args:
+            image_bytes: Raw image bytes to encode
+            information_extracted: Float value (0.0-1.0) controlling how much style information is extracted
+            model: Model name used for encoding
+            
+        Returns:
+            encoded_b64_data as string
+            
+        Raises:
+            NovelAIAPIError: If the API returns an error
+            NovelAIClientError: If there's a client-side error
+        """
+        # Validate information_extracted parameter
+        if not 0.0 <= information_extracted <= 1.0:
+            raise ValueError("information_extracted must be between 0.0 and 1.0")
+        
+        # Encode image to base64
+        image_b64 = base64.b64encode(image_bytes).decode("ascii")
+        
+        # Prepare the payload
+        payload = {
+            "image": image_b64,
+            "information_extracted": information_extracted,
+            "model": model
+        }
+        
+        response = self._make_request("ai/encode-vibe", payload)
+        
+        try:
+            response_data = response.json()
+            return response_data.get("encoded_data", "")
+        except (json.JSONDecodeError, KeyError) as e:
+            raise NovelAIClientError(f"Failed to parse vibe encoding response: {str(e)}")
+
     def generate_image(
         self,
         prompt: str,
@@ -259,6 +307,7 @@ class NovelAIClient:
         scale: float = 6.0,
         variety: bool = False,
         character_prompts: list[dict[str, str]] | None = None,
+        vibes: list[VibeReference] | None = None,
         **kwargs,
     ) -> bytes:
         """
@@ -274,6 +323,7 @@ class NovelAIClient:
             scale: CFG scale for prompt adherence
             variety: Enable variety mode for more diverse outputs
             character_prompts: List of character-specific prompts
+            vibes: List of vibe references to apply to generation
             **kwargs: Additional parameters for the generation
 
         Returns:
@@ -297,6 +347,20 @@ class NovelAIClient:
             character_prompts=character_prompts,
             **kwargs,
         )
+
+        # Validate and add vibe parameters if vibes are provided
+        if vibes is not None:
+            # Validate vibe count (1-4 vibes allowed)
+            if len(vibes) < 1 or len(vibes) > 4:
+                raise ValueError("Number of vibes must be between 1 and 4")
+            
+            # Extract vibe data and reference strengths
+            reference_image_multiple = [vibe.encoded_data for vibe in vibes]
+            reference_strength_multiple = [vibe.reference_strength for vibe in vibes]
+            
+            # Add vibe parameters to the request
+            parameters["reference_image_multiple"] = reference_image_multiple
+            parameters["reference_strength_multiple"] = reference_strength_multiple
 
         payload = {
             "action": NovelAIAction.GENERATE.value,

@@ -11,6 +11,7 @@ import zipfile
 import io
 from unittest.mock import Mock, patch
 from PIL import Image as PILImage
+from hypothesis import given, strategies as st
 
 from novelai_client import (
     NovelAIClient,
@@ -22,6 +23,7 @@ from novelai_client import (
     NovelAIClientError,
     NovelAIAPIError
 )
+from image_models import VibeReference
 
 
 class TestNovelAIClient:
@@ -1248,3 +1250,159 @@ class TestNovelAIExceptions:
         assert error.message == "Bad request"
         assert str(error) == "NovelAI API Error 400: Bad request"
         assert isinstance(error, NovelAIClientError)
+
+
+class TestNovelAIVibeEncoding:
+    """Property-based tests for NovelAI vibe encoding functionality."""
+    
+    @given(
+        image_bytes=st.binary(min_size=100, max_size=1000),
+        information_extracted=st.floats(min_value=0.0, max_value=1.0),
+        model=st.sampled_from(["nai-diffusion-4-5-full", "nai-diffusion-3"])
+    )
+    def test_encode_vibe_basic(self, image_bytes, information_extracted, model):
+        """
+        **Feature: novelai-vibe-encoding, Property 1: Encoding strength coverage**
+        **Validates: Requirements 1.3**
+        
+        Test that encode_vibe method accepts valid parameters and makes correct API call.
+        """
+        client = NovelAIClient("test-key")
+        
+        # Mock the API response
+        mock_response_data = {"encoded_data": "base64_encoded_vibe_data"}
+        
+        with patch.object(client, '_make_request') as mock_request:
+            mock_response = Mock()
+            mock_response.json.return_value = mock_response_data
+            mock_request.return_value = mock_response
+            
+            result = client.encode_vibe(image_bytes, information_extracted, model)
+            
+            # Verify the result
+            assert result == "base64_encoded_vibe_data"
+            
+            # Verify the API call was made correctly
+            mock_request.assert_called_once()
+            call_args = mock_request.call_args
+            endpoint, payload = call_args[0]
+            
+            assert endpoint == "ai/encode-vibe"
+            assert payload["information_extracted"] == information_extracted
+            assert payload["model"] == model
+            assert "image" in payload
+    
+    def test_encode_vibe_invalid_strength_bounds(self):
+        """Test that encode_vibe validates information_extracted bounds."""
+        client = NovelAIClient("test-key")
+        
+        # Test values outside valid range
+        invalid_values = [-0.1, 1.1, -1.0, 2.0]
+        
+        for invalid_value in invalid_values:
+            with pytest.raises(ValueError, match="information_extracted must be between 0.0 and 1.0"):
+                client.encode_vibe(b"test_image", invalid_value, "nai-diffusion-4-5-full")
+    
+    @given(
+        vibes=st.lists(
+            st.builds(
+                VibeReference,
+                encoded_data=st.text(min_size=1, max_size=100),
+                reference_strength=st.floats(min_value=0.0, max_value=1.0)
+            ),
+            min_size=1,
+            max_size=4
+        ),
+        prompt=st.text(min_size=1, max_size=100)
+    )
+    def test_generate_image_with_vibes_parameter_structure(self, vibes, prompt):
+        """
+        **Feature: novelai-vibe-encoding, Property 9: Vibe parameter structure**
+        **Validates: Requirements 3.4, 3.5**
+        
+        Test that vibe parameters are correctly structured in generation requests.
+        """
+        # Create a mock ZIP file with image data
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w') as zip_file:
+            zip_file.writestr("image.png", b"fake image data")
+        zip_content = zip_buffer.getvalue()
+        
+        client = NovelAIClient("test-key")
+        
+        with patch.object(client, '_make_request') as mock_request:
+            mock_response = Mock()
+            mock_response.content = zip_content
+            mock_request.return_value = mock_response
+            
+            result = client.generate_image(prompt, vibes=vibes)
+            
+            assert result == b"fake image data"
+            
+            # Verify the request payload structure
+            mock_request.assert_called_once()
+            call_args = mock_request.call_args
+            endpoint, payload = call_args[0]
+            
+            assert endpoint == "ai/generate-image"
+            
+            # Verify vibe parameters are correctly structured
+            params = payload["parameters"]
+            assert "reference_image_multiple" in params
+            assert "reference_strength_multiple" in params
+            
+            # Verify arrays have equal lengths matching number of vibes
+            ref_images = params["reference_image_multiple"]
+            ref_strengths = params["reference_strength_multiple"]
+            
+            assert len(ref_images) == len(vibes)
+            assert len(ref_strengths) == len(vibes)
+            assert len(ref_images) == len(ref_strengths)
+            
+            # Verify content matches input vibes
+            for i, vibe in enumerate(vibes):
+                assert ref_images[i] == vibe.encoded_data
+                assert ref_strengths[i] == vibe.reference_strength
+    
+    def test_generate_image_vibe_count_constraint(self):
+        """Test that generate_image enforces vibe count constraints (1-4 vibes)."""
+        client = NovelAIClient("test-key")
+        
+        # Test with 0 vibes (empty list)
+        with pytest.raises(ValueError, match="Number of vibes must be between 1 and 4"):
+            client.generate_image("test prompt", vibes=[])
+        
+        # Test with more than 4 vibes
+        too_many_vibes = [
+            VibeReference(encoded_data=f"vibe_{i}", reference_strength=0.5)
+            for i in range(5)
+        ]
+        
+        with pytest.raises(ValueError, match="Number of vibes must be between 1 and 4"):
+            client.generate_image("test prompt", vibes=too_many_vibes)
+    
+    def test_generate_image_without_vibes(self):
+        """Test that generate_image works normally without vibes parameter."""
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w') as zip_file:
+            zip_file.writestr("image.png", b"fake image data")
+        zip_content = zip_buffer.getvalue()
+        
+        client = NovelAIClient("test-key")
+        
+        with patch.object(client, '_make_request') as mock_request:
+            mock_response = Mock()
+            mock_response.content = zip_content
+            mock_request.return_value = mock_response
+            
+            result = client.generate_image("test prompt")
+            
+            assert result == b"fake image data"
+            
+            # Verify no vibe parameters are included
+            call_args = mock_request.call_args
+            payload = call_args[0][1]
+            params = payload["parameters"]
+            
+            assert "reference_image_multiple" not in params
+            assert "reference_strength_multiple" not in params
