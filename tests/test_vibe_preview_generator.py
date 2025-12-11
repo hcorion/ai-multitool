@@ -8,7 +8,7 @@ vibe preview generation operations and image properties.
 import os
 import tempfile
 import uuid
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 from PIL import Image as PILImage
 import io
 

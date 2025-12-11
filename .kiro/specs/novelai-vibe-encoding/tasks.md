@@ -94,7 +94,12 @@
   - **Property 5: Preview file completeness**
   - **Validates: Requirements 2.5, 2.6**
 
-- [ ] 6. Implement vibe encoding API endpoints
+- [x] 6. Implement vibe encoding API endpoints
+
+
+
+
+
   - Add POST /vibes/encode endpoint for creating vibe collections from existing images with progress streaming
   - Add GET /vibes endpoint for listing user's vibe collections
   - Add GET /vibes/<guid> endpoint for vibe collection details
@@ -103,7 +108,9 @@
   - Add Server-Sent Events (SSE) endpoint for real-time progress updates during vibe creation
   - _Requirements: 1.1, 1.2, 7.1, 7.3_
 
-- [ ] 6.1 Write unit tests for vibe API endpoints
+- [x] 6.1 Write unit tests for vibe API endpoints
+
+
   - Test vibe creation flow with mocked NovelAI API
   - Test vibe listing and retrieval
   - Test vibe deletion with file cleanup verification

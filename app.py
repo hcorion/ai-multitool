@@ -69,9 +69,12 @@ from image_models import (
     create_request_from_form_data,
     create_success_response,
 )
-from novelai_client import NovelAIAPIError, NovelAIClient, NovelAIClientError
+from novelai_client import NovelAIAPIError, NovelAIClient, NovelAIClientError, NovelAIModel
 from tool_framework import ToolExecutor, ToolRegistry
 from tools.calculator_tool import CalculatorTool
+from vibe_encoder import VibeEncoderService
+from vibe_preview_generator import VibePreviewGenerator
+from vibe_storage import VibeStorageManager
 
 # Configure logging to file with dated session logs
 os.makedirs("logs", exist_ok=True)
@@ -1668,6 +1671,113 @@ logging.info("Tool executor initialized")
 
 # Initialize the Responses API client with tool registry
 responses_client = ResponsesAPIClient(client, tool_registry=tool_registry)
+
+# Initialize vibe-related services
+vibe_storage_manager = VibeStorageManager(app.static_folder or "static")
+
+# Global progress tracking for vibe processing
+vibe_progress_tracker: dict[str, dict[str, Any]] = {}
+vibe_progress_lock = threading.Lock()
+
+logging.info("Vibe services initialized")
+
+
+def process_vibe_encoding_background(username: str, collection_guid: str, image_path: str, name: str, model: str) -> None:
+    """Background task to encode vibe and generate previews with progress tracking."""
+    try:
+        # Initialize progress tracking for encoding phase
+        with vibe_progress_lock:
+            vibe_progress_tracker[collection_guid] = {
+                "phase": "encoding",
+                "step": 0,
+                "total": 30,  # 5 encoding + 25 preview steps
+                "message": "Starting vibe encoding",
+                "complete": False,
+                "error": None
+            }
+        
+        # Initialize services
+        novelai_client = NovelAIClient(NOVELAI_API_KEY)
+        encoder_service = VibeEncoderService(novelai_client, vibe_storage_manager)
+        
+        # Progress callback for encoding phase
+        def encoding_progress_callback(step: int, total: int, message: str) -> None:
+            with vibe_progress_lock:
+                if collection_guid in vibe_progress_tracker:
+                    vibe_progress_tracker[collection_guid].update({
+                        "phase": "encoding",
+                        "step": step,
+                        "total": 30,  # Total steps including preview
+                        "message": message
+                    })
+        
+        # Encode the vibe with progress tracking
+        collection = encoder_service.encode_vibe_with_guid(
+            username, collection_guid, image_path, name, model, encoding_progress_callback
+        )
+        
+        # Transition to preview phase
+        with vibe_progress_lock:
+            if collection_guid in vibe_progress_tracker:
+                vibe_progress_tracker[collection_guid].update({
+                    "phase": "preview",
+                    "step": 5,
+                    "total": 30,
+                    "message": "Encoding complete, starting preview generation"
+                })
+        
+        # Progress callback for preview phase (offset by 5 for encoding steps)
+        def preview_progress_callback(step: int, total: int, message: str) -> None:
+            with vibe_progress_lock:
+                if collection_guid in vibe_progress_tracker:
+                    vibe_progress_tracker[collection_guid].update({
+                        "phase": "preview",
+                        "step": 5 + step,  # Offset by encoding steps
+                        "total": 30,
+                        "message": message
+                    })
+        
+        # Generate previews with progress tracking
+        preview_generator = VibePreviewGenerator(novelai_client, vibe_storage_manager)
+        preview_generator.generate_previews(username, collection, preview_progress_callback)
+        
+        # Mark as complete
+        with vibe_progress_lock:
+            if collection_guid in vibe_progress_tracker:
+                vibe_progress_tracker[collection_guid].update({
+                    "phase": "complete",
+                    "step": 30,
+                    "total": 30,
+                    "message": "Vibe collection ready",
+                    "complete": True
+                })
+        
+        logging.info(f"Successfully created vibe collection {collection_guid}")
+        
+    except FileNotFoundError as e:
+        logging.error(f"File not found for vibe {collection_guid}: {e}")
+        with vibe_progress_lock:
+            if collection_guid in vibe_progress_tracker:
+                vibe_progress_tracker[collection_guid].update({
+                    "error": f"File not found: {str(e)}",
+                    "complete": True
+                })
+    except ValueError as e:
+        logging.error(f"Validation error for vibe {collection_guid}: {e}")
+        with vibe_progress_lock:
+            if collection_guid in vibe_progress_tracker:
+                vibe_progress_tracker[collection_guid].update({
+                    "error": f"Validation error: {str(e)}",
+                    "complete": True
+                })
+    except Exception as e:
+        logging.error(f"Error processing vibe {collection_guid}: {e}", exc_info=True)
+        with vibe_progress_lock:
+            if collection_guid in vibe_progress_tracker:
+                vibe_progress_tracker[collection_guid].update({
+                    "error": str(e),
+                    "complete": True
+                })
 
 
 def upscale_stability_creative(
@@ -5443,6 +5553,285 @@ def handle_agent_preset(preset_id: str):
             exc_info=True,
         )
         return jsonify({"error": "Internal server error"}), 500
+
+
+# Vibe API Endpoints
+
+@app.route("/vibes/encode", methods=["POST"])
+def encode_vibe():
+    """Create a new vibe collection from an existing image with progress streaming."""
+    if "username" not in session:
+        return create_authentication_error()
+    
+    username = session["username"]
+    
+    try:
+        # Validate request data
+        if not request.json:
+            return create_validation_error("Request must contain JSON data")
+        
+        image_filename = request.json.get("image_filename")
+        name = request.json.get("name")
+        
+        if not image_filename:
+            return create_validation_error("image_filename is required", field="image_filename")
+        
+        if not name:
+            return create_validation_error("name is required", field="name")
+        
+        # Validate name
+        name = name.strip()
+        if not name:
+            return create_validation_error("name cannot be empty or whitespace only", field="name")
+        
+        if len(name) > 100:
+            return create_validation_error("name cannot exceed 100 characters", field="name")
+        
+        # Check if source image exists
+        user_images_dir = os.path.join(app.static_folder or "static", "images", username)
+        image_path = os.path.join(user_images_dir, image_filename)
+        
+        if not os.path.exists(image_path):
+            return create_not_found_error(f"Source image '{image_filename}' not found")
+        
+        # Use backend default model
+        model = NovelAIModel.DIFFUSION_4_5_FULL
+        
+        # Generate GUID upfront so we can return it immediately
+        from vibe_storage import VibeStorageManager
+        collection_guid = VibeStorageManager.generate_guid()
+        
+        # Start encoding and preview generation in background thread
+        threading.Thread(
+            target=process_vibe_encoding_background,
+            args=(username, collection_guid, image_path, name, model),
+            daemon=True
+        ).start()
+        
+        # Return immediately with the GUID so frontend can start polling
+        return jsonify({
+            "success": True,
+            "guid": collection_guid,
+            "name": name.strip(),
+            "preview_count": 0,  # Will be generated in background
+            "encoding_count": 0,  # Will be generated in background
+            "progress_stream_url": f"/vibes/{collection_guid}/progress"
+        })
+        
+    except Exception as e:
+        logging.error(f"Error encoding vibe for {username}: {e}", exc_info=True)
+        return create_internal_error(error=e, message="Failed to encode vibe")
+
+
+@app.route("/vibes", methods=["GET"])
+def list_vibes():
+    """List all vibe collections for the current user."""
+    if "username" not in session:
+        return create_authentication_error()
+    
+    username = session["username"]
+    
+    try:
+        collections = vibe_storage_manager.list_collections(username)
+        
+        # Convert to API format
+        collections_data = []
+        for collection in collections:
+            collections_data.append({
+                "guid": collection.guid,
+                "name": collection.name,
+                "model": collection.model,
+                "created_at": collection.created_at,
+                "preview_image": collection.preview_image
+            })
+        
+        return jsonify({"collections": collections_data})
+        
+    except Exception as e:
+        logging.error(f"Error listing vibes for {username}: {e}", exc_info=True)
+        return create_internal_error(error=e, message="Failed to list vibe collections")
+
+
+@app.route("/vibes/<guid>", methods=["GET"])
+def get_vibe(guid: str):
+    """Get details of a specific vibe collection."""
+    if "username" not in session:
+        return create_authentication_error()
+    
+    username = session["username"]
+    
+    try:
+        collection = vibe_storage_manager.load_collection(username, guid)
+        
+        if not collection:
+            return create_not_found_error(f"Vibe collection '{guid}' not found")
+        
+        # Build response data
+        response_data = {
+            "guid": collection.guid,
+            "name": collection.name,
+            "model": collection.model,
+            "created_at": collection.created_at,
+            "encoding_strengths": [1.0, 0.85, 0.7, 0.5, 0.35],
+            "previews": collection.preview_images
+        }
+        
+        return jsonify(response_data)
+        
+    except Exception as e:
+        logging.error(f"Error getting vibe {guid} for {username}: {e}", exc_info=True)
+        return create_internal_error(error=e, message="Failed to get vibe collection")
+
+
+@app.route("/vibes/<guid>", methods=["DELETE"])
+def delete_vibe(guid: str):
+    """Delete a vibe collection and all associated files."""
+    if "username" not in session:
+        return create_authentication_error()
+    
+    username = session["username"]
+    
+    try:
+        success = vibe_storage_manager.delete_collection(username, guid)
+        
+        if not success:
+            return create_not_found_error(f"Vibe collection '{guid}' not found")
+        
+        return jsonify({
+            "success": True,
+            "message": "Vibe collection deleted successfully"
+        })
+        
+    except Exception as e:
+        logging.error(f"Error deleting vibe {guid} for {username}: {e}", exc_info=True)
+        return create_internal_error(error=e, message="Failed to delete vibe collection")
+
+
+@app.route("/vibes/<guid>/preview/<enc_strength>/<ref_strength>", methods=["GET"])
+def get_vibe_preview(guid: str, enc_strength: str, ref_strength: str):
+    """Get preview image path for specific encoding and reference strength combination."""
+    if "username" not in session:
+        return create_authentication_error()
+    
+    username = session["username"]
+    
+    try:
+        # Validate strength values
+        try:
+            enc_float = float(enc_strength)
+            ref_float = float(ref_strength)
+        except ValueError:
+            return create_validation_error("Invalid strength values - must be numbers")
+        
+        # Validate encoding strength is one of the allowed values
+        valid_enc_strengths = {1.0, 0.85, 0.7, 0.5, 0.35}
+        if enc_float not in valid_enc_strengths:
+            return create_validation_error(
+                f"Invalid encoding strength '{enc_strength}' - must be one of {valid_enc_strengths}",
+                field="encoding_strength"
+            )
+        
+        # Validate reference strength is in valid range
+        if not (0.0 <= ref_float <= 1.0):
+            return create_validation_error(
+                f"Invalid reference strength '{ref_strength}' - must be between 0.0 and 1.0",
+                field="reference_strength"
+            )
+        
+        # Load the collection
+        collection = vibe_storage_manager.load_collection(username, guid)
+        
+        if not collection:
+            return create_not_found_error(f"Vibe collection '{guid}' not found")
+        
+        # Find the closest reference strength from available previews
+        available_ref_strengths = [1.0, 0.85, 0.7, 0.5, 0.35]
+        closest_ref_strength = min(available_ref_strengths, key=lambda x: abs(x - ref_float))
+        
+        # Build preview key
+        preview_key = f"enc{enc_strength}_ref{closest_ref_strength}"
+        
+        # Get preview image path
+        preview_path = collection.preview_images.get(preview_key)
+        
+        if not preview_path:
+            return create_not_found_error(f"Preview image not found for strengths {enc_strength}/{ref_strength}")
+        
+        return jsonify({
+            "preview_url": preview_path,
+            "encoding_strength": enc_float,
+            "reference_strength": ref_float,
+            "actual_reference_strength": closest_ref_strength
+        })
+        
+    except Exception as e:
+        logging.error(f"Error getting vibe preview {guid} for {username}: {e}", exc_info=True)
+        return create_internal_error(error=e, message="Failed to get vibe preview")
+
+
+@app.route("/vibes/<guid>/progress", methods=["GET"])
+def get_vibe_progress(guid: str):
+    """Server-Sent Events endpoint for real-time progress updates during vibe creation."""
+    if "username" not in session:
+        return create_authentication_error()
+    
+    username = session["username"]
+    
+    try:
+        # Check if collection exists
+        collection = vibe_storage_manager.load_collection(username, guid)
+        
+        if not collection:
+            return create_not_found_error(f"Vibe collection '{guid}' not found")
+        
+        def generate_progress_events():
+            """Generate Server-Sent Events for real progress updates."""
+            last_progress = None
+            
+            while True:
+                with vibe_progress_lock:
+                    current_progress = vibe_progress_tracker.get(guid)
+                
+                # If no progress tracking, check if collection has previews (already complete)
+                if not current_progress:
+                    if collection.preview_images:
+                        yield f"data: {json.dumps({'phase': 'complete', 'step': 25, 'total': 25, 'message': 'Vibe collection ready'})}\n\n"
+                        break
+                    else:
+                        # Collection exists but no progress tracking - might be old collection
+                        yield f"data: {json.dumps({'phase': 'unknown', 'message': 'Collection status unknown'})}\n\n"
+                        break
+                
+                # Send progress update if it changed
+                if current_progress != last_progress:
+                    yield f"data: {json.dumps(current_progress)}\n\n"
+                    last_progress = current_progress.copy()
+                
+                # Break if complete or error
+                if current_progress.get("complete") or current_progress.get("error"):
+                    break
+                
+                # Wait a bit before checking again
+                time.sleep(0.5)
+            
+            # Clean up progress tracking after completion
+            with vibe_progress_lock:
+                if guid in vibe_progress_tracker:
+                    del vibe_progress_tracker[guid]
+        
+        return Response(
+            generate_progress_events(),
+            mimetype='text/event-stream',
+            headers={
+                'Cache-Control': 'no-cache',
+                'Connection': 'keep-alive',
+                'Access-Control-Allow-Origin': '*'
+            }
+        )
+        
+    except Exception as e:
+        logging.error(f"Error getting vibe progress {guid} for {username}: {e}", exc_info=True)
+        return create_internal_error(error=e, message="Failed to get vibe progress")
 
 
 if __name__ == "__main__":

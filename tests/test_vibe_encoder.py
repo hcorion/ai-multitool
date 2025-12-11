@@ -247,3 +247,35 @@ class TestVibeEncoderService:
         # Should wrap as client error
         with pytest.raises(NovelAIClientError, match="Unexpected error during encoding"):
             encoder_service._call_encode_api(image_bytes, strength, model)
+    
+    def test_encode_vibe_with_guid_success(self, mock_novelai_client, storage_manager):
+        """Test successful vibe encoding with pre-generated GUID."""
+        encoder_service = VibeEncoderService(mock_novelai_client, storage_manager)
+        
+        username = "testuser"
+        guid = "550e8400-e29b-41d4-a716-446655440000"
+        image_path = "/test/image.png"
+        name = "Test Vibe"
+        model = "nai-diffusion-4-5-full"
+        
+        # Mock file reading and API response
+        mock_novelai_client.encode_vibe.return_value = "encoded_data_test"
+        
+        with patch("os.path.exists", return_value=True), \
+             patch("builtins.open", mock_open(read_data=b"test_image_data")), \
+             patch.object(storage_manager, 'save_collection') as mock_save:
+            
+            collection = encoder_service.encode_vibe_with_guid(username, guid, image_path, name, model)
+            
+            # Verify collection properties
+            assert collection.guid == guid
+            assert collection.name == name
+            assert collection.model == model
+            assert len(collection.encodings) == 5
+            
+            # Verify all encoding strengths are present
+            expected_strengths = {"1.0", "0.85", "0.7", "0.5", "0.35"}
+            assert set(collection.encodings.keys()) == expected_strengths
+            
+            # Verify storage manager was called
+            mock_save.assert_called_once_with(username, collection)

@@ -122,6 +122,100 @@ class VibeEncoderService:
         
         return collection
     
+    def encode_vibe_with_guid(
+        self, 
+        username: str,
+        guid: str,
+        image_path: str, 
+        name: str, 
+        model: str,
+        progress_callback: Optional[Callable[[int, int, str], None]] = None
+    ) -> VibeCollection:
+        """Encode image at all strength levels with a pre-generated GUID.
+        
+        Args:
+            username: Username for the vibe collection
+            guid: Pre-generated GUID for the collection
+            image_path: Path to the source image file
+            name: User-provided name for the vibe collection
+            model: Model name used for encoding
+            progress_callback: Optional callback for progress updates (step, total, message)
+            
+        Returns:
+            VibeCollection with all encodings
+            
+        Raises:
+            FileNotFoundError: If the source image file doesn't exist
+            NovelAIAPIError: If the NovelAI API returns an error
+            NovelAIClientError: If there's a client-side error
+            ValueError: If validation fails
+        """
+        # Validate inputs
+        if not os.path.exists(image_path):
+            raise FileNotFoundError(f"Source image not found: {image_path}")
+        
+        if not name or not name.strip():
+            raise ValueError("Vibe collection name cannot be empty")
+        
+        if not model or not model.strip():
+            raise ValueError("Model name cannot be empty")
+        
+        if not guid or not guid.strip():
+            raise ValueError("GUID cannot be empty")
+        
+        # Read the source image
+        try:
+            with open(image_path, 'rb') as f:
+                image_bytes = f.read()
+        except IOError as e:
+            raise FileNotFoundError(f"Failed to read source image: {str(e)}")
+        
+        # Encode at all strength levels
+        encodings = {}
+        total_steps = len(self.ENCODING_STRENGTHS)
+        
+        for step, strength in enumerate(self.ENCODING_STRENGTHS, 1):
+            if progress_callback:
+                progress_callback(step, total_steps, f"Encoding at strength {strength}")
+            
+            try:
+                encoded_data = self._call_encode_api(image_bytes, strength, model)
+                
+                # Create VibeEncoding object
+                encoding = VibeEncoding(
+                    encoding_strength=strength,
+                    encoded_data=encoded_data
+                )
+                
+                # Store with string key for JSON serialization
+                encodings[str(strength)] = encoding
+                
+            except (NovelAIAPIError, NovelAIClientError) as e:
+                # Re-raise API errors with context
+                if isinstance(e, NovelAIAPIError):
+                    raise NovelAIAPIError(e.status_code, f"Failed to encode at strength {strength}: {e.message}")
+                else:
+                    raise NovelAIClientError(f"Failed to encode at strength {strength}: {str(e)}")
+        
+        # Create the vibe collection with the provided GUID
+        collection = VibeCollection(
+            guid=guid,
+            name=name.strip(),
+            model=model,
+            created_at=int(time.time()),
+            source_image_path=image_path,
+            encodings=encodings,
+            preview_images={}  # Will be populated by preview generator
+        )
+        
+        # Save the collection
+        try:
+            self.storage_manager.save_collection(username, collection)
+        except Exception as e:
+            raise ValueError(f"Failed to save vibe collection: {str(e)}")
+        
+        return collection
+    
     def _call_encode_api(self, image_bytes: bytes, strength: float, model: str) -> str:
         """Call NovelAI encode-vibe endpoint.
         
