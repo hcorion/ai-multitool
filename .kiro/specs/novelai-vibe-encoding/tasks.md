@@ -69,7 +69,12 @@
   - Pass reference_strength_multiple and reference_image_multiple arrays to NovelAI API
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
 
-- [ ] 5. Create vibe preview generation system
+- [x] 5. Create vibe preview generation system
+
+
+
+
+
   - Implement VibePreviewGenerator class with fixed seed (42) and prompt ("1girl, portrait, simple background")
   - Generate 25 preview images (5 encoding × 5 reference strengths) at 512x768 resolution
   - Add progress callback support for preview generation phase (25 steps)
@@ -77,11 +82,15 @@
   - Store preview image paths in VibeCollection.preview_images dict
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6_
 
-- [ ] 5.1 Write property test for preview image dimensions
+- [x] 5.1 Write property test for preview image dimensions
+
+
   - **Property 4: Preview image dimensions**
   - **Validates: Requirements 2.4**
 
-- [ ] 5.2 Write property test for preview file completeness
+- [x] 5.2 Write property test for preview file completeness
+
+
   - **Property 5: Preview file completeness**
   - **Validates: Requirements 2.5, 2.6**
 
