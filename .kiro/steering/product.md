@@ -1,42 +1,31 @@
 # AI Multitool
 
-A web-based frontend for interacting with multiple AI image generation services including OpenAI's GPT-Image-1, StabilityAI's Stable Diffusion, and NovelAI's image generation models.
+Web frontend for AI image generation (OpenAI, StabilityAI, NovelAI) and chat (GPT-5 via Responses API).
 
-## Core Features
-
-- **Multi-provider image generation**: Supports OpenAI, StabilityAI, and NovelAI backends with unified API
-- **Advanced image operations**: Text-to-image generation, inpainting, and img2img transformations
-- **Multi-character prompt system**: NovelAI-specific character-based prompt management with individual positive/negative prompts
-- **Dynamic prompt system**: Template-based prompts with randomization and user-specific customization
-- **Grid generation**: Batch image generation with different prompt variations
-- **Image gallery**: Browse and manage generated images with comprehensive metadata
-- **Chat interface**: OpenAI Responses API integration with GPT-5 model for conversational AI
-- **Auto-generated conversation titles**: Automatic title generation for chat conversations using gpt-5-nano
-- **Image sharing**: Share generated images and conversations via URLs
-
-## Key Capabilities
+## Features
 
 ### Image Generation
-- Text-to-image generation with various quality and style options
-- **Inpainting operations**: Edit specific regions of images using mask-based editing (OpenAI and NovelAI)
-- **Img2img transformations**: Transform existing images with new prompts (NovelAI)
-- Negative prompting support for StabilityAI and NovelAI
-- **Character-specific prompts**: Multi-character prompt system for NovelAI with individual character control
-- Image upscaling for supported providers
-- Prompt metadata preservation with character prompt tracking
-- **Unified image API**: Structured request/response system with proper error handling
+- Multi-provider support with unified `/image` API
+- Text-to-image, inpainting, img2img operations
+- Multi-character prompts (NovelAI)
+- Dynamic prompt templates with randomization and follow-up options
+- Grid generation for batch variations
+- Metadata preservation and gallery browsing
 
-### Chat & Conversation Management
-- **OpenAI Responses API**: Modern API integration with gpt-5 model for enhanced reasoning
-- Real-time streaming chat responses with proper event handling
-- **Local conversation management**: Thread-based conversation storage with response ID tracking
-- **Automatic conversation titles**: AI-generated conversation titles using o3-mini model
-- Conversation sharing and persistence
-- User session management with personalized conversation storage
+### Chat
+- GPT-5 streaming via Responses API
+- Local conversation storage with auto-generated titles
+- Web search integration and reasoning inspection modal
+- Agent presets with configurable tools and reasoning levels
 
-### User Experience
-- **Provider-specific interfaces**: Dynamic UI adaptation based on selected image generation provider
-- **Character prompt management**: Add/remove character prompts with visual indicators and validation
-- **Advanced metadata display**: Comprehensive image metadata with character prompt differentiation
-- **Copy prompt functionality**: Transfer image metadata back to generation interface including character prompts
-- **Diff highlighting**: Visual comparison between original and processed prompts
+### Inpainting Canvas
+- Full-featured mask editor with brush tools
+- Zoom/pan controls and undo/redo history
+- Web worker-based mask processing
+- Mask save/load functionality
+
+### UI
+- Provider-specific form interfaces
+- Prompt diff highlighting (original vs processed)
+- Copy image metadata back to generation form
+- Dynamic prompt file editor

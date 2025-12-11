@@ -1,101 +1,74 @@
 # Project Structure
 
-## Code Organization Principles
+## Organization Principles
 
-### Separation of Concerns
-- **Keep route handlers thin**: Delegate business logic to service functions
-- **Separate data access**: Use manager classes for file operations and data persistence
-- **Isolate presentation**: Keep data transformation separate from HTTP response construction
-- **Modular frontend**: Separate DOM manipulation from business logic
+- **Thin route handlers**: Delegate to service functions
+- **Flat over deep**: Prefer composition over inheritance
+- **Explicit over clever**: Clear code beats clever abstractions
+- **Don't over-split**: Jumping between files increases cognitive load
 
-### Abstraction Guidelines
-- **Prefer duplication over wrong abstraction**: Don't extract until you have 3+ identical use cases
-- **Flat over deep**: Avoid deep inheritance hierarchies; prefer composition
-- **Explicit over clever**: Clear, straightforward code beats clever abstractions
-- **Measure by cognitive load**: Code should be easy to understand, not just follow rules
+## Key Files
 
-### Function Design
-- **Tell a clear story**: A long function with clear flow is better than artificially split functions
-- **Single responsibility**: But don't over-split - jumping between files increases cognitive load
-- **Synchronous by default**: Only use async when genuinely needed for performance
-- **Avoid premature generalization**: Solve specific problems; generalize only when needed
+### Root
+- `app.py` - Flask app with all endpoints
+- `image_models.py` - Pydantic models for image API
+- `novelai_client.py` - NovelAI API client
+- `dynamic_prompts.py` - Template-based prompt system with follow-up state
+- `tool_framework.py` - Agent tool registry and executor
+- `error_handlers.py` - Standardized error response creation
+- `file_manager_utils.py` - User file management utilities
+- `utils.py` - Shared utilities
 
-## Root Level
-- `app.py` - Main Flask application with unified image API and Responses API chat integration
-- `image_models.py` - Pydantic data models for unified image generation API
-- `novelai_client.py` - Dedicated NovelAI API client for all image operations
-- `dynamic_prompts.py` - Dynamic prompt system with multi-character prompt support
-- `utils.py` - Utility functions (stop word removal, text processing)
-- `secret-key.txt` - Auto-generated Flask session secret (gitignored)
-
-## Frontend Source (`src/`)
-- `chat.ts` - Chat functionality and message handling
-- `script.ts` - Main frontend logic, event handlers, and UI interactions
+### Frontend (`src/`)
+- `script.ts` - Main UI logic and image generation
+- `chat.ts` - Chat functionality with streaming
+- `agent-presets.ts` / `agent-preset-ui.ts` - Agent preset management
+- `error-handler.ts` - Frontend error handling
 - `share.ts` - Sharing functionality
-- `utils.ts` - Frontend utility functions
+- `dom_utils.ts` / `utils.ts` - Utility functions
 
-## Templates (`templates/`)
+### Inpainting (`src/inpainting/`)
+- `inpainting-mask-canvas.ts` - Main canvas orchestrator
+- `canvas-manager.ts` - Canvas rendering
+- `brush-engine.ts` - Brush drawing logic
+- `input-engine.ts` - Mouse/touch input handling
+- `zoom-pan-controller.ts` - Zoom and pan controls
+- `history-manager.ts` - Undo/redo support
+- `mask-file-manager.ts` - Mask save/load
+- `worker-manager.ts` / `mask-worker.ts` - Web worker processing
+
+### Templates (`templates/`)
 - `index.html` - Main application interface
 - `login.html` - User login page
-- `result-section.html` - Image generation results partial
 - `share.html` - Shared content display
+- `result-section.html` - Image results partial
 
-## Static Assets (`static/`)
-- `css/` - Compiled CSS from Sass with character prompt styling
-- `sass/` - Sass source files with responsive design for multi-character interface
-- `js/` - Compiled TypeScript output with unified image API integration
-- `images/` - User-generated images with comprehensive metadata including character prompts
-- `prompts/` - User-specific dynamic prompt files
-- `chats/` - Local conversation storage with response ID tracking and auto-generated titles
-- `assets/` - Static assets and resources
+### Sass (`static/sass/`)
+- `style.scss` - Main stylesheet
+- `_inpainting-mask-canvas.scss` - Inpainting canvas styles
+- Compiles to `static/css/`
 
-## Testing Structure (`tests/`)
-- `tests/` - Unit tests for core functionality
-- `tests/integration/` - Integration tests with real API calls
-- `conftest.py` - Shared fixtures and test configuration
-- Test files organized by module: `test_app.py`, `test_novelai_client.py`, `test_image_models.py`
+### Tools (`tools/`)
+- `calculator_tool.py` - Example agent tool implementation
 
-### JavaScript Testing Pattern
-- **Selenium-based Testing**: JavaScript functionality tested using Selenium WebDriver in real Chrome browser
-- **Python Test Generators**: Python test files generate and execute JavaScript test code dynamically
-- **Canvas and DOM Testing**: Full browser environment for testing complex frontend interactions
-- **Module Import Testing**: Tests use ES module dynamic imports to load compiled TypeScript modules
-- **Promise-based Execution**: JavaScript tests return promises for async validation in Python
-- **Examples**: `test_brush_engine.py`, `test_canvas_manager.py`, `test_input_engine.py`, `test_mask_overlay.py`
-
-## Configuration Files
-- `tsconfig.json` - TypeScript compiler configuration
-- `package.json` - Frontend dependencies
-- `Pipfile` - Python dependencies
-- `ruff.toml` - Python linting configuration
-- `.prettierrc` - Code formatting rules
-- `.env` / `.env.local` - Environment variables (gitignored)
+### Static (`static/`)
+- `js/` - Compiled TypeScript
+- `css/` - Compiled Sass
+- `images/{username}/` - Generated images with metadata
+- `prompts/{username}/` - User prompt template files
+- `chats/{username}.json` - Conversation storage
 
 ## Conventions
 
-### File Organization
-- User-specific content stored under `static/{type}/{username}/`
-- Generated images include metadata and thumbnails
-- Chat conversations stored as JSON files
+### Naming
+- Python: `snake_case`
+- TypeScript: `camelCase` functions, `PascalCase` types
+- Images: `{sequence}-{prompt}.png` with `.thumb.jpg`
 
-### Naming Patterns
-- Python files use snake_case
-- TypeScript files use camelCase for functions, PascalCase for types
-- Generated images: `{sequence}-{cleaned_prompt}.png`
-- Thumbnails: `{sequence}-{cleaned_prompt}.thumb.jpg`
-
-### Code Organization
-- **Flask routes**: Unified `/image` endpoint for all image operations, `/chat` for streaming responses
-- **TypeScript modules**: Provider-specific UI logic with character prompt management
-- **Image processing**: Structured request/response objects with comprehensive error handling
-- **API clients**: Dedicated client classes (NovelAIClient, ResponsesAPIClient) with proper abstraction
-- **Data models**: Pydantic models for type safety and validation across all operations
-- **Conversation management**: Local thread storage with ConversationManager class and response ID tracking
-
-### Advanced Features
-- **Multi-character prompts**: Character-specific positive/negative prompts for NovelAI
-- **Inpainting operations**: Mask-based image editing with provider-specific processing
-- **Img2img transformations**: Image-to-image generation with strength parameters
-- **Auto-generated titles**: AI-powered conversation title generation using gpt-5-nano
-- **Diff highlighting**: Visual comparison between original and processed prompts
-- **Metadata preservation**: Comprehensive image metadata including character prompt tracking
+### API Endpoints
+- `/image` - Unified image generation (generate, inpaint, img2img)
+- `/chat` - Streaming chat with conversation management
+- `/chat/reasoning/{id}/{index}` - Reasoning data retrieval
+- `/agents` - Agent preset CRUD
+- `/prompt-files` - Dynamic prompt file management
+- `/save-mask` - Inpainting mask upload
