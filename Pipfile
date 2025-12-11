@@ -15,6 +15,7 @@ pydantic = "*"
 pytest = "*"
 pytest-dotenv = "*"
 selenium = "*"
+hypothesis = "*"
 
 [dev-packages]
 ruff = "*"
