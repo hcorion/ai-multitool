@@ -1406,3 +1406,171 @@ class TestNovelAIVibeEncoding:
             
             assert "reference_image_multiple" not in params
             assert "reference_strength_multiple" not in params
+    
+    def test_generate_inpaint_image_with_vibes(self):
+        """Test that generate_inpaint_image correctly handles vibe parameters."""
+        # Create test vibes
+        vibes = [
+            VibeReference(encoded_data="vibe_data_1", reference_strength=0.8),
+            VibeReference(encoded_data="vibe_data_2", reference_strength=0.6)
+        ]
+        
+        # Create a mock ZIP file with image data
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w') as zip_file:
+            zip_file.writestr("image.png", b"fake inpaint image data")
+        zip_content = zip_buffer.getvalue()
+        
+        client = NovelAIClient("test-key")
+        
+        with patch.object(client, '_make_request') as mock_request:
+            with patch.object(client, '_process_novelai_mask', return_value=b"processed_mask"):
+                mock_response = Mock()
+                mock_response.content = zip_content
+                mock_request.return_value = mock_response
+                
+                result = client.generate_inpaint_image(
+                    base_image=b"base_image_data",
+                    mask=b"mask_data", 
+                    prompt="test inpaint prompt",
+                    vibes=vibes
+                )
+                
+                assert result == b"fake inpaint image data"
+                
+                # Verify the request payload structure
+                mock_request.assert_called_once()
+                call_args = mock_request.call_args
+                endpoint, payload = call_args[0]
+                
+                assert endpoint == "ai/generate-image"
+                assert payload["action"] == "infill"
+                assert payload["model"] == "nai-diffusion-4-5-full-inpainting"
+                
+                # Verify vibe parameters are correctly structured
+                params = payload["parameters"]
+                assert "reference_image_multiple" in params
+                assert "reference_strength_multiple" in params
+                
+                # Verify arrays have equal lengths matching number of vibes
+                ref_images = params["reference_image_multiple"]
+                ref_strengths = params["reference_strength_multiple"]
+                
+                assert len(ref_images) == len(vibes)
+                assert len(ref_strengths) == len(vibes)
+                assert len(ref_images) == len(ref_strengths)
+                
+                # Verify content matches input vibes
+                for i, vibe in enumerate(vibes):
+                    assert ref_images[i] == vibe.encoded_data
+                    assert ref_strengths[i] == vibe.reference_strength
+    
+    def test_generate_inpaint_image_vibe_count_constraint(self):
+        """Test that generate_inpaint_image enforces vibe count constraints (1-4 vibes)."""
+        client = NovelAIClient("test-key")
+        
+        with patch.object(client, '_process_novelai_mask', return_value=b"processed_mask"):
+            # Test with 0 vibes (empty list)
+            with pytest.raises(ValueError, match="Number of vibes must be between 1 and 4"):
+                client.generate_inpaint_image(
+                    base_image=b"base_image_data",
+                    mask=b"mask_data",
+                    prompt="test prompt",
+                    vibes=[]
+                )
+            
+            # Test with more than 4 vibes
+            too_many_vibes = [
+                VibeReference(encoded_data=f"vibe_{i}", reference_strength=0.5)
+                for i in range(5)
+            ]
+            
+            with pytest.raises(ValueError, match="Number of vibes must be between 1 and 4"):
+                client.generate_inpaint_image(
+                    base_image=b"base_image_data",
+                    mask=b"mask_data",
+                    prompt="test prompt",
+                    vibes=too_many_vibes
+                )
+    
+    def test_generate_img2img_image_with_vibes(self):
+        """Test that generate_img2img_image correctly handles vibe parameters."""
+        # Create test vibes
+        vibes = [
+            VibeReference(encoded_data="vibe_data_1", reference_strength=0.9),
+            VibeReference(encoded_data="vibe_data_2", reference_strength=0.7),
+            VibeReference(encoded_data="vibe_data_3", reference_strength=0.5)
+        ]
+        
+        # Create a mock ZIP file with image data
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w') as zip_file:
+            zip_file.writestr("image.png", b"fake img2img image data")
+        zip_content = zip_buffer.getvalue()
+        
+        client = NovelAIClient("test-key")
+        
+        with patch.object(client, '_make_request') as mock_request:
+            mock_response = Mock()
+            mock_response.content = zip_content
+            mock_request.return_value = mock_response
+            
+            result = client.generate_img2img_image(
+                base_image=b"base_image_data",
+                prompt="test img2img prompt",
+                vibes=vibes
+            )
+            
+            assert result == b"fake img2img image data"
+            
+            # Verify the request payload structure
+            mock_request.assert_called_once()
+            call_args = mock_request.call_args
+            endpoint, payload = call_args[0]
+            
+            assert endpoint == "ai/generate-image"
+            assert payload["action"] == "img2img"
+            assert payload["model"] == "nai-diffusion-4-5-full"
+            
+            # Verify vibe parameters are correctly structured
+            params = payload["parameters"]
+            assert "reference_image_multiple" in params
+            assert "reference_strength_multiple" in params
+            
+            # Verify arrays have equal lengths matching number of vibes
+            ref_images = params["reference_image_multiple"]
+            ref_strengths = params["reference_strength_multiple"]
+            
+            assert len(ref_images) == len(vibes)
+            assert len(ref_strengths) == len(vibes)
+            assert len(ref_images) == len(ref_strengths)
+            
+            # Verify content matches input vibes
+            for i, vibe in enumerate(vibes):
+                assert ref_images[i] == vibe.encoded_data
+                assert ref_strengths[i] == vibe.reference_strength
+    
+    def test_generate_img2img_image_vibe_count_constraint(self):
+        """Test that generate_img2img_image enforces vibe count constraints (1-4 vibes)."""
+        client = NovelAIClient("test-key")
+        
+        # Test with 0 vibes (empty list)
+        with pytest.raises(ValueError, match="Number of vibes must be between 1 and 4"):
+            client.generate_img2img_image(
+                base_image=b"base_image_data",
+                prompt="test prompt",
+                vibes=[]
+            )
+        
+        # Test with more than 4 vibes
+        too_many_vibes = [
+            VibeReference(encoded_data=f"vibe_{i}", reference_strength=0.5)
+            for i in range(5)
+        ]
+        
+        with pytest.raises(ValueError, match="Number of vibes must be between 1 and 4"):
+            client.generate_img2img_image(
+                base_image=b"base_image_data",
+                prompt="test prompt",
+                vibes=too_many_vibes
+            )

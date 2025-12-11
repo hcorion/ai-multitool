@@ -447,6 +447,7 @@ class NovelAIClient:
         scale: float = 6.0,
         variety: bool = False,
         character_prompts: list[dict[str, str]] | None = None,
+        vibes: list[VibeReference] | None = None,
         **kwargs,
     ) -> bytes:
         """
@@ -464,6 +465,7 @@ class NovelAIClient:
             scale: CFG scale for prompt adherence
             variety: Enable variety mode for more diverse outputs
             character_prompts: List of character-specific prompts
+            vibes: List of vibe references to apply to generation
             **kwargs: Additional parameters for the generation
 
         Returns:
@@ -494,6 +496,20 @@ class NovelAIClient:
             character_prompts=character_prompts,
             **kwargs,
         )
+
+        # Validate and add vibe parameters if vibes are provided
+        if vibes is not None:
+            # Validate vibe count (1-4 vibes allowed)
+            if len(vibes) < 1 or len(vibes) > 4:
+                raise ValueError("Number of vibes must be between 1 and 4")
+            
+            # Extract vibe data and reference strengths
+            reference_image_multiple = [vibe.encoded_data for vibe in vibes]
+            reference_strength_multiple = [vibe.reference_strength for vibe in vibes]
+            
+            # Add vibe parameters to the request
+            parameters["reference_image_multiple"] = reference_image_multiple
+            parameters["reference_strength_multiple"] = reference_strength_multiple
 
         # Add image and mask to parameters structure
         parameters["image"] = base_image_b64
@@ -530,6 +546,7 @@ class NovelAIClient:
         scale: float = 6.0,
         variety: bool = False,
         character_prompts: list[dict[str, str]] | None = None,
+        vibes: list[VibeReference] | None = None,
         **kwargs,
     ) -> bytes:
         """
@@ -547,6 +564,7 @@ class NovelAIClient:
             scale: CFG scale for prompt adherence
             variety: Enable variety mode for more diverse outputs
             character_prompts: List of character-specific prompts
+            vibes: List of vibe references to apply to generation
             **kwargs: Additional parameters for the generation
 
         Returns:
@@ -573,6 +591,20 @@ class NovelAIClient:
             character_prompts=character_prompts,
             **kwargs,
         )
+
+        # Validate and add vibe parameters if vibes are provided
+        if vibes is not None:
+            # Validate vibe count (1-4 vibes allowed)
+            if len(vibes) < 1 or len(vibes) > 4:
+                raise ValueError("Number of vibes must be between 1 and 4")
+            
+            # Extract vibe data and reference strengths
+            reference_image_multiple = [vibe.encoded_data for vibe in vibes]
+            reference_strength_multiple = [vibe.reference_strength for vibe in vibes]
+            
+            # Add vibe parameters to the request
+            parameters["reference_image_multiple"] = reference_image_multiple
+            parameters["reference_strength_multiple"] = reference_strength_multiple
 
         payload = {
             "action": NovelAIAction.IMG2IMG.value,
