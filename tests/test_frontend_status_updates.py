@@ -2,14 +2,8 @@
 Test frontend status updates using Selenium WebDriver.
 """
 
-import json
-import time
-from unittest.mock import Mock, patch
-
 import pytest
 from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
 

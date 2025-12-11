@@ -1,8 +1,5 @@
 """Integration tests for chat endpoint tool integration."""
 
-import json
-from unittest.mock import Mock, patch
-
 import pytest
 
 from tool_framework import ToolExecutor, ToolRegistry

@@ -160,7 +160,7 @@ class TestFollowUpPromptFileErrorHandling:
         """Test parsing completely empty file"""
         # Requirement 5.4: Should handle empty files gracefully
         file_path = os.path.join(temp_dir, "empty.txt")
-        with open(file_path, "w") as f:
+        with open(file_path, "w"):
             pass  # Create empty file
         
         result = parse_followup_file(file_path)

@@ -527,8 +527,6 @@ class TestGridGeneration:
             
             # Verify that the handler was called with the correct request
             assert mock_handler.call_count == 1
-            call_args = mock_handler.call_args_list[0]
-            request_obj = call_args[0][0]
             
             # The individual image should have been created with enhanced metadata
             # We can't directly access it here, but we know the keys should be correct
