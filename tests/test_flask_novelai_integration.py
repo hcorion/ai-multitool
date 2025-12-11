@@ -153,7 +153,7 @@ class TestFlaskNovelAIIntegration:
         # Should return 401 for unauthenticated
         assert response.status_code == 401
         data = response.get_json()
-        assert data['error'] == 'Not authenticated'
+        assert data['error_message'] == 'Authentication required'
 
     @patch("app.generate_novelai_image")
     def test_index_post_novelai_missing_prompt(self, mock_generate_novelai, client, logged_in_session):
@@ -168,7 +168,7 @@ class TestFlaskNovelAIIntegration:
         # Verify error response
         assert response.status_code == 400
         data = response.get_json()
-        assert "Prompt cannot be empty" in data['error']
+        assert "Prompt cannot be empty" in data['error_message']
 
         # Verify generate_novelai_image was not called
         mock_generate_novelai.assert_not_called()

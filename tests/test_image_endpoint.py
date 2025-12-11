@@ -101,7 +101,7 @@ class TestImageEndpoint:
         assert data['provider'] == 'openai'
         assert data['operation'] == 'inpaint'
     
-    @patch('app.novelai_api_key', 'test-api-key')
+    @patch('app.NOVELAI_API_KEY', 'test-api-key')
     @patch('app.os.path.exists')
     @patch('app.generate_novelai_img2img_image')
     @patch('builtins.open', new_callable=mock_open, read_data=b'fake_image_data')

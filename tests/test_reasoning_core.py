@@ -107,6 +107,7 @@ class TestStreamEventProcessor:
             "timestamp": 0,
             "response_id": "",
             "web_searches": [],
+            "tool_outputs": [],
             "message_data": None,
         }
         assert processor.current_response_id == "resp_123"
@@ -658,7 +659,7 @@ class TestReasoningAPIEndpoint:
 
         assert response.status_code == 401
         response_data = json.loads(response.data)
-        assert response_data["error"] == "Authentication required"
+        assert response_data["error_message"] == "Authentication required"
 
     def test_get_reasoning_data_conversation_not_found(
         self, client, setup_conversation_with_reasoning

@@ -34,7 +34,7 @@ class TestGridGeneration:
         data = json.loads(response.data)
         assert data['name'] == 'colors'
         assert data['content'] == ['red', 'blue', 'green', 'yellow']
-        assert data['line_count'] == 4
+        assert len(data['content']) == 4
 
     def test_get_nonexistent_prompt_file(self, client):
         """Test getting a non-existent prompt file."""
@@ -42,8 +42,8 @@ class TestGridGeneration:
         assert response.status_code == 404
         
         data = json.loads(response.data)
-        assert 'error' in data
-        assert 'not found' in data['error'].lower()
+        assert 'error_message' in data
+        assert 'not found' in data['error_message'].lower()
 
     def test_get_prompt_file_invalid_filename(self, client):
         """Test getting a prompt file with invalid filename."""
@@ -51,8 +51,8 @@ class TestGridGeneration:
         assert response.status_code == 400
         
         data = json.loads(response.data)
-        assert 'error' in data
-        assert 'invalid filename' in data['error'].lower()
+        assert 'error_message' in data
+        assert 'invalid filename' in data['error_message'].lower()
 
     @patch('app._handle_generation_request')
     def test_grid_generation_via_unified_endpoint(self, mock_handler, client):
@@ -549,5 +549,5 @@ class TestGridGeneration:
             assert response.status_code == 401
             
             data = json.loads(response.data)
-            assert 'error' in data
-            assert 'not authenticated' in data['error'].lower()
+            assert 'error_message' in data
+            assert 'authentication required' in data['error_message'].lower()

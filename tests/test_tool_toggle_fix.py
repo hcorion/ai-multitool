@@ -8,6 +8,7 @@ from selenium.webdriver.support import expected_conditions as EC
 import time
 
 
+@pytest.mark.skip(reason="Requires running Flask server - manual test only")
 class TestToolToggleFix:
     """Test tool toggle functionality in agent preset modal."""
 

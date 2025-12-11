@@ -11,6 +11,7 @@ from selenium.common.exceptions import TimeoutException
 import time
 
 
+@pytest.mark.skip(reason="Requires running Flask server - manual test only")
 class TestToolConfigurationUI:
     """Test tool configuration UI functionality."""
 

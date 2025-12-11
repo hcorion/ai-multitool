@@ -206,5 +206,5 @@ class TestReasoningAPIEnhancement:
         response = client.get('/chat/reasoning/test_conv/0')
         assert response.status_code == 401
         data = json.loads(response.data)
-        assert 'error' in data
-        assert data['error'] == 'Authentication required'
+        assert 'error_message' in data
+        assert data['error_message'] == 'Authentication required'

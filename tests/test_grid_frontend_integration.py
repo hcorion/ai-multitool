@@ -13,6 +13,7 @@ from selenium.webdriver.chrome.options import Options
 import time
 
 
+@pytest.mark.skip(reason="Requires running Flask server - manual test only")
 class TestGridFrontendIntegration:
     """Test grid generation frontend integration."""
 

@@ -10,6 +10,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
 
 
+@pytest.mark.skip(reason="Requires running Flask server - manual test only")
 class TestInpaintButtonIntegration:
     @pytest.fixture
     def driver(self):

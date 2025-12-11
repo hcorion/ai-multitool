@@ -224,4 +224,4 @@ class TestChatToolIntegration:
             (t for t in tools if t.get("type") == "function"), None
         )
         assert calculator_tool is not None
-        assert calculator_tool["function"]["name"] == "calculator"
+        assert calculator_tool["name"] == "calculator"

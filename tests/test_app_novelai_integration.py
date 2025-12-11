@@ -15,7 +15,7 @@ from novelai_client import NovelAIAPIError, NovelAIClientError
 class TestGenerateNovelAIImageRefactored:
     """Test cases for the refactored generate_novelai_image function."""
 
-    @patch("app.novelai_api_key", "test-api-key")
+    @patch("app.NOVELAI_API_KEY", "test-api-key")
     @patch("app.make_prompt_dynamic")
     @patch("app.process_image_response")
     @patch("app.NovelAIClient")
@@ -68,7 +68,7 @@ class TestGenerateNovelAIImageRefactored:
         assert result.prompt == "test prompt"
         assert result.image_name == "image.png"
 
-    @patch("app.novelai_api_key", "test-api-key")
+    @patch("app.NOVELAI_API_KEY", "test-api-key")
     @patch("app.make_prompt_dynamic")
     @patch("app.make_character_prompts_dynamic")
     @patch("app.process_image_response")
@@ -116,7 +116,7 @@ class TestGenerateNovelAIImageRefactored:
 
         # Verify character prompts were processed
         mock_make_char_prompts.assert_called_once_with(
-            character_prompts, "testuser", "/test/static", 0, None
+            character_prompts, "testuser", "/test/static", 0, None, {}
         )
 
         # Verify client was called with processed character prompts
@@ -144,7 +144,7 @@ class TestGenerateNovelAIImageRefactored:
         assert "Character 2 Prompt" in metadata
         assert metadata["Character 2 Prompt"] == "char 2 prompt"
 
-    @patch("app.novelai_api_key", "test-api-key")
+    @patch("app.NOVELAI_API_KEY", "test-api-key")
     @patch("app.make_prompt_dynamic")
     @patch("app.process_image_response")
     @patch("app.NovelAIClient")
@@ -186,7 +186,7 @@ class TestGenerateNovelAIImageRefactored:
         # The file_bytes should be a BytesIO object containing the upscaled data
         assert process_args[0].read() == b"upscaled image data"
 
-    @patch("app.novelai_api_key", None)
+    @patch("app.NOVELAI_API_KEY", None)
     def test_generate_novelai_image_no_api_key(self):
         """Test that missing API key raises appropriate error."""
         with pytest.raises(ValueError, match="NovelAI API key not configured"):
@@ -210,7 +210,7 @@ class TestGenerateNovelAIImageRefactored:
                     size=(512, 512),
                 )
 
-    @patch("app.novelai_api_key", "test-api-key")
+    @patch("app.NOVELAI_API_KEY", "test-api-key")
     @patch("app.make_prompt_dynamic")
     @patch("app.NovelAIClient")
     def test_generate_novelai_image_api_error(
@@ -238,7 +238,7 @@ class TestGenerateNovelAIImageRefactored:
                     size=(512, 512),
                 )
 
-    @patch("app.novelai_api_key", "test-api-key")
+    @patch("app.NOVELAI_API_KEY", "test-api-key")
     @patch("app.make_prompt_dynamic")
     @patch("app.NovelAIClient")
     def test_generate_novelai_image_client_error(
@@ -266,7 +266,7 @@ class TestGenerateNovelAIImageRefactored:
                     size=(512, 512),
                 )
 
-    @patch("app.novelai_api_key", "test-api-key")
+    @patch("app.NOVELAI_API_KEY", "test-api-key")
     @patch("app.make_prompt_dynamic")
     @patch("app.make_character_prompts_dynamic")
     def test_generate_novelai_image_character_prompt_error(

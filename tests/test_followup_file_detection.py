@@ -193,5 +193,5 @@ class TestFollowUpFileAPI:
         assert response.status_code == 401
         
         data = response.get_json()
-        assert 'error' in data
-        assert 'Not authenticated' in data['error']
+        assert 'error_message' in data
+        assert 'Authentication required' in data['error_message']
