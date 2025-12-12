@@ -244,6 +244,14 @@ export class VibeSelectionModal {
     }
     
     /**
+     * Convert a full resolution PNG path to a thumbnail JPG path
+     */
+    private toThumbnailPath(pngPath: string): string {
+        // Convert /path/to/preview.png to /path/to/preview.thumb.jpg
+        return pngPath.replace(/\.png$/, '.thumb.jpg');
+    }
+    
+    /**
      * Create a DOM element for a vibe collection
      */
     private createCollectionElement(collection: VibeCollection): HTMLElement {
@@ -255,9 +263,12 @@ export class VibeSelectionModal {
         const compatibilityClass = isCompatible ? 'compatible' : 'incompatible';
         const compatibilityIcon = isCompatible ? '✓' : '⚠️';
         
+        // Use thumbnail for the grid display
+        const thumbnailPath = this.toThumbnailPath(collection.preview_image);
+        
         element.innerHTML = `
             <div class="vibe-collection-preview">
-                <img src="${collection.preview_image}" alt="${collection.name}" class="vibe-thumbnail">
+                <img src="${thumbnailPath}" alt="${collection.name}" class="vibe-thumbnail">
                 <div class="vibe-collection-overlay ${compatibilityClass}">
                     <span class="compatibility-icon">${compatibilityIcon}</span>
                 </div>

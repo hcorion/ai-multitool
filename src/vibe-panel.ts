@@ -335,7 +335,16 @@ export class VibePanel {
     }
     
     /**
+     * Convert a full resolution PNG path to a thumbnail JPG path
+     */
+    private toThumbnailPath(pngPath: string): string {
+        // Convert /path/to/preview.png to /path/to/preview.thumb.jpg
+        return pngPath.replace(/\.png$/, '.thumb.jpg');
+    }
+    
+    /**
      * Get the preview image path for a vibe based on its current strength settings
+     * Returns the thumbnail JPG for smaller display in the vibe list
      */
     private getPreviewImagePath(vibe: SelectedVibe): string {
         if (!vibe.preview_paths) {
@@ -348,7 +357,9 @@ export class VibePanel {
         const refStrengthStr = this.formatStrengthForKey(closestRefStrength);
         const previewKey = `enc${encStrengthStr}_ref${refStrengthStr}`;
         
-        return vibe.preview_paths[previewKey] || '';
+        const fullPath = vibe.preview_paths[previewKey] || '';
+        // Use thumbnail for the vibe list display
+        return fullPath ? this.toThumbnailPath(fullPath) : '';
     }
     
     /**

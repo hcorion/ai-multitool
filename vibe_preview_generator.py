@@ -100,13 +100,13 @@ class VibePreviewGenerator:
                     preview_key = f"enc{enc_strength}_ref{ref_strength}"
                     collection.preview_images[preview_key] = web_image_path
                     
-                    # Notify progress with the generated thumbnail URL
+                    # Notify progress with the generated image URL (full resolution)
                     if progress_callback:
                         progress_callback(
                             step,
                             total_combinations,
                             f"Generated preview {enc_strength}x{ref_strength}",
-                            web_thumb_path
+                            web_image_path
                         )
                     
                 except (NovelAIAPIError, NovelAIClientError) as e:
