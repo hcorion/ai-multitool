@@ -84,41 +84,41 @@ export class VibeSelectionModal {
                             </div>
                         </div>
                         
-                        <div class="vibe-collections-grid" id="vibe-collections-grid">
-                            <!-- Vibe collections will be loaded here -->
-                        </div>
-                        
-                        <div class="vibe-selection-controls" id="vibe-selection-controls" style="display: none;">
-                            <div class="vibe-preview-section">
-                                <h3>Preview</h3>
-                                <img id="vibe-preview-image" class="vibe-preview-image" alt="Vibe preview">
+                        <div class="vibe-modal-layout">
+                            <div class="vibe-collections-grid" id="vibe-collections-grid">
+                                <!-- Vibe collections will be loaded here -->
                             </div>
                             
-                            <div class="vibe-strength-controls">
-                                <div class="strength-control">
-                                    <label for="encoding-strength-slider">Encoding Strength:</label>
-                                    <div class="discrete-slider">
-                                        <input type="range" id="encoding-strength-slider" min="0" max="4" step="1" value="4">
-                                        <div class="slider-labels">
-                                            <span>0.35</span>
-                                            <span>0.5</span>
-                                            <span>0.7</span>
-                                            <span>0.85</span>
-                                            <span>1.0</span>
+                            <div class="vibe-selection-controls" id="vibe-selection-controls" style="display: none;">
+                                <div class="vibe-preview-section">
+                                    <img id="vibe-preview-image" class="vibe-preview-image" alt="Vibe preview">
+                                    <div class="vibe-strength-overlay">
+                                        <div class="strength-control">
+                                            <label for="encoding-strength-slider">Encoding</label>
+                                            <div class="discrete-slider">
+                                                <input type="range" id="encoding-strength-slider" min="0" max="4" step="1" value="4">
+                                                <div class="slider-labels">
+                                                    <span>0.35</span>
+                                                    <span>0.5</span>
+                                                    <span>0.7</span>
+                                                    <span>0.85</span>
+                                                    <span>1.0</span>
+                                                </div>
+                                            </div>
+                                            <span id="encoding-strength-value">1.0</span>
+                                        </div>
+                                        
+                                        <div class="strength-control">
+                                            <label for="reference-strength-slider">Reference</label>
+                                            <input type="range" id="reference-strength-slider" min="0" max="1" step="0.01" value="1.0">
+                                            <span id="reference-strength-value">1.0</span>
                                         </div>
                                     </div>
-                                    <span id="encoding-strength-value">1.0</span>
                                 </div>
                                 
-                                <div class="strength-control">
-                                    <label for="reference-strength-slider">Reference Strength:</label>
-                                    <input type="range" id="reference-strength-slider" min="0" max="1" step="0.01" value="1.0">
-                                    <span id="reference-strength-value">1.0</span>
+                                <div class="vibe-validation-messages" id="vibe-validation-messages">
+                                    <!-- Validation messages will appear here -->
                                 </div>
-                            </div>
-                            
-                            <div class="vibe-validation-messages" id="vibe-validation-messages">
-                                <!-- Validation messages will appear here -->
                             </div>
                         </div>
                     </div>
