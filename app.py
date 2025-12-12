@@ -5778,29 +5778,43 @@ def get_vibe_progress(guid: str):
     username = session["username"]
     
     try:
-        # Check if collection exists
-        collection = vibe_storage_manager.load_collection(username, guid)
+        # Check progress tracker first (handles race condition where collection isn't created yet)
+        with vibe_progress_lock:
+            has_active_progress = guid in vibe_progress_tracker
         
-        if not collection:
-            return create_not_found_error(f"Vibe collection '{guid}' not found")
+        # If no active progress, check if collection exists
+        collection = None
+        if not has_active_progress:
+            collection = vibe_storage_manager.load_collection(username, guid)
+            if not collection:
+                return create_not_found_error(f"Vibe collection '{guid}' not found")
         
         def generate_progress_events():
             """Generate Server-Sent Events for real progress updates."""
             last_progress = None
+            max_wait_iterations = 20  # Wait up to 10 seconds for progress to start
+            wait_iterations = 0
             
             while True:
                 with vibe_progress_lock:
                     current_progress = vibe_progress_tracker.get(guid)
                 
-                # If no progress tracking, check if collection has previews (already complete)
+                # If no progress tracking yet, wait a bit for background thread to start
                 if not current_progress:
-                    if collection.preview_images:
-                        yield f"data: {json.dumps({'phase': 'complete', 'step': 25, 'total': 25, 'message': 'Vibe collection ready'})}\n\n"
+                    # Check if collection exists and has previews (already complete)
+                    coll = collection or vibe_storage_manager.load_collection(username, guid)
+                    if coll and coll.preview_images:
+                        yield f"data: {json.dumps({'phase': 'complete', 'step': 30, 'total': 30, 'message': 'Vibe collection ready', 'complete': True})}\n\n"
                         break
-                    else:
-                        # Collection exists but no progress tracking - might be old collection
-                        yield f"data: {json.dumps({'phase': 'unknown', 'message': 'Collection status unknown'})}\n\n"
+                    
+                    # Wait for progress tracking to start
+                    wait_iterations += 1
+                    if wait_iterations >= max_wait_iterations:
+                        yield f"data: {json.dumps({'phase': 'unknown', 'message': 'Progress tracking not available', 'error': 'Timeout waiting for progress'})}\n\n"
                         break
+                    
+                    time.sleep(0.5)
+                    continue
                 
                 # Send progress update if it changed
                 if current_progress != last_progress:

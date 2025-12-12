@@ -3274,5 +3274,311 @@ painting Section Styles */
     gap: 8px;
   }
 }
+.vibe-progress-modal-content {
+  max-width: 600px;
+  width: 90%;
+  background-color: #121212;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+.vibe-progress-modal-content .modal-header {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid #666666;
+}
+.vibe-progress-modal-content .modal-header h2 {
+  margin: 0;
+  color: #fff;
+  font-size: 1.3rem;
+}
+.vibe-progress-modal-content .modal-body {
+  padding: 25px;
+}
+.vibe-progress-modal-content .modal-footer {
+  display: flex;
+  justify-content: center;
+  padding: 15px 20px;
+  border-top: 1px solid #666666;
+}
+.vibe-progress-modal-content .modal-footer .btn {
+  padding: 10px 30px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.95rem;
+}
+.vibe-progress-modal-content .modal-footer .btn.btn-secondary {
+  background-color: rgba(102, 102, 102, 0.3);
+  color: #fff;
+}
+.vibe-progress-modal-content .modal-footer .btn.btn-secondary:hover {
+  background-color: rgba(102, 102, 102, 0.5);
+}
+
+.vibe-progress-info {
+  text-align: center;
+  margin-bottom: 20px;
+}
+.vibe-progress-info p {
+  margin: 0;
+  color: #fff;
+  font-size: 1rem;
+}
+
+.vibe-progress-bar-container {
+  margin-bottom: 20px;
+}
+.vibe-progress-bar-container .vibe-progress-bar {
+  height: 20px;
+  background-color: rgba(102, 102, 102, 0.3);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+.vibe-progress-bar-container .vibe-progress-bar .vibe-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #0a84ff, rgb(61, 157.6040816327, 255));
+  border-radius: 10px;
+  transition: width 0.3s ease;
+}
+.vibe-progress-bar-container .vibe-progress-text {
+  text-align: center;
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.vibe-progress-phases {
+  display: flex;
+  justify-content: space-around;
+  margin-bottom: 20px;
+  padding: 15px;
+  background-color: rgba(51, 51, 51, 0.3);
+  border-radius: 8px;
+}
+.vibe-progress-phases .vibe-phase {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  transition: all 0.3s ease;
+}
+.vibe-progress-phases .vibe-phase .phase-icon {
+  font-size: 1.2rem;
+}
+.vibe-progress-phases .vibe-phase .phase-label {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+.vibe-progress-phases .vibe-phase.pending {
+  opacity: 0.5;
+}
+.vibe-progress-phases .vibe-phase.active {
+  background-color: rgba(10, 132, 255, 0.2);
+}
+.vibe-progress-phases .vibe-phase.active .phase-label {
+  color: #fff;
+  font-weight: 500;
+}
+.vibe-progress-phases .vibe-phase.complete .phase-label {
+  color: #4caf50;
+}
+
+.vibe-preview-thumbnails {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 10px 0;
+  min-height: 80px;
+  background-color: rgba(51, 51, 51, 0.2);
+  border-radius: 6px;
+  padding: 10px;
+}
+.vibe-preview-thumbnails .vibe-progress-thumbnail {
+  width: 60px;
+  height: 80px;
+  object-fit: contain;
+  border-radius: 4px;
+  flex-shrink: 0;
+  border: 1px solid rgba(102, 102, 102, 0.3);
+  animation: fadeIn 0.3s ease;
+}
+.vibe-preview-thumbnails:empty::after {
+  content: "Preview thumbnails will appear here...";
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.85rem;
+  font-style: italic;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.vibe-progress-error {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 15px;
+  background-color: rgba(244, 67, 54, 0.1);
+  border: 1px solid rgba(244, 67, 54, 0.3);
+  border-radius: 6px;
+  margin-top: 15px;
+}
+.vibe-progress-error .error-icon {
+  font-size: 1.2rem;
+}
+.vibe-progress-error .error-message {
+  color: #f44336;
+  font-size: 0.9rem;
+}
+
+#generate-vibe-btn {
+  background-color: #9c27b0;
+  color: #fff;
+  border: none;
+  padding: 10px 20px;
+  font-size: 1rem;
+  cursor: pointer;
+  border-radius: 4px;
+  margin: 0;
+}
+#generate-vibe-btn:hover {
+  background-color: #7b1fa2;
+}
+#generate-vibe-btn:disabled {
+  background-color: rgba(156, 39, 176, 0.5);
+  cursor: not-allowed;
+}
+
+.vibe-confirm-dialog {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10001;
+}
+.vibe-confirm-dialog .vibe-confirm-content {
+  background-color: #121212;
+  border-radius: 8px;
+  padding: 25px;
+  max-width: 450px;
+  width: 90%;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+.vibe-confirm-dialog .vibe-confirm-content h3 {
+  margin: 0 0 15px 0;
+  color: #fff;
+  font-size: 1.2rem;
+}
+.vibe-confirm-dialog .vibe-confirm-content p {
+  margin: 0 0 10px 0;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+.vibe-confirm-dialog .vibe-confirm-content .warning-text {
+  color: #ff9800;
+  font-weight: 500;
+  background-color: rgba(255, 152, 0, 0.1);
+  padding: 10px;
+  border-radius: 4px;
+  margin: 15px 0;
+}
+.vibe-confirm-dialog .vibe-confirm-content .vibe-name-input {
+  width: 100%;
+  padding: 10px;
+  margin: 15px 0;
+  background-color: #333;
+  border: 1px solid #666666;
+  border-radius: 4px;
+  color: #fff;
+  font-size: 1rem;
+  box-sizing: border-box;
+}
+.vibe-confirm-dialog .vibe-confirm-content .vibe-name-input:focus {
+  outline: none;
+  border-color: #0a84ff;
+}
+.vibe-confirm-dialog .vibe-confirm-content .vibe-confirm-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+.vibe-confirm-dialog .vibe-confirm-content .vibe-confirm-buttons button {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.95rem;
+}
+.vibe-confirm-dialog .vibe-confirm-content .vibe-confirm-buttons button.btn-cancel {
+  background-color: rgba(102, 102, 102, 0.3);
+  color: #fff;
+}
+.vibe-confirm-dialog .vibe-confirm-content .vibe-confirm-buttons button.btn-cancel:hover {
+  background-color: rgba(102, 102, 102, 0.5);
+}
+.vibe-confirm-dialog .vibe-confirm-content .vibe-confirm-buttons button.btn-confirm {
+  background-color: #9c27b0;
+  color: #fff;
+}
+.vibe-confirm-dialog .vibe-confirm-content .vibe-confirm-buttons button.btn-confirm:hover {
+  background-color: #7b1fa2;
+}
+.vibe-confirm-dialog .vibe-confirm-content .vibe-confirm-buttons button.btn-confirm:disabled {
+  background-color: rgba(156, 39, 176, 0.5);
+  cursor: not-allowed;
+}
+
+.vibe-toast {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 15px 20px;
+  border-radius: 8px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+  z-index: 10002;
+  transform: translateX(120%);
+  transition: transform 0.3s ease;
+}
+.vibe-toast.show {
+  transform: translateX(0);
+}
+.vibe-toast .toast-icon {
+  font-size: 1.2rem;
+}
+.vibe-toast .toast-message {
+  font-size: 0.95rem;
+  color: #fff;
+}
+.vibe-toast.vibe-toast-success {
+  background-color: rgba(76, 175, 80, 0.95);
+  border-left: 4px solid #2e7d32;
+}
+.vibe-toast.vibe-toast-error {
+  background-color: rgba(244, 67, 54, 0.95);
+  border-left: 4px solid #c62828;
+}
 
 /*# sourceMappingURL=style.css.map */

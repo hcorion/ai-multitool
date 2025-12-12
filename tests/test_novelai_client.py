@@ -1267,20 +1267,22 @@ class TestNovelAIVibeEncoding:
         
         Test that encode_vibe method accepts valid parameters and makes correct API call.
         """
+        import base64
         client = NovelAIClient("test-key")
         
-        # Mock the API response
-        mock_response_data = {"encoded_data": "base64_encoded_vibe_data"}
+        # Mock the API response - NovelAI returns binary vibe data
+        mock_binary_vibe_data = b"binary_vibe_data_here"
+        expected_b64 = base64.b64encode(mock_binary_vibe_data).decode("ascii")
         
         with patch.object(client, '_make_request') as mock_request:
             mock_response = Mock()
-            mock_response.json.return_value = mock_response_data
+            mock_response.content = mock_binary_vibe_data
             mock_request.return_value = mock_response
             
             result = client.encode_vibe(image_bytes, information_extracted, model)
             
-            # Verify the result
-            assert result == "base64_encoded_vibe_data"
+            # Verify the result is base64 encoded binary data
+            assert result == expected_b64
             
             # Verify the API call was made correctly
             mock_request.assert_called_once()
@@ -1307,7 +1309,7 @@ class TestNovelAIVibeEncoding:
         vibes=st.lists(
             st.builds(
                 VibeReference,
-                encoded_data=st.text(min_size=1, max_size=100),
+                encoded_data=st.text(alphabet=st.characters(whitelist_categories=('L', 'N')), min_size=1, max_size=100),
                 reference_strength=st.floats(min_value=0.0, max_value=1.0)
             ),
             min_size=1,

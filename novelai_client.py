@@ -290,11 +290,14 @@ class NovelAIClient:
         
         response = self._make_request("ai/encode-vibe", payload)
         
-        try:
-            response_data = response.json()
-            return response_data.get("encoded_data", "")
-        except (json.JSONDecodeError, KeyError) as e:
-            raise NovelAIClientError(f"Failed to parse vibe encoding response: {str(e)}")
+        # NovelAI returns binary vibe data (application/binary), not JSON
+        # We need to base64 encode the raw binary response
+        if not response.content:
+            raise NovelAIClientError("Vibe encoding returned empty response")
+        
+        # Base64 encode the binary vibe data for storage/transmission
+        encoded_data = base64.b64encode(response.content).decode("ascii")
+        return encoded_data
 
     def generate_image(
         self,

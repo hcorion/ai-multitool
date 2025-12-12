@@ -5,6 +5,7 @@ import { getElementByIdSafe } from './dom_utils.js';
 import * as agentPresetUI from './agent-preset-ui.js';
 import { parseJQueryError, extractErrorMessage } from './error-handler.js';
 import { vibePanel } from './vibe-panel.js';
+import { vibeProgressModal } from './vibe-progress.js';
 document.addEventListener("DOMContentLoaded", () => {
     $("#loading-spinner").hide();
     $("#prompt-form").on("submit", (event) => {
@@ -849,6 +850,162 @@ function attachMetadataActions(metadataDiv, metadata) {
         closeGridModal();
         openInpaintingMaskCanvas(imageUrl, prompt, negativePrompt, characterPrompts);
     };
+    // Create or update Generate Vibe button
+    let generateVibeButton = document.getElementById("generate-vibe-btn");
+    if (!generateVibeButton) {
+        generateVibeButton = document.createElement("button");
+        generateVibeButton.id = "generate-vibe-btn";
+        generateVibeButton.textContent = "🎨 Generate Vibe";
+        buttonContainer.appendChild(generateVibeButton);
+    }
+    // Attach Generate Vibe action
+    generateVibeButton.onclick = () => {
+        const modalImage = document.getElementById("grid-modal-image");
+        const imageUrl = modalImage.src;
+        // Extract filename from URL
+        const fileName = imageUrl.split('/').pop() || '';
+        showVibeConfirmationDialog(fileName);
+    };
+}
+/**
+ * Show confirmation dialog for vibe generation with Anlas cost warning
+ */
+function showVibeConfirmationDialog(imageFileName) {
+    // Create confirmation dialog
+    const dialog = document.createElement('div');
+    dialog.className = 'vibe-confirm-dialog';
+    dialog.id = 'vibe-confirm-dialog';
+    dialog.innerHTML = `
+        <div class="vibe-confirm-content">
+            <h3>🎨 Generate Vibe Collection</h3>
+            <p>This will create a vibe collection from the selected image, encoding it at 5 different strength levels and generating 25 preview images.</p>
+            <div class="warning-text">
+                ⚠️ <strong>High Anlas Cost Warning:</strong> This operation will consume approximately 30 Anlas (5 encodings + 25 preview generations).
+            </div>
+            <p>Enter a name for your vibe collection:</p>
+            <input type="text" class="vibe-name-input" id="vibe-name-input" placeholder="My Vibe Collection" maxlength="100">
+            <div class="vibe-confirm-buttons">
+                <button class="btn-cancel" id="vibe-confirm-cancel">Cancel</button>
+                <button class="btn-confirm" id="vibe-confirm-proceed">Generate Vibe</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(dialog);
+    // Focus the name input
+    const nameInput = document.getElementById('vibe-name-input');
+    nameInput?.focus();
+    // Attach event listeners
+    const cancelBtn = document.getElementById('vibe-confirm-cancel');
+    const proceedBtn = document.getElementById('vibe-confirm-proceed');
+    cancelBtn?.addEventListener('click', () => {
+        dialog.remove();
+    });
+    // Close on click outside
+    dialog.addEventListener('click', (e) => {
+        if (e.target === dialog) {
+            dialog.remove();
+        }
+    });
+    // Close on Escape key
+    const escapeHandler = (e) => {
+        if (e.key === 'Escape') {
+            dialog.remove();
+            document.removeEventListener('keydown', escapeHandler);
+        }
+    };
+    document.addEventListener('keydown', escapeHandler);
+    // Handle Enter key in input
+    nameInput?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            proceedBtn?.click();
+        }
+    });
+    proceedBtn?.addEventListener('click', () => {
+        const vibeName = nameInput?.value.trim();
+        if (!vibeName) {
+            nameInput?.focus();
+            nameInput?.classList.add('error');
+            return;
+        }
+        // Remove dialog and start vibe generation
+        dialog.remove();
+        document.removeEventListener('keydown', escapeHandler);
+        startVibeGeneration(imageFileName, vibeName);
+    });
+}
+/**
+ * Start the vibe generation process
+ */
+async function startVibeGeneration(imageFileName, vibeName) {
+    try {
+        // Call the vibe encoding API
+        const response = await fetch('/vibes/encode', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                image_filename: imageFileName,
+                name: vibeName
+            })
+        });
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+            const errorMessage = data.error_message || data.error || 'Failed to start vibe encoding';
+            showVibeError(errorMessage);
+            return;
+        }
+        // Close the grid modal
+        closeGridModal();
+        // Show progress modal with SSE connection
+        const progressUrl = data.progress_stream_url;
+        vibeProgressModal.show(progressUrl, () => {
+            // On complete callback
+            showVibeSuccess(`Vibe collection "${vibeName}" created successfully!`);
+        }, (error) => {
+            // On error callback
+            showVibeError(error);
+        });
+    }
+    catch (error) {
+        console.error('Error starting vibe generation:', error);
+        showVibeError('Failed to start vibe generation. Please try again.');
+    }
+}
+/**
+ * Show a success toast notification
+ */
+function showVibeSuccess(message) {
+    showToast(message, 'success');
+}
+/**
+ * Show an error toast notification
+ */
+function showVibeError(message) {
+    showToast(message, 'error');
+}
+/**
+ * Show a toast notification
+ */
+function showToast(message, type) {
+    // Remove any existing toast
+    const existingToast = document.getElementById('vibe-toast');
+    existingToast?.remove();
+    const toast = document.createElement('div');
+    toast.id = 'vibe-toast';
+    toast.className = `vibe-toast vibe-toast-${type}`;
+    toast.innerHTML = `
+        <span class="toast-icon">${type === 'success' ? '✅' : '❌'}</span>
+        <span class="toast-message">${message}</span>
+    `;
+    document.body.appendChild(toast);
+    // Trigger animation
+    setTimeout(() => toast.classList.add('show'), 10);
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+    }, 5000);
 }
 /**
  * Navigate to previous image in grid modal
