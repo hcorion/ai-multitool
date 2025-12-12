@@ -17,8 +17,9 @@ export class VibeSelectionModal {
     selectedVibes = [];
     currentModel = '';
     onVibeSelectedCallback = null;
-    // Validation constants
-    static VALID_ENCODING_STRENGTHS = [1.0, 0.85, 0.7, 0.5, 0.35];
+    cachedCollectionDetails = new Map();
+    // Validation constants (ordered from low to high for slider mapping: left=0.35, right=1.0)
+    static VALID_ENCODING_STRENGTHS = [0.35, 0.5, 0.7, 0.85, 1.0];
     static VALID_REFERENCE_STRENGTHS = [1.0, 0.85, 0.7, 0.5, 0.35];
     static MIN_VIBES = 1;
     static MAX_VIBES = 4;
@@ -59,13 +60,13 @@ export class VibeSelectionModal {
                                 <div class="strength-control">
                                     <label for="encoding-strength-slider">Encoding Strength:</label>
                                     <div class="discrete-slider">
-                                        <input type="range" id="encoding-strength-slider" min="0" max="4" step="1" value="0">
+                                        <input type="range" id="encoding-strength-slider" min="0" max="4" step="1" value="4">
                                         <div class="slider-labels">
-                                            <span>1.0</span>
-                                            <span>0.85</span>
-                                            <span>0.7</span>
-                                            <span>0.5</span>
                                             <span>0.35</span>
+                                            <span>0.5</span>
+                                            <span>0.7</span>
+                                            <span>0.85</span>
+                                            <span>1.0</span>
                                         </div>
                                     </div>
                                     <span id="encoding-strength-value">1.0</span>
@@ -148,6 +149,7 @@ export class VibeSelectionModal {
             return;
         this.modal.style.display = 'none';
         this.selectedVibes = [];
+        this.cachedCollectionDetails.clear(); // Clear cache when modal is hidden
         this.hideSelectionControls();
     }
     /**
@@ -246,7 +248,8 @@ export class VibeSelectionModal {
                 name: collection.name,
                 encoding_strength: 1.0, // Default to highest strength
                 reference_strength: 1.0, // Default to highest strength
-                model: collection.model
+                model: collection.model,
+                preview_paths: details.previews // Include preview paths from API
             };
             this.selectedVibes.push(selectedVibe);
             this.updateSelectedVibesCount();
@@ -262,11 +265,18 @@ export class VibeSelectionModal {
      * Load detailed information for a vibe collection
      */
     async loadCollectionDetails(guid) {
+        // Check cache first
+        if (this.cachedCollectionDetails.has(guid)) {
+            return this.cachedCollectionDetails.get(guid);
+        }
         const response = await fetch(`/vibes/${guid}`);
         if (!response.ok) {
             throw new Error(`Failed to load vibe details: ${response.statusText}`);
         }
-        return await response.json();
+        const details = await response.json();
+        // Cache the details
+        this.cachedCollectionDetails.set(guid, details);
+        return details;
     }
     /**
      * Show the vibe selection controls for the currently selected vibe
@@ -301,6 +311,19 @@ export class VibeSelectionModal {
         this.clearValidationMessages();
     }
     /**
+     * Format a strength value to match the JSON key format (minimal decimal places)
+     * Examples: 1.0 -> "1.0", 0.85 -> "0.85", 0.5 -> "0.5", 0.7 -> "0.7"
+     */
+    formatStrengthForKey(value) {
+        // Convert to string and check if it needs formatting
+        const str = value.toString();
+        // If it's a whole number, add .0
+        if (!str.includes('.')) {
+            return str + '.0';
+        }
+        return str;
+    }
+    /**
      * Update the preview image based on current strength settings
      */
     updatePreviewImage(selectedVibe, details) {
@@ -309,7 +332,10 @@ export class VibeSelectionModal {
             return;
         // Find closest reference strength for preview
         const closestRefStrength = this.findClosestReferenceStrength(selectedVibe.reference_strength);
-        const previewKey = `enc${selectedVibe.encoding_strength}_ref${closestRefStrength}`;
+        // Format numbers to match JSON key format (minimal decimal places)
+        const encStrengthStr = this.formatStrengthForKey(selectedVibe.encoding_strength);
+        const refStrengthStr = this.formatStrengthForKey(closestRefStrength);
+        const previewKey = `enc${encStrengthStr}_ref${refStrengthStr}`;
         const previewPath = details.previews[previewKey];
         if (previewPath) {
             previewImg.src = previewPath;
@@ -336,11 +362,17 @@ export class VibeSelectionModal {
         lastVibe.encoding_strength = newStrength;
         this.updateStrengthDisplays();
         this.validateCurrentSelection();
-        // Update preview if we have collection details
-        // Note: In a full implementation, we'd cache the details
-        this.loadCollectionDetails(lastVibe.guid).then(details => {
-            this.updatePreviewImage(lastVibe, details);
-        }).catch(console.error);
+        // Update preview if we have cached collection details
+        const cachedDetails = this.cachedCollectionDetails.get(lastVibe.guid);
+        if (cachedDetails) {
+            this.updatePreviewImage(lastVibe, cachedDetails);
+        }
+        else {
+            // Fallback to loading details if not cached
+            this.loadCollectionDetails(lastVibe.guid).then(details => {
+                this.updatePreviewImage(lastVibe, details);
+            }).catch(console.error);
+        }
     }
     /**
      * Handle reference strength slider change
@@ -355,10 +387,17 @@ export class VibeSelectionModal {
         lastVibe.reference_strength = newStrength;
         this.updateStrengthDisplays();
         this.validateCurrentSelection();
-        // Update preview if we have collection details
-        this.loadCollectionDetails(lastVibe.guid).then(details => {
-            this.updatePreviewImage(lastVibe, details);
-        }).catch(console.error);
+        // Update preview if we have cached collection details
+        const cachedDetails = this.cachedCollectionDetails.get(lastVibe.guid);
+        if (cachedDetails) {
+            this.updatePreviewImage(lastVibe, cachedDetails);
+        }
+        else {
+            // Fallback to loading details if not cached
+            this.loadCollectionDetails(lastVibe.guid).then(details => {
+                this.updatePreviewImage(lastVibe, details);
+            }).catch(console.error);
+        }
     }
     /**
      * Update the strength display values

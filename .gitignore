@@ -3,6 +3,7 @@ static/images/*
 static/chats/*
 static/prompts/*
 static/agents/*
+static/vibes/*
 !static/images/DONOTDELETE
 !static/chats/DONOTDELETE
 !static/prompts/DONOTDELETE

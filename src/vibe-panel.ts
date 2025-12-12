@@ -16,6 +16,7 @@ interface SelectedVibe {
     encoding_strength: number;
     reference_strength: number;
     model: string;
+    preview_paths?: Record<string, string>; // Preview image paths keyed by 'enc{X}_ref{Y}'
 }
 
 interface VibeGenerationParams {
@@ -234,7 +235,7 @@ export class VibePanel {
         element.innerHTML = `
             <div class="vibe-item-content">
                 <div class="vibe-thumbnail-container">
-                    <img class="vibe-thumbnail" src="/vibes/${vibe.guid}/preview/${vibe.encoding_strength}/${this.findClosestReferenceStrength(vibe.reference_strength)}" alt="${this.escapeHtml(vibe.name)}">
+                    <img class="vibe-thumbnail" src="${this.getPreviewImagePath(vibe)}" alt="${this.escapeHtml(vibe.name)}">
                 </div>
                 <div class="vibe-info">
                     <h4 class="vibe-name">${this.escapeHtml(vibe.name)}</h4>
@@ -316,9 +317,38 @@ export class VibePanel {
     private updateVibeThumbnail(element: HTMLElement, vibe: SelectedVibe): void {
         const thumbnail = element.querySelector('.vibe-thumbnail') as HTMLImageElement;
         if (thumbnail) {
-            const closestRefStrength = this.findClosestReferenceStrength(vibe.reference_strength);
-            thumbnail.src = `/vibes/${vibe.guid}/preview/${vibe.encoding_strength}/${closestRefStrength}`;
+            thumbnail.src = this.getPreviewImagePath(vibe);
         }
+    }
+    
+    /**
+     * Format a strength value to match the JSON key format (minimal decimal places)
+     * Examples: 1.0 -> "1.0", 0.85 -> "0.85", 0.5 -> "0.5", 0.7 -> "0.7"
+     */
+    private formatStrengthForKey(value: number): string {
+        const str = value.toString();
+        // If it's a whole number, add .0
+        if (!str.includes('.')) {
+            return str + '.0';
+        }
+        return str;
+    }
+    
+    /**
+     * Get the preview image path for a vibe based on its current strength settings
+     */
+    private getPreviewImagePath(vibe: SelectedVibe): string {
+        if (!vibe.preview_paths) {
+            return '';
+        }
+        
+        const closestRefStrength = this.findClosestReferenceStrength(vibe.reference_strength);
+        // Format numbers to match JSON key format (minimal decimal places)
+        const encStrengthStr = this.formatStrengthForKey(vibe.encoding_strength);
+        const refStrengthStr = this.formatStrengthForKey(closestRefStrength);
+        const previewKey = `enc${encStrengthStr}_ref${refStrengthStr}`;
+        
+        return vibe.preview_paths[previewKey] || '';
     }
     
     /**
