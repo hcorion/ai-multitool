@@ -924,6 +924,15 @@ function attachMetadataActions(metadataDiv: HTMLElement, metadata: any): void {
         buttonContainer.appendChild(copyPromptButton);
     }
 
+    // Create or update Copy Seed button
+    let copySeedButton = document.getElementById("copy-seed-btn") as HTMLButtonElement;
+    if (!copySeedButton) {
+        copySeedButton = document.createElement("button");
+        copySeedButton.id = "copy-seed-btn";
+        copySeedButton.textContent = "Copy Seed";
+        buttonContainer.appendChild(copySeedButton);
+    }
+
     // Create or update Inpaint button
     let inpaintButton = document.getElementById("inpaint-btn") as HTMLButtonElement;
     if (!inpaintButton) {
@@ -966,6 +975,19 @@ function attachMetadataActions(metadataDiv: HTMLElement, metadata: any): void {
         }
 
         document.getElementById("generationTab")?.click();
+    };
+
+    // Attach Copy Seed action
+    copySeedButton.onclick = () => {
+        const seedInput = document.getElementById("seed") as HTMLInputElement;
+        const seedValue = metadata["seed"];
+        
+        if (seedValue !== undefined && seedValue !== null) {
+            seedInput.value = seedValue.toString();
+            document.getElementById("generationTab")?.click();
+        } else {
+            console.warn("No seed found in image metadata");
+        }
     };
 
     // Attach Inpaint action

@@ -804,6 +804,14 @@ function attachMetadataActions(metadataDiv, metadata) {
         copyPromptButton.textContent = "Copy Prompt";
         buttonContainer.appendChild(copyPromptButton);
     }
+    // Create or update Copy Seed button
+    let copySeedButton = document.getElementById("copy-seed-btn");
+    if (!copySeedButton) {
+        copySeedButton = document.createElement("button");
+        copySeedButton.id = "copy-seed-btn";
+        copySeedButton.textContent = "Copy Seed";
+        buttonContainer.appendChild(copySeedButton);
+    }
     // Create or update Inpaint button
     let inpaintButton = document.getElementById("inpaint-btn");
     if (!inpaintButton) {
@@ -841,6 +849,18 @@ function attachMetadataActions(metadataDiv, metadata) {
             }
         }
         document.getElementById("generationTab")?.click();
+    };
+    // Attach Copy Seed action
+    copySeedButton.onclick = () => {
+        const seedInput = document.getElementById("seed");
+        const seedValue = metadata["seed"];
+        if (seedValue !== undefined && seedValue !== null) {
+            seedInput.value = seedValue.toString();
+            document.getElementById("generationTab")?.click();
+        }
+        else {
+            console.warn("No seed found in image metadata");
+        }
     };
     // Attach Inpaint action
     inpaintButton.onclick = () => {

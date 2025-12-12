@@ -1353,6 +1353,7 @@ button#send-chat {
 }
 
 #copy-prompt-btn,
+#copy-seed-btn,
 #inpaint-btn {
     border: none;
     padding: 10px 20px;
@@ -3477,7 +3478,7 @@ painting Section Styles */
 
         .vibe-progress-fill {
             height: 100%;
-            background: linear-gradient(90deg, $submit-btn-color, lighten($submit-btn-color, 10%));
+            background: linear-gradient(90deg, $submit-btn-color, color.adjust($submit-btn-color, $lightness: 10%));
             border-radius: 10px;
             transition: width 0.3s ease;
         }

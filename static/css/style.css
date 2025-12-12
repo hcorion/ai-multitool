@@ -1499,6 +1499,7 @@ button#send-chat:hover {
 }
 
 #copy-prompt-btn,
+#copy-seed-btn,
 #inpaint-btn {
   border: none;
   padding: 10px 20px;

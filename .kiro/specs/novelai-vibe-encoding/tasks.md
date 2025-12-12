@@ -187,6 +187,11 @@
   - _Requirements: 1.1, 1.2_
 
 - [ ] 10. Add copy seed functionality to grid modal
+
+
+
+
+
   - Add "Copy Seed" button to grid modal action buttons
   - Extract seed from image metadata and copy to generation form seed field
   - Switch to generation tab after copying seed
