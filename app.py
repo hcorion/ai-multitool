@@ -1727,15 +1727,19 @@ def process_vibe_encoding_background(username: str, collection_guid: str, image_
                 })
         
         # Progress callback for preview phase (offset by 5 for encoding steps)
-        def preview_progress_callback(step: int, total: int, message: str) -> None:
+        def preview_progress_callback(step: int, total: int, message: str, preview_url: str | None = None) -> None:
             with vibe_progress_lock:
                 if collection_guid in vibe_progress_tracker:
-                    vibe_progress_tracker[collection_guid].update({
+                    update_data = {
                         "phase": "preview",
                         "step": 5 + step,  # Offset by encoding steps
                         "total": 30,
                         "message": message
-                    })
+                    }
+                    if preview_url:
+                        # preview_url is already a web-relative path from the generator
+                        update_data["preview_url"] = preview_url
+                    vibe_progress_tracker[collection_guid].update(update_data)
         
         # Generate previews with progress tracking
         preview_generator = VibePreviewGenerator(novelai_client, vibe_storage_manager)

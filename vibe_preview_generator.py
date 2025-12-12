@@ -22,7 +22,8 @@ class VibePreviewGenerator:
     PREVIEW_WIDTH = 512
     PREVIEW_HEIGHT = 768
     PREVIEW_SEED = 42
-    PREVIEW_PROMPT = "1girl, portrait, simple background"
+    PREVIEW_PROMPT = "1girl, portrait, masterpiece, best quality, very aesthetic"
+    PREVIEW_PROMPT_NEGATIVE = "nsfw, ugly, nipples, lowres, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, worst quality, bad quality, jpeg artifacts, signature, watermark, username, blurry, very displeasing"
     
     # Standard strength values
     ENCODING_STRENGTHS = [1.0, 0.85, 0.7, 0.5, 0.35]
@@ -42,17 +43,17 @@ class VibePreviewGenerator:
         self,
         username: str,
         collection: VibeCollection,
-        progress_callback: Optional[Callable[[int, int, str], None]] = None
+        progress_callback: Optional[Callable[[int, int, str, Optional[str]], None]] = None
     ) -> Dict[Tuple[float, float], str]:
         """Generate all 25 preview images for a vibe collection.
         
         Args:
             username: Username for file storage
             collection: VibeCollection to generate previews for
-            progress_callback: Optional callback for progress updates (step, total, message)
+            progress_callback: Optional callback for progress updates (step, total, message, preview_url)
             
         Returns:
-            Dictionary mapping (enc_strength, ref_strength) tuples to file paths
+            Dictionary mapping (enc_strength, ref_strength) tuples to web-relative file paths
             
         Raises:
             NovelAIAPIError: If the NovelAI API returns an error
@@ -65,9 +66,12 @@ class VibePreviewGenerator:
         if required_strengths != available_strengths:
             raise ValueError(f"Collection missing required encodings. Expected: {required_strengths}, Got: {available_strengths}")
         
-        # Get collection directory
+        # Get collection directory (absolute path for file operations)
         collection_dir = self.storage_manager.get_collection_directory(username, collection.guid)
         os.makedirs(collection_dir, exist_ok=True)
+        
+        # Web-relative path prefix for stored URLs
+        web_path_prefix = f"/static/vibes/{username}/{collection.guid}"
         
         # Generate all combinations
         preview_paths = {}
@@ -78,26 +82,32 @@ class VibePreviewGenerator:
             for ref_strength in self.REFERENCE_STRENGTHS:
                 step += 1
                 
-                if progress_callback:
-                    progress_callback(
-                        step, 
-                        total_combinations, 
-                        f"Generating preview {enc_strength}x{ref_strength}"
-                    )
-                
                 try:
-                    # Generate the preview image
-                    image_path, thumb_path = self._generate_single_preview(
+                    # Generate the preview image (returns absolute paths for file ops)
+                    image_filename, thumb_filename = self._generate_single_preview(
                         collection, enc_strength, ref_strength, collection_dir
                     )
                     
-                    # Store the paths
-                    key = (enc_strength, ref_strength)
-                    preview_paths[key] = image_path
+                    # Convert to web-relative paths for storage
+                    web_image_path = f"{web_path_prefix}/{image_filename}"
+                    web_thumb_path = f"{web_path_prefix}/{thumb_filename}"
                     
-                    # Update collection's preview_images dict
+                    # Store the web-relative paths
+                    key = (enc_strength, ref_strength)
+                    preview_paths[key] = web_image_path
+                    
+                    # Update collection's preview_images dict with web-relative paths
                     preview_key = f"enc{enc_strength}_ref{ref_strength}"
-                    collection.preview_images[preview_key] = image_path
+                    collection.preview_images[preview_key] = web_image_path
+                    
+                    # Notify progress with the generated thumbnail URL
+                    if progress_callback:
+                        progress_callback(
+                            step,
+                            total_combinations,
+                            f"Generated preview {enc_strength}x{ref_strength}",
+                            web_thumb_path
+                        )
                     
                 except (NovelAIAPIError, NovelAIClientError) as e:
                     # Re-raise API errors with context
@@ -132,7 +142,7 @@ class VibePreviewGenerator:
             collection_dir: Directory to save the preview files
             
         Returns:
-            Tuple of (image_path, thumbnail_path)
+            Tuple of (image_filename, thumbnail_filename) - just the filenames, not full paths
             
         Raises:
             NovelAIAPIError: If the NovelAI API returns an error
@@ -153,6 +163,7 @@ class VibePreviewGenerator:
         # Generate the image using NovelAI
         image_bytes = self.novelai_client.generate_image(
             prompt=self.PREVIEW_PROMPT,
+            negative_prompt=self.PREVIEW_PROMPT_NEGATIVE,
             width=self.PREVIEW_WIDTH,
             height=self.PREVIEW_HEIGHT,
             seed=self.PREVIEW_SEED,
@@ -172,7 +183,8 @@ class VibePreviewGenerator:
         
         self._create_thumbnail(image_bytes, thumb_path)
         
-        return image_path, thumb_path
+        # Return just filenames, caller will construct web paths
+        return image_filename, thumb_filename
     
     def _create_thumbnail(self, image_bytes: bytes, thumb_path: str) -> None:
         """Create a JPG thumbnail from image bytes.
