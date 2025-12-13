@@ -2897,6 +2897,15 @@ painting Section Styles */
 .vibe-collection-item.incompatible:hover {
   border-color: rgba(255, 107, 107, 0.5);
 }
+.vibe-collection-item.vibe-baseline-item {
+  cursor: default;
+  opacity: 0.8;
+  border-color: rgba(102, 102, 102, 0.3);
+}
+.vibe-collection-item.vibe-baseline-item:hover {
+  border-color: rgba(102, 102, 102, 0.3);
+  background-color: rgba(102, 102, 102, 0.1);
+}
 .vibe-collection-item .vibe-collection-preview {
   position: relative;
   margin-bottom: 10px;
@@ -2926,6 +2935,37 @@ painting Section Styles */
 .vibe-collection-item .vibe-collection-preview .vibe-collection-overlay.incompatible {
   background-color: rgba(255, 152, 0, 0.8);
   color: white;
+}
+.vibe-collection-item .vibe-collection-preview .vibe-delete-btn {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: none;
+  background-color: rgba(244, 67, 54, 0.8);
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: bold;
+  opacity: 0;
+  transition: opacity 0.2s ease, background-color 0.2s ease;
+  padding: 0;
+  line-height: 1;
+}
+.vibe-collection-item .vibe-collection-preview .vibe-delete-btn:hover {
+  background-color: #f44336;
+}
+.vibe-collection-item .vibe-collection-preview .vibe-delete-btn span {
+  display: block;
+  margin-top: -2px;
+}
+.vibe-collection-item .vibe-collection-preview:hover .vibe-delete-btn {
+  opacity: 1;
 }
 .vibe-collection-item .vibe-collection-info .vibe-collection-name {
   margin: 0 0 5px 0;
@@ -3443,6 +3483,58 @@ painting Section Styles */
 .vibe-progress-error .error-message {
   color: #f44336;
   font-size: 0.9rem;
+}
+
+.vibe-delete-confirm-content {
+  max-width: 450px;
+  width: 90%;
+}
+.vibe-delete-confirm-content .vibe-delete-confirm-info {
+  text-align: center;
+}
+.vibe-delete-confirm-content .vibe-delete-confirm-info p {
+  margin: 0 0 12px 0;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+.vibe-delete-confirm-content .vibe-delete-confirm-info .vibe-delete-warning {
+  color: #f44336;
+  font-weight: 600;
+  font-size: 1rem;
+  margin-bottom: 15px;
+}
+.vibe-delete-confirm-content .vibe-delete-confirm-info .vibe-delete-details {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.7);
+  margin-top: 15px;
+}
+.vibe-delete-confirm-content .vibe-delete-confirm-info #vibe-delete-name {
+  font-weight: 600;
+  color: #fff;
+}
+.vibe-delete-confirm-content .modal-footer {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  margin-top: 20px;
+}
+.vibe-delete-confirm-content .modal-footer .btn-danger {
+  background-color: #f44336;
+  color: white;
+  border: none;
+  padding: 10px 25px;
+  font-size: 1rem;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+}
+.vibe-delete-confirm-content .modal-footer .btn-danger:hover {
+  background-color: #d32f2f;
+}
+.vibe-delete-confirm-content .modal-footer .btn-danger:disabled {
+  background-color: rgba(244, 67, 54, 0.5);
+  cursor: not-allowed;
 }
 
 #generate-vibe-btn {

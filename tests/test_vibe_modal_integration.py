@@ -201,3 +201,74 @@ class TestVibeModalBasicFunctionality:
                 with open("static/css/style.css", 'r', encoding='utf-8') as f:
                     css_content = f.read()
                     assert css_class in css_content, f"CSS should contain {css_class} class"
+
+
+
+class TestVibeDeleteConfirmation:
+    """Tests for vibe collection delete confirmation functionality."""
+    
+    def test_delete_confirmation_dialog_html_exists(self):
+        """Test that the delete confirmation dialog HTML is generated."""
+        import os
+        
+        # Check that the compiled JavaScript file exists and contains delete dialog
+        js_file_path = "static/js/vibe-modal.js"
+        assert os.path.exists(js_file_path), "Vibe modal JavaScript file should exist"
+        
+        with open(js_file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        # Verify delete confirmation dialog elements
+        assert "vibe-delete-confirm-modal" in content
+        assert "vibe-delete-confirm-close" in content
+        assert "vibe-delete-name" in content
+        assert "vibe-delete-cancel" in content
+        assert "vibe-delete-confirm" in content
+        assert "btn-danger" in content
+    
+    def test_delete_confirmation_css_exists(self):
+        """Test that the delete confirmation dialog CSS is compiled."""
+        import os
+        
+        css_file_path = "static/css/style.css"
+        assert os.path.exists(css_file_path), "Main CSS file should exist"
+        
+        with open(css_file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        # Verify delete confirmation styles
+        assert ".vibe-delete-confirm-content" in content
+        assert ".vibe-delete-btn" in content
+        assert ".vibe-delete-warning" in content
+        assert ".btn-danger" in content
+    
+    def test_delete_button_in_collection_element(self):
+        """Test that delete button is included in collection element HTML."""
+        import os
+        
+        js_file_path = "static/js/vibe-modal.js"
+        assert os.path.exists(js_file_path), "Vibe modal JavaScript file should exist"
+        
+        with open(js_file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        # Verify delete button is in collection element
+        assert "vibe-delete-btn" in content
+        assert "Delete vibe collection" in content  # title attribute
+    
+    def test_delete_methods_exist(self):
+        """Test that delete-related methods exist in the compiled JavaScript."""
+        import os
+        
+        js_file_path = "static/js/vibe-modal.js"
+        assert os.path.exists(js_file_path), "Vibe modal JavaScript file should exist"
+        
+        with open(js_file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        # Verify delete methods exist
+        assert "showDeleteConfirmation" in content
+        assert "hideDeleteConfirmation" in content
+        assert "confirmDelete" in content
+        assert "attachDeleteConfirmListeners" in content
+        assert "pendingDeleteGuid" in content

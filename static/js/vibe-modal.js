@@ -48,6 +48,15 @@ export class VibeSelectionModal {
                         
                         <div class="vibe-modal-layout">
                             <div class="vibe-collections-grid" id="vibe-collections-grid">
+                                <div class="vibe-collection-item vibe-baseline-item">
+                                    <div class="vibe-collection-preview">
+                                        <img src="/static/vibes/baseline_preview.png" alt="Baseline" class="vibe-thumbnail">
+                                    </div>
+                                    <div class="vibe-collection-info">
+                                        <h4 class="vibe-collection-name">Baseline</h4>
+                                        <p class="vibe-collection-model">No vibe applied</p>
+                                    </div>
+                                </div>
                                 <!-- Vibe collections will be loaded here -->
                             </div>
                             
@@ -90,6 +99,27 @@ export class VibeSelectionModal {
                     </div>
                 </div>
             </div>
+            
+            <!-- Delete Confirmation Dialog -->
+            <div id="vibe-delete-confirm-modal" class="modal" style="display: none;">
+                <div class="modal-content vibe-delete-confirm-content">
+                    <div class="modal-header">
+                        <h2>Delete Vibe Collection</h2>
+                        <span class="close" id="vibe-delete-confirm-close">&times;</span>
+                    </div>
+                    <div class="modal-body">
+                        <div class="vibe-delete-confirm-info">
+                            <p class="vibe-delete-warning">⚠️ This action cannot be undone.</p>
+                            <p>Are you sure you want to delete the vibe collection "<span id="vibe-delete-name"></span>"?</p>
+                            <p class="vibe-delete-details">This will permanently remove the vibe encodings and all 25 preview images.</p>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button id="vibe-delete-cancel" class="btn btn-secondary">Cancel</button>
+                        <button id="vibe-delete-confirm" class="btn btn-danger">Delete</button>
+                    </div>
+                </div>
+            </div>
         `;
         // Inject modal HTML into the document body
         document.body.insertAdjacentHTML('beforeend', modalHTML);
@@ -126,6 +156,27 @@ export class VibeSelectionModal {
         const referenceSlider = document.getElementById('reference-strength-slider');
         encodingSlider?.addEventListener('input', () => this.updateEncodingStrength());
         referenceSlider?.addEventListener('input', () => this.updateReferenceStrength());
+        // Delete confirmation dialog events
+        this.attachDeleteConfirmListeners();
+    }
+    /**
+     * Attach event listeners for the delete confirmation dialog
+     */
+    attachDeleteConfirmListeners() {
+        const deleteModal = document.getElementById('vibe-delete-confirm-modal');
+        const closeBtn = document.getElementById('vibe-delete-confirm-close');
+        const cancelBtn = document.getElementById('vibe-delete-cancel');
+        const confirmBtn = document.getElementById('vibe-delete-confirm');
+        closeBtn?.addEventListener('click', () => this.hideDeleteConfirmation());
+        cancelBtn?.addEventListener('click', () => this.hideDeleteConfirmation());
+        // Click outside to close
+        deleteModal?.addEventListener('click', (e) => {
+            if (e.target === deleteModal) {
+                this.hideDeleteConfirmation();
+            }
+        });
+        // Confirm delete
+        confirmBtn?.addEventListener('click', () => this.confirmDelete());
     }
     /**
      * Show the vibe selection modal
@@ -212,16 +263,32 @@ export class VibeSelectionModal {
                 <div class="vibe-collection-overlay ${compatibilityClass}">
                     <span class="compatibility-icon">${compatibilityIcon}</span>
                 </div>
+                <button class="vibe-delete-btn" title="Delete vibe collection" data-guid="${collection.guid}">
+                    <span>×</span>
+                </button>
             </div>
             <div class="vibe-collection-info">
                 <h4 class="vibe-collection-name">${this.escapeHtml(collection.name)}</h4>
                 <p class="vibe-collection-model">Model: ${collection.model}</p>
-                <p class="vibe-collection-date">${this.formatDate(collection.created_at)}</p>
+                <p class="vibe-collection-date">Created: ${this.formatDate(collection.created_at)}</p>
                 ${!isCompatible ? '<p class="compatibility-warning">⚠️ Model incompatible</p>' : ''}
             </div>
         `;
-        // Add click handler
-        element.addEventListener('click', () => this.selectCollection(collection));
+        // Add click handler for selection
+        element.addEventListener('click', (e) => {
+            // Don't select if clicking the delete button
+            const target = e.target;
+            if (target.closest('.vibe-delete-btn')) {
+                return;
+            }
+            this.selectCollection(collection);
+        });
+        // Add click handler for delete button
+        const deleteBtn = element.querySelector('.vibe-delete-btn');
+        deleteBtn?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.showDeleteConfirmation(collection);
+        });
         return element;
     }
     /**
@@ -502,6 +569,79 @@ export class VibeSelectionModal {
             this.onVibeSelectedCallback([...this.selectedVibes]);
         }
         this.hide();
+    }
+    // ==================== Delete Confirmation Methods ====================
+    /** GUID of the vibe collection pending deletion */
+    pendingDeleteGuid = null;
+    /**
+     * Show the delete confirmation dialog for a vibe collection
+     */
+    showDeleteConfirmation(collection) {
+        const deleteModal = document.getElementById('vibe-delete-confirm-modal');
+        const nameSpan = document.getElementById('vibe-delete-name');
+        if (!deleteModal || !nameSpan)
+            return;
+        this.pendingDeleteGuid = collection.guid;
+        nameSpan.textContent = collection.name;
+        deleteModal.style.display = 'block';
+    }
+    /**
+     * Hide the delete confirmation dialog
+     */
+    hideDeleteConfirmation() {
+        const deleteModal = document.getElementById('vibe-delete-confirm-modal');
+        if (deleteModal) {
+            deleteModal.style.display = 'none';
+        }
+        this.pendingDeleteGuid = null;
+    }
+    /**
+     * Confirm and execute the vibe collection deletion
+     */
+    async confirmDelete() {
+        if (!this.pendingDeleteGuid)
+            return;
+        const guid = this.pendingDeleteGuid;
+        const confirmBtn = document.getElementById('vibe-delete-confirm');
+        // Disable button and show loading state
+        if (confirmBtn) {
+            confirmBtn.disabled = true;
+            confirmBtn.textContent = 'Deleting...';
+        }
+        try {
+            const response = await fetch(`/vibes/${guid}`, {
+                method: 'DELETE'
+            });
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error || `Failed to delete vibe: ${response.statusText}`);
+            }
+            // Remove from selected vibes if it was selected
+            this.selectedVibes = this.selectedVibes.filter(v => v.guid !== guid);
+            // Remove from collections list
+            this.collections = this.collections.filter(c => c.guid !== guid);
+            // Clear from cache
+            this.cachedCollectionDetails.delete(guid);
+            // Re-render the collections grid
+            this.renderCollections();
+            this.updateSelectedVibesCount();
+            this.updateCollectionSelection();
+            // Hide the delete confirmation dialog
+            this.hideDeleteConfirmation();
+            // Show success message
+            this.showValidationMessage('Vibe collection deleted successfully', 'success');
+        }
+        catch (error) {
+            console.error('Error deleting vibe collection:', error);
+            this.showValidationMessage(error instanceof Error ? error.message : 'Failed to delete vibe collection', 'error');
+        }
+        finally {
+            // Reset button state
+            if (confirmBtn) {
+                confirmBtn.disabled = false;
+                confirmBtn.textContent = 'Delete';
+            }
+        }
     }
     /**
      * Show validation message

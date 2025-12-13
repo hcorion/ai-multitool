@@ -186,7 +186,7 @@
   - Integrate with vibe encoding service with progress callbacks
   - _Requirements: 1.1, 1.2_
 
-- [ ] 10. Add copy seed functionality to grid modal
+- [x] 10. Add copy seed functionality to grid modal
 
 
 
@@ -197,7 +197,12 @@
   - Switch to generation tab after copying seed
   - _Requirements: 5.1, 5.2, 5.3_
 
-- [ ] 11. Add vibe management UI features
+- [x] 11. Add vibe management UI features
+
+
+
+
+
   - Display vibe collection names and creation dates in selection modal
   - Add delete confirmation dialog for vibe collections
   - Implement vibe collection deletion with file cleanup

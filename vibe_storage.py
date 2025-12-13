@@ -88,8 +88,8 @@ class VibeStorageManager(UserFileManager):
                 preview_images = collection_data.get("preview_images", {})
                 preview_image = ""
                 if preview_images:
-                    # Use the highest strength combination as the representative image
-                    preview_image = preview_images.get("enc1.0_ref1.0", list(preview_images.values())[0])
+                    # Use moderate strength combination as the representative image
+                    preview_image = preview_images.get("enc0.85_ref0.5", list(preview_images.values())[0])
                 
                 summary = VibeCollectionSummary(
                     guid=guid,
