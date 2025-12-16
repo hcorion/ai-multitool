@@ -559,7 +559,7 @@ function populatePresetForm(preset?: AgentPreset): void {
     } else {
         if (nameField) nameField.value = '';
         if (instructionsField) instructionsField.value = '';
-        if (modelField) modelField.value = 'gpt-5.1';
+        if (modelField) modelField.value = 'gpt-5.2';
         if (reasoningField) reasoningField.value = 'medium';
         
         // Set default tools for new presets
@@ -718,7 +718,7 @@ function getFormData(): AgentPresetFormData {
     return {
         name: nameField?.value?.trim() || '',
         instructions: instructionsField?.value?.trim() || '',
-        model: (modelField?.value as 'gpt-5.1' | 'gpt-5' | 'gpt-5-mini' | 'gpt-5-pro') || 'gpt-5.1',
+        model: (modelField?.value as 'gpt-5.2' | 'gpt-5.1' | 'gpt-5' | 'gpt-5-mini' | 'gpt-5-pro') || 'gpt-5.2',
         default_reasoning_level: (reasoningField?.value as 'high' | 'medium' | 'low' | 'none') || 'medium',
         enabled_tools: enabledTools
     };

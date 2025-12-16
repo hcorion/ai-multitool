@@ -51,7 +51,7 @@ class TestAgentPresetModel:
             updated_at=current_time
         )
         
-        assert preset.model == 'gpt-5.1'  # Default value
+        assert preset.model == 'gpt-5.2'  # Default value
         assert preset.default_reasoning_level == 'medium'  # Default value
         assert preset.enabled_tools == ['web_search', 'calculator']  # Default value
 
@@ -364,7 +364,7 @@ class TestAgentPresetManager:
         
         assert default_preset.id == 'default'
         assert default_preset.name == 'Default Assistant'
-        assert default_preset.model == 'gpt-5.1'
+        assert default_preset.model == 'gpt-5.2'
         assert default_preset.default_reasoning_level == 'medium'
         assert len(default_preset.instructions) > 0
 

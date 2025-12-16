@@ -111,8 +111,6 @@ def parse_followup_file(file_path: str) -> FollowUpPromptFile | None:
 
     Returns:
         FollowUpPromptFile if valid follow-up file, None if regular file or malformed
-
-    Requirements: 1.1, 1.2, 5.1, 5.2, 5.3, 5.4, 5.5
     """
     try:
         with open(file_path, "r", encoding="utf-8") as f:
@@ -192,8 +190,6 @@ def get_prompt_dict(
 
     Returns:
         Tuple of (regular_prompts, followup_prompts) dictionaries
-
-    Requirements: 1.1, 1.2, 5.1, 5.2, 5.3, 5.4, 5.5
     """
     dynamic_prompts_path = os.path.join(static_folder, "prompts", username)
     os.makedirs(dynamic_prompts_path, exist_ok=True)

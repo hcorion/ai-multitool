@@ -99,10 +99,6 @@ export class VibePanel {
     private attachEventListeners(): void {
         // Add Vibe button click handler
         this.addVibeButton?.addEventListener('click', () => this.showVibeSelectionModal());
-        
-        // Listen for form submission to include vibe parameters
-        const form = document.getElementById('prompt-form');
-        form?.addEventListener('submit', (e) => this.onFormSubmit(e));
     }
     
     /**
@@ -211,6 +207,7 @@ export class VibePanel {
         if (this.vibes.length === 0) {
             this.panelElement.style.display = 'none';
             vibeList.innerHTML = '';
+            this.updateHiddenInputs();
             return;
         }
         
@@ -221,6 +218,43 @@ export class VibePanel {
         this.vibes.forEach((vibe, index) => {
             const vibeElement = this.createVibeElement(vibe, index);
             vibeList.appendChild(vibeElement);
+        });
+        
+        // Update hidden form inputs for submission
+        this.updateHiddenInputs();
+    }
+    
+    /**
+     * Update hidden form inputs with current vibe data
+     * These inputs are always present in the form and get serialized on submit
+     */
+    private updateHiddenInputs(): void {
+        const form = document.getElementById('prompt-form');
+        if (!form) return;
+        
+        // Remove any existing vibe input fields
+        const existingVibeInputs = form.querySelectorAll('input[name^="vibe_"]');
+        existingVibeInputs.forEach(input => input.remove());
+        
+        // Add hidden inputs for each vibe
+        this.vibes.forEach((vibe, index) => {
+            const guidInput = document.createElement('input');
+            guidInput.type = 'hidden';
+            guidInput.name = `vibe_guid_${index}`;
+            guidInput.value = vibe.guid;
+            form.appendChild(guidInput);
+            
+            const encodingInput = document.createElement('input');
+            encodingInput.type = 'hidden';
+            encodingInput.name = `vibe_encoding_strength_${index}`;
+            encodingInput.value = vibe.encoding_strength.toString();
+            form.appendChild(encodingInput);
+            
+            const referenceInput = document.createElement('input');
+            referenceInput.type = 'hidden';
+            referenceInput.name = `vibe_reference_strength_${index}`;
+            referenceInput.value = vibe.reference_strength.toString();
+            form.appendChild(referenceInput);
         });
     }
     
@@ -291,6 +325,7 @@ export class VibePanel {
             if (vibe) {
                 vibe.encoding_strength = newStrength;
                 this.updateVibeThumbnail(element, vibe);
+                this.updateHiddenInputs();
             }
         });
         
@@ -307,6 +342,7 @@ export class VibePanel {
                     referenceValue.textContent = newStrength.toFixed(2);
                 }
                 this.updateVibeThumbnail(element, vibe);
+                this.updateHiddenInputs();
             }
         });
     }
@@ -384,51 +420,7 @@ export class VibePanel {
         };
     }
     
-    /**
-     * Handle form submission to include vibe parameters
-     */
-    private onFormSubmit(event: Event): void {
-        // Only add vibe parameters if we're using NovelAI and have vibes
-        const provider = getElementByIdSafe('provider', HTMLSelectElement);
-        if (!provider || provider.value !== 'novelai' || this.vibes.length === 0) {
-            return;
-        }
-        
-        // Get the form element
-        const form = event.target as HTMLFormElement;
-        if (!form) return;
-        
-        // Remove any existing vibe input fields
-        const existingVibeInputs = form.querySelectorAll('input[name^="vibe_"]');
-        existingVibeInputs.forEach(input => input.remove());
-        
-        // Add vibe parameters as hidden form fields
-        const vibeParams = this.getVibesForGeneration();
-        
-        // Add reference strengths
-        vibeParams.reference_strength_multiple.forEach((strength, index) => {
-            const input = document.createElement('input');
-            input.type = 'hidden';
-            input.name = `vibe_reference_strength_${index}`;
-            input.value = strength.toString();
-            form.appendChild(input);
-        });
-        
-        // Add vibe GUIDs and encoding strengths
-        this.vibes.forEach((vibe, index) => {
-            const guidInput = document.createElement('input');
-            guidInput.type = 'hidden';
-            guidInput.name = `vibe_guid_${index}`;
-            guidInput.value = vibe.guid;
-            form.appendChild(guidInput);
-            
-            const encodingInput = document.createElement('input');
-            encodingInput.type = 'hidden';
-            encodingInput.name = `vibe_encoding_strength_${index}`;
-            encodingInput.value = vibe.encoding_strength.toString();
-            form.appendChild(encodingInput);
-        });
-    }
+
     
     /**
      * Show the vibe panel (called when NovelAI is selected)

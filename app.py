@@ -379,7 +379,7 @@ class AgentPreset(BaseModel):
     name: str = Field(..., description="User-friendly name for the preset")
     instructions: str = Field(..., description="System instructions for the agent")
     model: str = Field(
-        default="gpt-5.1", description="Model to use (gpt-5.1, gpt-5, gpt-5-mini, gpt-5-pro)"
+        default="gpt-5.2", description="Model to use (gpt-5.2, gpt-5.1, gpt-5, gpt-5-mini, gpt-5-pro)"
     )
     default_reasoning_level: str = Field(
         default="medium", description="Default reasoning level (high, medium, low)"
@@ -395,7 +395,7 @@ class AgentPreset(BaseModel):
     @classmethod
     def validate_model(cls, v: str) -> str:
         """Validate model type."""
-        valid_models = {"gpt-5.1", "gpt-5", "gpt-5-mini", "gpt-5-pro"}
+        valid_models = {"gpt-5.2", "gpt-5.1", "gpt-5", "gpt-5-mini", "gpt-5-pro"}
         if v not in valid_models:
             raise ValueError(f"Model must be one of {valid_models}, got: {v}")
         return v
@@ -466,7 +466,7 @@ class ChatMessage(BaseModel):
         """Validate model type if provided."""
         if v is None:
             return v
-        valid_models = {"gpt-5.1", "gpt-5", "gpt-5-mini", "gpt-5-pro"}
+        valid_models = {"gpt-5.2", "gpt-5.1", "gpt-5", "gpt-5-mini", "gpt-5-pro"}
         if v not in valid_models:
             raise ValueError(f"Model must be one of {valid_models}, got: {v}")
         return v
@@ -1125,7 +1125,7 @@ code
             id="default",
             name="Default Assistant",
             instructions=default_instructions,
-            model="gpt-5.1",
+            model="gpt-5.2",
             default_reasoning_level="medium",
             enabled_tools=["web_search", "calculator"],
             created_at=current_time,
@@ -1179,10 +1179,11 @@ class ResponsesAPIClient:
     """Client wrapper for OpenAI Responses API with support for multiple models and reasoning levels."""
 
     # Valid models supported by the Responses API
-    VALID_MODELS = {"gpt-5.1", "gpt-5", "gpt-5-mini", "gpt-5-pro"}
+    VALID_MODELS = {"gpt-5.2", "gpt-5.1", "gpt-5", "gpt-5-mini", "gpt-5-pro"}
 
     # Model knowledge cutoff dates
     MODEL_KNOWLEDGE_CUTOFFS = {
+        "gpt-5.2": "2025-08-31",
         "gpt-5.1": "2024-09-30",
         "gpt-5": "2024-09-30",
         "gpt-5-mini": "2024-09-30",
@@ -1200,7 +1201,7 @@ class ResponsesAPIClient:
     def __init__(self, openai_client: openai.OpenAI, tool_registry: ToolRegistry | None = None):
         self.client = openai_client
         self.tool_registry = tool_registry
-        self.default_model = "gpt-5.1"
+        self.default_model = "gpt-5.2"
         self.default_reasoning_level = "medium"
 
     def _get_model_metadata(self, model: str) -> str:
@@ -1682,6 +1683,40 @@ vibe_progress_lock = threading.Lock()
 logging.info("Vibe services initialized")
 
 
+def resolve_vibe_params(username: str, vibe_params: list[dict[str, Any]]) -> list[VibeReference]:
+    """Resolve vibe GUIDs to VibeReference objects with encoded data."""
+    from vibe_models import VibeReference
+    
+    vibes: list[VibeReference] = []
+    for param in vibe_params:
+        guid = param.get("guid")
+        encoding_strength = param.get("encoding_strength", 1.0)
+        reference_strength = param.get("reference_strength", 0.6)
+        
+        if not guid:
+            continue
+        
+        # Load the vibe collection from storage
+        collection = vibe_storage_manager.load_collection(username, guid)
+        if not collection:
+            logging.warning(f"Vibe collection {guid} not found for user {username}")
+            continue
+        
+        # Get the encoding for the requested strength
+        encoding_key = str(encoding_strength)
+        encoding = collection.encodings.get(encoding_key)
+        if not encoding:
+            logging.warning(f"Encoding strength {encoding_strength} not found for vibe {guid}")
+            continue
+        
+        vibes.append(VibeReference(
+            encoded_data=encoding.encoded_data,
+            reference_strength=reference_strength
+        ))
+    
+    return vibes if vibes else []
+
+
 def process_vibe_encoding_background(username: str, collection_guid: str, image_path: str, name: str, model: str) -> None:
     """Background task to encode vibe and generate previews with progress tracking."""
     try:
@@ -1842,6 +1877,7 @@ def generate_novelai_image(
     grid_dynamic_prompt: GridDynamicPromptInfo | None = None,
     character_prompts: list[dict[str, str]] | None = None,
     followup_state: dict[str, FollowUpState] | None = None,
+    vibes: list | None = None,
 ) -> GeneratedImageData:
     if not app.static_folder:
         raise ValueError("Flask static folder not defined")
@@ -1888,6 +1924,7 @@ def generate_novelai_image(
             seed=seed,
             variety=variety,
             character_prompts=processed_character_prompts,
+            vibes=vibes,
         )
 
         if upscale:
@@ -3180,6 +3217,11 @@ def _handle_generation_request(
             if image_request.character_prompts:
                 character_prompts = image_request.character_prompts
 
+            # Resolve vibe GUIDs to VibeReference objects
+            vibes = None
+            if image_request.vibe_params:
+                vibes = resolve_vibe_params(session["username"], image_request.vibe_params)
+
             generated_data = generate_novelai_image(
                 prompt=image_request.prompt,
                 negative_prompt=image_request.negative_prompt,
@@ -3191,6 +3233,7 @@ def _handle_generation_request(
                 grid_dynamic_prompt=image_request.grid_dynamic_prompt,
                 character_prompts=character_prompts,
                 followup_state=followup_state,
+                vibes=vibes,
             )
         else:
             raise ValueError(f"Unsupported provider: {image_request.provider.value}")
@@ -3536,7 +3579,7 @@ def converse():
                     username=username,
                     conversation_id=conversation_id,
                     openai_client=responses_client.client,
-                    model=model or "gpt-5.1",
+                    model=model or "gpt-5.2",
                     tools=tools,
                     instructions=instructions,
                 )
@@ -3878,7 +3921,7 @@ class StreamEventProcessor:
         self.username = username
         self.conversation_id = conversation_id
         self.openai_client = openai_client
-        self.model = model or "gpt-5.1"
+        self.model = model or "gpt-5.2"
         self.tools = tools or []
         self.instructions = instructions
         self.current_response_id: str | None = None
@@ -5392,7 +5435,7 @@ def manage_agent_presets():
                     "id": preset_id,
                     "name": data["name"].strip(),
                     "instructions": data["instructions"].strip(),
-                    "model": data.get("model", "gpt-5.1"),
+                    "model": data.get("model", "gpt-5.2"),
                     "default_reasoning_level": data.get(
                         "default_reasoning_level", "medium"
                     ),

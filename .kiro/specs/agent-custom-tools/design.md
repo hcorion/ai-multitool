@@ -446,7 +446,7 @@ export interface AgentPreset {
     id: string;
     name: string;
     instructions: string;
-    model: 'gpt-5.1' | 'gpt-5' | 'gpt-5-mini' | 'gpt-5-pro';
+    model: 'gpt-5.2' | 'gpt-5.1' | 'gpt-5' | 'gpt-5-mini' | 'gpt-5-pro';
     default_reasoning_level: 'high' | 'medium' | 'low' | 'none';
     created_at: number;
     updated_at: number;

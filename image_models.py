@@ -78,6 +78,7 @@ class ImageGenerationRequest:
     variety: bool = False
     seed: int = (0,)
     grid_dynamic_prompt: GridDynamicPromptInfo | None = None
+    vibe_params: list[dict[str, Any]] | None = None  # List of {guid, encoding_strength, reference_strength}
 
     def __post_init__(self):
         """Validate prompt and dimensions after object initialization."""
@@ -269,6 +270,32 @@ def create_request_from_form_data(
     # Extract variety flag from form data
     variety = form_data.get("variety", "false").lower() == "on"
 
+    # Extract vibe parameters from form data (NovelAI only)
+    vibe_params: list[dict[str, Any]] | None = None
+    if provider == Provider.NOVELAI:
+        vibe_list: list[dict[str, Any]] = []
+        vibe_index = 0
+        while True:
+            guid_key = f"vibe_guid_{vibe_index}"
+            if guid_key not in form_data:
+                break
+            
+            guid = form_data.get(guid_key, "")
+            encoding_strength = float(form_data.get(f"vibe_encoding_strength_{vibe_index}", "1.0"))
+            reference_strength = float(form_data.get(f"vibe_reference_strength_{vibe_index}", "0.6"))
+            
+            if guid:
+                vibe_list.append({
+                    "guid": guid,
+                    "encoding_strength": encoding_strength,
+                    "reference_strength": reference_strength
+                })
+            
+            vibe_index += 1
+        
+        if vibe_list:
+            vibe_params = vibe_list
+
     # Set default model if not provided
     if not model:
         model = ImageRequestValidator.get_default_model(provider, operation)
@@ -325,6 +352,7 @@ def create_request_from_form_data(
             character_prompts=character_prompts_final,
             variety=variety,
             seed=seed,
+            vibe_params=vibe_params,
         )
 
 
