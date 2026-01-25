@@ -90,7 +90,6 @@ class VibePreviewGenerator:
                     
                     # Convert to web-relative paths for storage
                     web_image_path = f"{web_path_prefix}/{image_filename}"
-                    web_thumb_path = f"{web_path_prefix}/{thumb_filename}"
                     
                     # Store the web-relative paths
                     key = (enc_strength, ref_strength)

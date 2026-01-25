@@ -73,6 +73,7 @@ from novelai_client import NovelAIAPIError, NovelAIClient, NovelAIClientError, N
 from tool_framework import ToolExecutor, ToolRegistry
 from tools.calculator_tool import CalculatorTool
 from vibe_encoder import VibeEncoderService
+from vibe_models import VibeReference
 from vibe_preview_generator import VibePreviewGenerator
 from vibe_storage import VibeStorageManager
 
@@ -1685,7 +1686,6 @@ logging.info("Vibe services initialized")
 
 def resolve_vibe_params(username: str, vibe_params: list[dict[str, Any]]) -> list[VibeReference]:
     """Resolve vibe GUIDs to VibeReference objects with encoded data."""
-    from vibe_models import VibeReference
     
     vibes: list[VibeReference] = []
     for param in vibe_params:
