@@ -51,7 +51,7 @@ class TestAgentPresetModel:
             updated_at=current_time
         )
         
-        assert preset.model == 'gpt-5.3'  # Default value
+        assert preset.model == 'gpt-5.2'  # Default value
         assert preset.default_reasoning_level == 'medium'  # Default value
         assert preset.enabled_tools == ['web_search', 'calculator']  # Default value
 
@@ -86,7 +86,7 @@ class TestAgentPresetModel:
     def test_valid_model_types(self):
         """Test all valid model types are accepted."""
         current_time = int(time.time())
-        valid_models = ['gpt-5.3', 'gpt-5.2', 'gpt-5.1', 'gpt-5', 'gpt-5-mini', 'gpt-5-pro']
+        valid_models = ['gpt-5.3-codex', 'gpt-5.2', 'gpt-5.1', 'gpt-5', 'gpt-5-mini', 'gpt-5-pro']
         
         for model in valid_models:
             preset = AgentPreset(
@@ -212,7 +212,7 @@ class TestChatMessageModel:
     def test_valid_model_types_in_message(self):
         """Test all valid model types are accepted in messages."""
         current_time = int(time.time())
-        valid_models = ['gpt-5.3', 'gpt-5.2', 'gpt-5.1', 'gpt-5', 'gpt-5-mini', 'gpt-5-pro']
+        valid_models = ['gpt-5.3-codex', 'gpt-5.2', 'gpt-5.1', 'gpt-5', 'gpt-5-mini', 'gpt-5-pro']
         
         for model in valid_models:
             message = ChatMessage(
@@ -364,7 +364,7 @@ class TestAgentPresetManager:
         
         assert default_preset.id == 'default'
         assert default_preset.name == 'Default Assistant'
-        assert default_preset.model == 'gpt-5.3'
+        assert default_preset.model == 'gpt-5.2'
         assert default_preset.default_reasoning_level == 'medium'
         assert len(default_preset.instructions) > 0
 
