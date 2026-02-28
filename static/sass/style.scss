@@ -545,13 +545,42 @@ img {
     overflow-y: auto;
 }
 
+// Chat message styling
+.user-message,
 .ai-message {
-    padding: 10px;
-    margin-bottom: 10px; // Keeps space between messages
-    border-bottom: 1px solid $border-color; // Thin separator line
-
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    border-radius: 8px;
+    position: relative;
+    
     &:last-child {
-        border-bottom: none; // Removes separator from last message
+        margin-bottom: 0;
+    }
+    
+    &::before {
+        content: "";
+        display: block;
+        font-size: 13px;
+        line-height: 1;
+        margin-bottom: 6px;
+    }
+}
+
+.user-message {
+    background-color: rgba($submit-btn-color, 0.15);
+    border-left: 3px solid $submit-btn-color;
+    
+    &::before {
+        content: "👤";
+    }
+}
+
+.ai-message {
+    background-color: rgba($text-color, 0.05);
+    border-left: 3px solid rgba($text-color, 0.3);
+    
+    &::before {
+        content: "🤖";
     }
 }
 
@@ -586,9 +615,9 @@ img {
 #chat-history {
     flex-grow: 1;
     overflow-y: auto;
-    margin-bottom: 10px; // Reduced margin to accommodate input area
+    margin-bottom: 10px;
     background-color: $modal-bg-color;
-    padding: 10px;
+    padding: 8px;
     box-sizing: border-box;
 }
 

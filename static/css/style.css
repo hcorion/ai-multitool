@@ -780,13 +780,40 @@ img {
   overflow-y: auto;
 }
 
+.user-message,
 .ai-message {
-  padding: 10px;
-  margin-bottom: 10px;
-  border-bottom: 1px solid #666666;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  border-radius: 8px;
+  position: relative;
 }
+.user-message:last-child,
 .ai-message:last-child {
-  border-bottom: none;
+  margin-bottom: 0;
+}
+.user-message::before,
+.ai-message::before {
+  content: "";
+  display: block;
+  font-size: 13px;
+  line-height: 1;
+  margin-bottom: 6px;
+}
+
+.user-message {
+  background-color: rgba(10, 132, 255, 0.15);
+  border-left: 3px solid #0a84ff;
+}
+.user-message::before {
+  content: "👤";
+}
+
+.ai-message {
+  background-color: rgba(255, 255, 255, 0.05);
+  border-left: 3px solid rgba(255, 255, 255, 0.3);
+}
+.ai-message::before {
+  content: "🤖";
 }
 
 .conversation-item {
@@ -819,7 +846,7 @@ img {
   overflow-y: auto;
   margin-bottom: 10px;
   background-color: rgba(0, 0, 0, 0.9);
-  padding: 10px;
+  padding: 8px;
   box-sizing: border-box;
 }
 
