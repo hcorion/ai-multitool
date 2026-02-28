@@ -4,7 +4,7 @@ export interface AgentPreset {
     id: string;
     name: string;
     instructions: string;
-    model: 'gpt-5.2' | 'gpt-5.1' | 'gpt-5' | 'gpt-5-mini' | 'gpt-5-pro';
+    model: 'gpt-5.3' | 'gpt-5.2' | 'gpt-5.1' | 'gpt-5' | 'gpt-5-mini' | 'gpt-5-pro';
     default_reasoning_level: 'high' | 'medium' | 'low' | 'none';
     created_at: number;
     updated_at: number;
@@ -19,7 +19,7 @@ export interface ChatState {
 export interface AgentPresetFormData {
     name: string;
     instructions: string;
-    model: 'gpt-5.2' | 'gpt-5.1' | 'gpt-5' | 'gpt-5-mini' | 'gpt-5-pro';
+    model: 'gpt-5.3' | 'gpt-5.2' | 'gpt-5.1' | 'gpt-5' | 'gpt-5-mini' | 'gpt-5-pro';
     default_reasoning_level: 'high' | 'medium' | 'low' | 'none';
     enabled_tools: string[];
 }
@@ -444,7 +444,7 @@ export function validateAgentPresetForm(formData: AgentPresetFormData): string[]
         errors.push('Instructions must be 5000 characters or less');
     }
     
-    if (!['gpt-5.2', 'gpt-5.1', 'gpt-5', 'gpt-5-mini', 'gpt-5-pro'].includes(formData.model)) {
+    if (!['gpt-5.3', 'gpt-5.2', 'gpt-5.1', 'gpt-5', 'gpt-5-mini', 'gpt-5-pro'].includes(formData.model)) {
         errors.push('Invalid model selection');
     }
     
