@@ -380,7 +380,7 @@ class AgentPreset(BaseModel):
     name: str = Field(..., description="User-friendly name for the preset")
     instructions: str = Field(..., description="System instructions for the agent")
     model: str = Field(
-        default="gpt-5.2", description="Model to use (gpt-5.3-codex, gpt-5.2, gpt-5.1, gpt-5, gpt-5-mini, gpt-5-pro)"
+        default="gpt-5.4", description="Model to use (gpt-5.4, gpt-5.3-codex, gpt-5.2, gpt-5.1, gpt-5, gpt-5-mini, gpt-5-pro)"
     )
     default_reasoning_level: str = Field(
         default="medium", description="Default reasoning level (high, medium, low)"
@@ -396,7 +396,7 @@ class AgentPreset(BaseModel):
     @classmethod
     def validate_model(cls, v: str) -> str:
         """Validate model type."""
-        valid_models = {"gpt-5.3-codex", "gpt-5.2", "gpt-5.1", "gpt-5", "gpt-5-mini", "gpt-5-pro"}
+        valid_models = {"gpt-5.4", "gpt-5.3-codex", "gpt-5.2", "gpt-5.1", "gpt-5", "gpt-5-mini", "gpt-5-pro"}
         if v not in valid_models:
             raise ValueError(f"Model must be one of {valid_models}, got: {v}")
         return v
@@ -467,7 +467,7 @@ class ChatMessage(BaseModel):
         """Validate model type if provided."""
         if v is None:
             return v
-        valid_models = {"gpt-5.3-codex", "gpt-5.2", "gpt-5.1", "gpt-5", "gpt-5-mini", "gpt-5-pro"}
+        valid_models = {"gpt-5.4", "gpt-5.3-codex", "gpt-5.2", "gpt-5.1", "gpt-5", "gpt-5-mini", "gpt-5-pro"}
         if v not in valid_models:
             raise ValueError(f"Model must be one of {valid_models}, got: {v}")
         return v
@@ -1126,7 +1126,7 @@ code
             id="default",
             name="Default Assistant",
             instructions=default_instructions,
-            model="gpt-5.2",
+            model="gpt-5.4",
             default_reasoning_level="medium",
             enabled_tools=["web_search", "calculator"],
             created_at=current_time,
@@ -1180,10 +1180,11 @@ class ResponsesAPIClient:
     """Client wrapper for OpenAI Responses API with support for multiple models and reasoning levels."""
 
     # Valid models supported by the Responses API
-    VALID_MODELS = {"gpt-5.3-codex", "gpt-5.2", "gpt-5.1", "gpt-5", "gpt-5-mini", "gpt-5-pro"}
+    VALID_MODELS = {"gpt-5.4", "gpt-5.3-codex", "gpt-5.2", "gpt-5.1", "gpt-5", "gpt-5-mini", "gpt-5-pro"}
 
     # Model knowledge cutoff dates
     MODEL_KNOWLEDGE_CUTOFFS = {
+        "gpt-5.4": "2026-02-28",
         "gpt-5.3-codex": "2025-12-31",
         "gpt-5.2": "2025-08-31",
         "gpt-5.1": "2024-09-30",
@@ -1203,7 +1204,7 @@ class ResponsesAPIClient:
     def __init__(self, openai_client: openai.OpenAI, tool_registry: ToolRegistry | None = None):
         self.client = openai_client
         self.tool_registry = tool_registry
-        self.default_model = "gpt-5.2"
+        self.default_model = "gpt-5.4"
         self.default_reasoning_level = "medium"
 
     def _get_model_metadata(self, model: str) -> str:
@@ -3580,7 +3581,7 @@ def converse():
                     username=username,
                     conversation_id=conversation_id,
                     openai_client=responses_client.client,
-                    model=model or "gpt-5.2",
+                    model=model or "gpt-5.4",
                     tools=tools,
                     instructions=instructions,
                 )
@@ -3922,7 +3923,7 @@ class StreamEventProcessor:
         self.username = username
         self.conversation_id = conversation_id
         self.openai_client = openai_client
-        self.model = model or "gpt-5.2"
+        self.model = model or "gpt-5.4"
         self.tools = tools or []
         self.instructions = instructions
         self.current_response_id: str | None = None
@@ -5436,7 +5437,7 @@ def manage_agent_presets():
                     "id": preset_id,
                     "name": data["name"].strip(),
                     "instructions": data["instructions"].strip(),
-                    "model": data.get("model", "gpt-5.2"),
+                    "model": data.get("model", "gpt-5.4"),
                     "default_reasoning_level": data.get(
                         "default_reasoning_level", "medium"
                     ),

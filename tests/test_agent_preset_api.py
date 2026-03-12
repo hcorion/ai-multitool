@@ -177,7 +177,7 @@ class TestAgentPresetAPICreate:
         
         data = json.loads(response.data)
         preset = data['preset']
-        assert preset['model'] == 'gpt-5.2'  # Default value
+        assert preset['model'] == 'gpt-5.4'  # Default value
         assert preset['default_reasoning_level'] == 'medium'  # Default value
 
     def test_create_agent_missing_name(self, authenticated_session):
