@@ -5604,6 +5604,31 @@ def handle_agent_preset(preset_id: str):
         return jsonify({"error": "Internal server error"}), 500
 
 
+# NovelAI Tag Suggestion Endpoint
+
+@app.route("/novelai/suggest-tags", methods=["GET"])
+def novelai_suggest_tags():
+    """Proxy tag suggestions from NovelAI API."""
+    if "username" not in session:
+        return create_authentication_error()
+
+    if not NOVELAI_API_KEY:
+        return create_validation_error("NovelAI API key not configured")
+
+    prompt = request.args.get("prompt", "").strip()
+    model = request.args.get("model", NovelAIModel.DIFFUSION_4_5_FULL.value)
+
+    if not prompt:
+        return jsonify({"tags": []})
+
+    try:
+        client = NovelAIClient(NOVELAI_API_KEY)
+        tags = client.suggest_tags(model=model, prompt=prompt)
+        return jsonify({"tags": tags})
+    except (NovelAIAPIError, NovelAIClientError) as e:
+        return create_internal_error(error=e, message=str(e))
+
+
 # Vibe API Endpoints
 
 @app.route("/vibes/encode", methods=["POST"])

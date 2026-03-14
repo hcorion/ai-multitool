@@ -253,6 +253,37 @@ class NovelAIClient:
         except Exception as e:
             raise NovelAIClientError(f"Network error: {str(e)}")
 
+    def suggest_tags(self, model: str, prompt: str, lang: str = "en") -> list[dict]:
+        """
+        Get tag suggestions for an incomplete tag query.
+
+        Args:
+            model: The image model (e.g. nai-diffusion-4-5-full)
+            prompt: The incomplete tag query
+
+        Returns:
+            List of tag suggestion dicts with 'tag', 'count', 'confidence' keys
+
+        Raises:
+            NovelAIAPIError: If the API returns an error
+            NovelAIClientError: If there's a network or client error
+        """
+        url = "https://image.novelai.net/ai/generate-image/suggest-tags"
+        try:
+            response = self.session.get(url, params={"model": model, "prompt": prompt, "lang": lang})
+            if response.status_code != 200:
+                try:
+                    error_body = response.json()
+                    error_message = error_body.get("message", "Unknown error")
+                except (json.JSONDecodeError, ValueError, KeyError):
+                    error_message = f"HTTP {response.status_code}"
+                raise NovelAIAPIError(response.status_code, error_message)
+            return response.json().get("tags", [])
+        except NovelAIAPIError:
+            raise
+        except requests.RequestException as e:
+            raise NovelAIClientError(f"Network error: {str(e)}")
+
     def encode_vibe(
         self, 
         image_bytes: bytes, 

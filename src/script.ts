@@ -6,6 +6,7 @@ import * as agentPresetUI from './agent-preset-ui.js';
 import { parseJQueryError, extractErrorMessage } from './error-handler.js';
 import { vibePanel } from './vibe-panel.js';
 import { vibeProgressModal } from './vibe-progress.js';
+import { initTagSuggestions, attachTagSuggestToTextarea } from './novelai-tag-suggest.js';
 
 
 // TypeScript interfaces for the new image API
@@ -138,6 +139,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Just refresh the image gen provider
     providerChanged();
+
+    // NovelAI tag suggestions on prompt textareas
+    initTagSuggestions();
 });
 
 /**
@@ -2358,6 +2362,9 @@ function addCharacterPrompt(): void {
             }
         });
     }
+
+    // Attach tag suggestions to the new character prompt textareas
+    characterDiv.querySelectorAll<HTMLTextAreaElement>("textarea").forEach(attachTagSuggestToTextarea);
 
     container.appendChild(characterDiv);
     updateCharacterPromptCount();

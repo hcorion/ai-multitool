@@ -6,6 +6,7 @@ import * as agentPresetUI from './agent-preset-ui.js';
 import { parseJQueryError, extractErrorMessage } from './error-handler.js';
 import { vibePanel } from './vibe-panel.js';
 import { vibeProgressModal } from './vibe-progress.js';
+import { initTagSuggestions, attachTagSuggestToTextarea } from './novelai-tag-suggest.js';
 document.addEventListener("DOMContentLoaded", () => {
     $("#loading-spinner").hide();
     $("#prompt-form").on("submit", (event) => {
@@ -102,6 +103,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     // Just refresh the image gen provider
     providerChanged();
+    // NovelAI tag suggestions on prompt textareas
+    initTagSuggestions();
 });
 /**
  * Handle keyboard navigation for grid images
@@ -2017,6 +2020,8 @@ function addCharacterPrompt() {
             }
         });
     }
+    // Attach tag suggestions to the new character prompt textareas
+    characterDiv.querySelectorAll("textarea").forEach(attachTagSuggestToTextarea);
     container.appendChild(characterDiv);
     updateCharacterPromptCount();
 }

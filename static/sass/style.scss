@@ -3897,3 +3897,47 @@ painting Section Styles */
         border-left: 4px solid #c62828;
     }
 }
+
+// NovelAI tag suggestions dropdown
+.nai-tag-suggestions {
+    position: absolute;
+    z-index: 1000;
+    list-style: none;
+    margin: 0;
+    padding: 2px 0;
+    background-color: $tab-bg-color;
+    border: 1px solid $border-color;
+    border-radius: 4px;
+    max-height: 260px;
+    overflow-y: auto;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+.nai-tag-suggestion-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 5px 10px;
+    cursor: pointer;
+    font-size: 0.875rem;
+    gap: 12px;
+
+    &:hover,
+    &.selected {
+        background-color: $tab-active-bg-color;
+    }
+
+    .nai-tag-name {
+        flex: 1;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .nai-tag-count {
+        color: color.adjust($text-color, $lightness: -35%);
+        font-size: 0.75rem;
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
+}
