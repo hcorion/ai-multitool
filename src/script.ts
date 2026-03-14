@@ -164,13 +164,28 @@ function renderImageResult(response: ImageOperationResponse): void {
     // Extract character prompts from metadata using existing extraction function
     let characterPromptsHtml = '';
     if (response.metadata) {
-        const { characterPrompts } = extractPromptsFromMetadata(response.metadata);
+        const { processedMetadata, characterPromptData, mainPromptData } = processImageMetadata(response.metadata);
         
-        if (characterPrompts && characterPrompts.length > 0) {
-            const promptTexts = characterPrompts.map(cp => cp.positive).filter(p => p);
-            if (promptTexts.length > 0) {
-                characterPromptsHtml = `<p><strong>Character Prompts:</strong> ${promptTexts.join(', ')}</p>`;
+        // Build character prompts display with processed versions when available
+        const characterPromptItems: string[] = [];
+        for (const key in processedMetadata) {
+            if (key.match(/^Character \d+ (Prompt|Negative)$/)) {
+                const baseValue = processedMetadata[key];
+                const processedKey = key.replace(/ (Prompt|Negative)$/, ' Processed $1');
+                const processedValue = processedMetadata[processedKey];
+                
+                if (processedValue && characterPromptData[key]?.isDifferent) {
+                    // Show base and processed with diff highlighting
+                    const diffHtml = highlightTextDifferences(baseValue, processedValue);
+                    characterPromptItems.push(`<span class="character-prompt-display">${diffHtml}</span>`);
+                } else {
+                    characterPromptItems.push(`<span class="character-prompt-display">${baseValue}</span>`);
+                }
             }
+        }
+        
+        if (characterPromptItems.length > 0) {
+            characterPromptsHtml = `<div class="character-prompts-display"><strong>Character Prompts:</strong> ${characterPromptItems.join(', ')}</div>`;
         }
     }
 
