@@ -1874,6 +1874,24 @@ button#send-chat:hover {
   background-color: #1e7e34;
 }
 
+/* Copy Seed button */
+.copy-seed-btn {
+  background-color: #007bff;
+  color: #fff;
+  border: none;
+  padding: 10px 15px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s ease;
+}
+.copy-seed-btn:hover {
+  background-color: #0056b3;
+}
+.copy-seed-btn:active {
+  background-color: #004085;
+}
+
 /* Chat status indicators */
 .chat-status-container {
   margin: 10px 0;

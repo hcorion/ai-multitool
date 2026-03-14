@@ -192,6 +192,11 @@ function renderImageResult(response: ImageOperationResponse): void {
                         🎨 Edit Mask for Inpainting
                     </button>
                 </div>
+                <div class="image-actions" style="margin-top: 10px;">
+                    <button id="copySeedBtn" class="copy-seed-btn">
+                        📋 Copy Seed
+                    </button>
+                </div>
             </div>
         </div>
             <div id="image-modal" style="display:none" class="modal">
@@ -216,6 +221,22 @@ function renderImageResult(response: ImageOperationResponse): void {
             // Open inpainting mask canvas with prompts
             if (response.image_path) {
                 openInpaintingMaskCanvas(response.image_path, prompt, negativePrompt, characterPrompts);
+            }
+        });
+    }
+
+    // Add event listener for copy seed button
+    const copySeedBtn = document.getElementById("copySeedBtn");
+    if (copySeedBtn) {
+        copySeedBtn.addEventListener("click", () => {
+            const seedInput = document.getElementById("seed") as HTMLInputElement;
+            const seedValue = response.metadata?.seed;
+
+            if (seedValue !== undefined && seedValue !== null) {
+                seedInput.value = seedValue.toString();
+                showToast("Seed copied to clipboard!", "success");
+            } else {
+                showToast("No seed found in image metadata", "error");
             }
         });
     }
