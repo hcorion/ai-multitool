@@ -356,6 +356,77 @@
     }
 }
 
+// Mode switcher
+.mode-switcher {
+    display: flex;
+    gap: 4px;
+    margin-right: 8px;
+    border-right: 1px solid rgba(255, 255, 255, 0.2);
+    padding-right: 8px;
+}
+
+.mode-btn {
+    padding: 6px 10px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    cursor: pointer;
+    font-size: 12px;
+    transition: background 0.2s;
+
+    &:hover {
+        background: rgba(255, 255, 255, 0.2);
+    }
+
+    &.active {
+        background: rgba(100, 150, 255, 0.5);
+        border-color: rgba(100, 150, 255, 0.8);
+    }
+}
+
+.toolbar-separator {
+    width: 1px;
+    height: 24px;
+    background: rgba(255, 255, 255, 0.2);
+    margin: 0 4px;
+    align-self: center;
+}
+
+.color-picker-container {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+
+    label {
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.8);
+        white-space: nowrap;
+    }
+}
+
+.color-picker-input {
+    width: 32px;
+    height: 28px;
+    padding: 2px;
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    border-radius: 4px;
+    cursor: pointer;
+    background: transparent;
+}
+
+.color-picker-hex {
+    width: 70px;
+    height: 28px;
+    padding: 0 6px;
+    font-size: 12px;
+    font-family: monospace;
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 4px;
+    color: white;
+}
+
 // Brush cursor preview
 .brush-cursor-preview {
     position: fixed;

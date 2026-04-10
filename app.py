@@ -63,6 +63,7 @@ from image_models import (
     ImageOperationResponse,
     Img2ImgRequest,
     InpaintingRequest,
+    CombinedRequest,
     Operation,
     Provider,
     create_error_response as create_image_error_response,
@@ -3138,6 +3139,10 @@ def handle_image_request():
             if not isinstance(image_request, Img2ImgRequest):
                 raise ValueError("Invalid request type for img2img operation")
             response = _handle_img2img_request(image_request)
+        elif image_request.operation == Operation.COMBINED:
+            if not isinstance(image_request, CombinedRequest):
+                raise ValueError("Invalid request type for combined operation")
+            response = _handle_combined_request(image_request)
         else:
             return jsonify(
                 {"error": f"Unsupported operation: {image_request.operation}"}
@@ -3412,6 +3417,85 @@ def _handle_img2img_request(image_request: Img2ImgRequest) -> ImageOperationResp
     except Exception as e:
         return create_image_error_response(
             error=e, provider=image_request.provider, operation=image_request.operation
+        )
+
+
+def _handle_combined_request(image_request) -> ImageOperationResponse:
+    """Handle combined img2img + inpainting requests (painted image + mask)."""
+    try:
+        # Only NovelAI supports combined operations currently
+        if image_request.provider != Provider.NOVELAI:
+            raise ValueError(
+                f"Provider {image_request.provider.value} does not support combined operations"
+            )
+
+        if not os.path.exists(image_request.base_image_path):
+            raise FileNotFoundError(
+                f"Base image file not found: {image_request.base_image_path}"
+            )
+        if not os.path.exists(image_request.mask_path):
+            raise FileNotFoundError(f"Mask file not found: {image_request.mask_path}")
+
+        # Read both images
+        with open(image_request.base_image_path, "rb") as f:
+            base_image_data = f.read()
+        with open(image_request.mask_path, "rb") as f:
+            mask_data = f.read()
+
+        # Validate dimensions match
+        base_img = PILImage.open(io.BytesIO(base_image_data))
+        mask_img = PILImage.open(io.BytesIO(mask_data))
+        if base_img.size != mask_img.size:
+            raise ValueError(
+                f"Painted image and mask dimensions must match: "
+                f"{base_img.size} vs {mask_img.size}"
+            )
+
+        seed = image_request.seed
+        if not seed or seed <= 0:
+            seed = generate_seed_for_provider(image_request.provider.value)
+            if not seed:
+                raise ValueError("Unable to generate seed for provider")
+
+        followup_state = init_followup_state()
+
+        # Use NovelAI inpainting with the painted image as base
+        generated_data = generate_novelai_inpaint_image(
+            base_image=base_image_data,
+            mask=mask_data,
+            prompt=image_request.prompt,
+            negative_prompt=image_request.negative_prompt,
+            username=session["username"],
+            size=(image_request.width, image_request.height),
+            seed=seed,
+            variety=image_request.variety,
+            character_prompts=image_request.character_prompts,
+            grid_dynamic_prompt=image_request.grid_dynamic_prompt,
+            followup_state=followup_state,
+        )
+
+        return create_success_response(
+            image_path=generated_data.local_image_path,
+            image_name=generated_data.image_name,
+            provider=image_request.provider,
+            operation=image_request.operation,
+            revised_prompt=getattr(generated_data, "revised_prompt", None),
+        )
+
+    except (ValueError, FileNotFoundError, IOError) as e:
+        return create_image_error_response(
+            error=e,
+            provider=image_request.provider,
+            operation=image_request.operation,
+            error_message=str(e),
+        )
+    except Exception as e:
+        logging.error(f"Unexpected error in combined request: {e}", exc_info=True)
+        return create_image_error_response(
+            error=e,
+            provider=image_request.provider,
+            operation=image_request.operation,
+            error_message=f"Combined operation failed: {str(e)}",
         )
 
 

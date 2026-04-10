@@ -9,7 +9,20 @@ import { WorkerManager } from './worker-manager.js';
 export interface StrokeCommand extends BrushStroke {
     // BrushStroke already contains: points, brushSize, mode, timestamp
     id: string; // Unique identifier for the stroke
+    layerType?: 'mask' | 'color';
+    color?: { r: number; g: number; b: number };
 }
+
+export interface ColorStrokeCommand extends StrokeCommand {
+    color: { r: number; g: number; b: number };
+    layerType: 'color';
+}
+
+export interface MaskStrokeCommand extends StrokeCommand {
+    layerType: 'mask';
+}
+
+export type DualLayerStrokeCommand = ColorStrokeCommand | MaskStrokeCommand;
 
 export interface TileData {
     x: number;
@@ -20,6 +33,7 @@ export interface TileData {
 export interface Checkpoint {
     maskData?: Uint8Array; // Full mask data (for compatibility)
     tiles?: TileData[]; // Tile-based data for memory efficiency
+    colorData?: Uint8Array | null;  // Full color layer data
     timestamp: number;
     strokeIndex: number;
     id: string;
@@ -58,7 +72,7 @@ export class HistoryManager {
      * Add a new stroke to the history
      * Clears redo history when new strokes are added
      */
-    public addStroke(stroke: BrushStroke, maskData?: Uint8Array): StrokeCommand {
+    public addStroke(stroke: BrushStroke & { layerType?: 'mask' | 'color'; color?: { r: number; g: number; b: number } }, maskData?: Uint8Array): StrokeCommand {
         // Create stroke command with unique ID
         const strokeCommand: StrokeCommand = {
             ...stroke,
@@ -277,6 +291,39 @@ export class HistoryManager {
         this.manageMemory();
 
         return checkpoint;
+    }
+
+    /**
+     * Create a dual-layer checkpoint storing both mask tiles and color data
+     */
+    public createDualLayerCheckpoint(maskData: Uint8Array, colorData: Uint8Array | null): Checkpoint {
+        if (this.imageWidth === 0 || this.imageHeight === 0) {
+            throw new Error('Image dimensions must be set before creating checkpoints');
+        }
+        const tiles = this.extractTiles(maskData);
+        const checkpoint: Checkpoint = {
+            tiles,
+            colorData: colorData ? new Uint8Array(colorData) : null,
+            timestamp: Date.now(),
+            strokeIndex: this.currentIndex,
+            id: `checkpoint_${this.nextCheckpointId++}`,
+            imageWidth: this.imageWidth,
+            imageHeight: this.imageHeight,
+            tileSize: this.tileSize
+        };
+        this.checkpoints.push(checkpoint);
+        this.checkpoints.sort((a, b) => a.strokeIndex - b.strokeIndex);
+        this.manageMemory();
+        return checkpoint;
+    }
+
+    /**
+     * Reconstruct both mask and color layer data from a dual-layer checkpoint
+     */
+    public reconstructDualLayerFromCheckpoint(checkpoint: Checkpoint): { maskData: Uint8Array; colorData: Uint8Array | null } {
+        const maskData = this.reconstructMaskFromCheckpoint(checkpoint);
+        const colorData = checkpoint.colorData ? new Uint8Array(checkpoint.colorData) : null;
+        return { maskData, colorData };
     }
 
     /**
@@ -564,6 +611,30 @@ export class HistoryManager {
         }
 
         return maskData;
+    }
+
+    /**
+     * Replay color strokes to the provided colorData buffer using the brush engine
+     */
+    public replayColorStrokes(
+        strokes: StrokeCommand[],
+        colorData: Uint8Array,
+        imageWidth: number,
+        imageHeight: number,
+        brushEngine: any
+    ): void {
+        for (const stroke of strokes) {
+            if (stroke.layerType === 'color' && stroke.color) {
+                brushEngine.applyColorStrokePath(
+                    colorData,
+                    imageWidth,
+                    imageHeight,
+                    stroke.points,
+                    stroke.brushSize,
+                    stroke.color
+                );
+            }
+        }
     }
 
     /**

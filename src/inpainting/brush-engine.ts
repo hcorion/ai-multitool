@@ -14,6 +14,8 @@ export interface BrushSettings {
     size: number;
     mode: 'paint' | 'erase';
     spacing: number; // As a fraction of brush diameter (default 0.35)
+    paintMode: 'mask' | 'color';
+    color?: { r: number; g: number; b: number };
 }
 
 export class BrushEngine {
@@ -26,6 +28,7 @@ export class BrushEngine {
             size: 20,
             mode: 'paint',
             spacing: 0.35,
+            paintMode: 'mask',
             ...initialSettings
         };
     }
@@ -214,6 +217,73 @@ export class BrushEngine {
             }
         }
 
+        return hasChanges;
+    }
+
+    /**
+     * Apply a circular color stamp to colorData array at the specified position
+     */
+    public applyColorStamp(
+        colorData: Uint8Array,
+        imageWidth: number,
+        imageHeight: number,
+        centerX: number,
+        centerY: number,
+        brushSize: number,
+        color: { r: number; g: number; b: number }
+    ): boolean {
+        const cx = Math.round(centerX);
+        const cy = Math.round(centerY);
+        const radius = Math.floor(brushSize / 2);
+        let hasChanges = false;
+
+        for (let y = cy - radius; y <= cy + radius; y++) {
+            for (let x = cx - radius; x <= cx + radius; x++) {
+                if (x < 0 || x >= imageWidth || y < 0 || y >= imageHeight) continue;
+                const dx = x - cx;
+                const dy = y - cy;
+                if (dx * dx + dy * dy <= radius * radius) {
+                    const index = (y * imageWidth + x) * 3;
+                    if (colorData[index] !== color.r || colorData[index + 1] !== color.g || colorData[index + 2] !== color.b) {
+                        colorData[index] = color.r;
+                        colorData[index + 1] = color.g;
+                        colorData[index + 2] = color.b;
+                        hasChanges = true;
+                    }
+                }
+            }
+        }
+        return hasChanges;
+    }
+
+    /**
+     * Apply color stamps along a stroke path
+     */
+    public applyColorStrokePath(
+        colorData: Uint8Array,
+        imageWidth: number,
+        imageHeight: number,
+        path: { x: number; y: number }[],
+        brushSize: number,
+        color: { r: number; g: number; b: number }
+    ): boolean {
+        let hasChanges = false;
+        if (path.length === 0) return false;
+
+        if (this.applyColorStamp(colorData, imageWidth, imageHeight, path[0].x, path[0].y, brushSize, color)) {
+            hasChanges = true;
+        }
+
+        let lastStampPos = path[0];
+        for (let i = 1; i < path.length; i++) {
+            const stamps = this.calculateStampPositions(lastStampPos, path[i], brushSize, this.settings.spacing);
+            for (const stampPos of stamps) {
+                if (this.applyColorStamp(colorData, imageWidth, imageHeight, stampPos.x, stampPos.y, brushSize, color)) {
+                    hasChanges = true;
+                }
+                lastStampPos = stampPos;
+            }
+        }
         return hasChanges;
     }
 

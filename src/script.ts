@@ -86,6 +86,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Inpainting buttons
     addEventListenerToElement("clear-inpainting-btn", "click", clearInpaintingMode);
+    addEventListenerToElement("create-blank-canvas-btn", "click", createBlankCanvas);
     addEventListenerToElement("grid-prev", "click", previousGridImage);
     addEventListenerToElement("grid-next", "click", nextGridImage);
     addEventListenerToElement("advanced-toggle", "click", toggleShowAdvanced);
@@ -1260,6 +1261,33 @@ function closeGenModal(): void {
 }
 
 /**
+ * Creates a blank white canvas at the currently selected resolution and opens the painting canvas
+ */
+async function createBlankCanvas(): Promise<void> {
+    const sizeSelect = document.getElementById('size') as HTMLSelectElement;
+    let width = 1024;
+    let height = 1024;
+    if (sizeSelect && sizeSelect.value) {
+        const parts = sizeSelect.value.split('x');
+        if (parts.length === 2) {
+            width = parseInt(parts[0], 10) || 1024;
+            height = parseInt(parts[1], 10) || 1024;
+        }
+    }
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, width, height);
+    const blankImageUrl = canvas.toDataURL('image/png');
+
+    await openInpaintingMaskCanvas(blankImageUrl);
+}
+
+/**
  * Opens the inpainting mask canvas for the given image
  * @param imageUrl - URL of the image to edit
  */
@@ -1267,12 +1295,9 @@ async function openInpaintingMaskCanvas(imageUrl: string, originalPrompt?: strin
     const canvas = new InpaintingMaskCanvas({
         imageUrl: imageUrl,
         containerElement: document.body,
-        onMaskComplete: async (maskDataUrl: string, maskFileId?: string | null) => {
-
-
+        onMaskComplete: async (maskDataUrl: string, maskFileId?: string | null, paintedImageDataUrl?: string) => {
             try {
-                // Save the mask to the server and set up inpainting
-                await setupInpaintingMode(imageUrl, maskDataUrl, maskFileId, originalPrompt, originalNegativePrompt, originalCharacterPrompts);
+                await setupInpaintingMode(imageUrl, maskDataUrl, maskFileId, originalPrompt, originalNegativePrompt, originalCharacterPrompts, paintedImageDataUrl);
             } catch (error) {
                 console.error('Failed to setup inpainting mode:', error);
                 alert('Failed to setup inpainting mode. Please try again.');
@@ -1293,16 +1318,36 @@ async function openInpaintingMaskCanvas(imageUrl: string, originalPrompt?: strin
 /**
  * Set up inpainting mode with the provided base image and mask
  */
-async function setupInpaintingMode(baseImageUrl: string, maskDataUrl: string, maskFileId?: string | null, originalPrompt?: string, originalNegativePrompt?: string, originalCharacterPrompts?: CharacterPromptData[]): Promise<void> {
+async function setupInpaintingMode(baseImageUrl: string, maskDataUrl: string, maskFileId?: string | null, originalPrompt?: string, originalNegativePrompt?: string, originalCharacterPrompts?: CharacterPromptData[], paintedImageDataUrl?: string): Promise<void> {
     try {
-        // Save the mask to the server
-        const maskPath = await saveMaskToServer(maskDataUrl);
+        // If we have a painted image, save it and use it as the base image
+        let effectiveBaseImageUrl = baseImageUrl;
+        let effectiveBaseImagePath: string;
+        let maskPath = '';
 
-        // Extract the base image path from the URL
-        const baseImagePath = extractImagePathFromUrl(baseImageUrl);
+        if (paintedImageDataUrl) {
+            const paintedPath = await savePaintedImageToServer(paintedImageDataUrl);
+            effectiveBaseImagePath = paintedPath;
+            effectiveBaseImageUrl = '/' + paintedPath;
+        } else {
+            effectiveBaseImagePath = extractImagePathFromUrl(baseImageUrl);
+        }
+
+        // Save the mask to the server (if there is one)
+        if (maskDataUrl && maskDataUrl.length > 0) {
+            maskPath = await saveMaskToServer(maskDataUrl);
+        }
+
+        // Determine operation type
+        const hasMask = maskDataUrl && maskDataUrl.length > 0;
+        const hasPainted = !!paintedImageDataUrl;
+        let operation: string;
+        if (hasPainted && hasMask) operation = 'combined';
+        else if (hasPainted && !hasMask) operation = 'img2img';
+        else operation = 'inpaint';
 
         // Show the inpainting section
-        showInpaintingSection(baseImageUrl, maskDataUrl, baseImagePath, maskPath);
+        showInpaintingSection(effectiveBaseImageUrl, maskDataUrl, effectiveBaseImagePath, maskPath, operation);
 
         // Copy original prompts to the form if provided
         if (originalPrompt) {
@@ -1320,7 +1365,6 @@ async function setupInpaintingMode(baseImageUrl: string, maskDataUrl: string, ma
         if (inpaintingSection) {
             inpaintingSection.scrollIntoView({ behavior: 'smooth' });
         }
-
 
     } catch (error) {
         const errorMessage = extractErrorMessage(error);
@@ -1373,6 +1417,21 @@ async function saveMaskToServer(maskDataUrl: string): Promise<string> {
 }
 
 /**
+ * Save a painted image data URL to the server and return the server path
+ */
+async function savePaintedImageToServer(paintedImageDataUrl: string): Promise<string> {
+    const formData = new FormData();
+    const response = await fetch(paintedImageDataUrl);
+    const blob = await response.blob();
+    formData.append('mask', blob, 'painted.png');
+    const saveResponse = await fetch('/save-mask', { method: 'POST', body: formData });
+    if (!saveResponse.ok) throw new Error('Failed to save painted image');
+    const result = await saveResponse.json();
+    if (!result.success) throw new Error(result.error || 'Unknown error');
+    return result.mask_path;
+}
+
+/**
  * Extract image path from full URL
  */
 function extractImagePathFromUrl(imageUrl: string): string {
@@ -1385,7 +1444,7 @@ function extractImagePathFromUrl(imageUrl: string): string {
 /**
  * Show the inpainting section and populate it with image and mask data
  */
-function showInpaintingSection(baseImageUrl: string, maskDataUrl: string, baseImagePath: string, maskPath: string): void {
+function showInpaintingSection(baseImageUrl: string, maskDataUrl: string, baseImagePath: string, maskPath: string, operation: string = 'inpaint'): void {
     const inpaintingSection = document.getElementById('inpainting-section') as HTMLElement;
     const imageNameSpan = document.getElementById('inpainting-image-name') as HTMLElement;
     const maskStatusSpan = document.getElementById('inpainting-mask-status') as HTMLElement;
@@ -1428,7 +1487,7 @@ function showInpaintingSection(baseImageUrl: string, maskDataUrl: string, baseIm
     }
 
     if (operationInput) {
-        operationInput.value = 'inpaint';
+        operationInput.value = operation;
     }
 
     if (submitBtn) {

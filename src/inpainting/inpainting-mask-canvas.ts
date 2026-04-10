@@ -10,10 +10,19 @@ import { HistoryManager, StrokeCommand, HistoryState } from './history-manager.j
 import { BrushStroke } from './brush-engine.js';
 import { maskFileManager, MaskFileManager } from './mask-file-manager.js';
 
+function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result ? {
+        r: parseInt(result[1], 16),
+        g: parseInt(result[2], 16),
+        b: parseInt(result[3], 16)
+    } : null;
+}
+
 interface InpaintingMaskCanvasConfig {
     imageUrl: string;
     containerElement: HTMLElement;
-    onMaskComplete: (maskDataUrl: string, maskFileId?: string | null) => void;
+    onMaskComplete: (maskDataUrl: string, maskFileId?: string | null, paintedImageDataUrl?: string) => void;
     onCancel: () => void;
     enableFileManager?: boolean;
 }
@@ -36,6 +45,7 @@ export class InpaintingMaskCanvas {
     private boundKeydownHandler = (e: KeyboardEvent) => this.handleKeyDown(e);
     private currentStroke: BrushStroke | null = null;
     private fileManager: MaskFileManager | null = null;
+    private currentPaintMode: 'mask' | 'color' = 'mask';
 
     constructor(config: InpaintingMaskCanvasConfig) {
         this.config = config;
@@ -219,6 +229,26 @@ export class InpaintingMaskCanvas {
         const toolbar = document.createElement('div');
         toolbar.className = 'inpainting-mask-toolbar';
 
+        // Add mode switcher (Color Paint / Mask Paint)
+        const modeSwitcher = document.createElement('div');
+        modeSwitcher.className = 'mode-switcher';
+
+        const colorModeBtn = document.createElement('button');
+        colorModeBtn.className = 'mode-btn color-mode-btn';
+        colorModeBtn.innerHTML = '🎨 Color Paint';
+        colorModeBtn.title = 'Paint colors on the image';
+
+        const maskModeBtn = document.createElement('button');
+        maskModeBtn.className = 'mode-btn mask-mode-btn active';
+        maskModeBtn.innerHTML = '⬜ Mask Paint';
+        maskModeBtn.title = 'Paint mask areas for inpainting';
+
+        modeSwitcher.appendChild(colorModeBtn);
+        modeSwitcher.appendChild(maskModeBtn);
+
+        const modeSeparator = document.createElement('div');
+        modeSeparator.className = 'toolbar-separator';
+
         // Add toolbar buttons
         const paintButton = document.createElement('button');
         paintButton.className = 'toolbar-btn paint-btn active';
@@ -301,10 +331,38 @@ export class InpaintingMaskCanvas {
         zoomContainer.appendChild(zoomOutButton);
         zoomContainer.appendChild(zoomResetButton);
 
+        // Color picker container (hidden by default, shown in color mode)
+        const colorPickerContainer = document.createElement('div');
+        colorPickerContainer.className = 'color-picker-container';
+        colorPickerContainer.style.display = 'none';
+
+        const colorPickerLabel = document.createElement('label');
+        colorPickerLabel.textContent = 'Color:';
+
+        const colorPickerInput = document.createElement('input');
+        colorPickerInput.type = 'color';
+        colorPickerInput.value = '#ff0000';
+        colorPickerInput.className = 'color-picker-input';
+        colorPickerInput.title = 'Select paint color';
+
+        const colorPickerHex = document.createElement('input');
+        colorPickerHex.type = 'text';
+        colorPickerHex.value = '#ff0000';
+        colorPickerHex.className = 'color-picker-hex';
+        colorPickerHex.maxLength = 7;
+        colorPickerHex.placeholder = '#rrggbb';
+
+        colorPickerContainer.appendChild(colorPickerLabel);
+        colorPickerContainer.appendChild(colorPickerInput);
+        colorPickerContainer.appendChild(colorPickerHex);
+
         // Add all buttons to toolbar
+        toolbar.appendChild(modeSwitcher);
+        toolbar.appendChild(modeSeparator);
         toolbar.appendChild(paintButton);
         toolbar.appendChild(eraseButton);
         toolbar.appendChild(brushSizeContainer);
+        toolbar.appendChild(colorPickerContainer);
         toolbar.appendChild(zoomContainer);
         toolbar.appendChild(undoButton);
         toolbar.appendChild(redoButton);
@@ -499,6 +557,42 @@ export class InpaintingMaskCanvas {
         paintBtn?.addEventListener('click', () => this.setTool('paint'));
         eraseBtn?.addEventListener('click', () => this.setTool('erase'));
 
+        // Mode switcher
+        const colorModeBtn = this.popupElement.querySelector('.color-mode-btn') as HTMLButtonElement;
+        const maskModeBtn = this.popupElement.querySelector('.mask-mode-btn') as HTMLButtonElement;
+        colorModeBtn?.addEventListener('click', () => this.setMode('color'));
+        maskModeBtn?.addEventListener('click', () => this.setMode('mask'));
+
+        // Color picker
+        const colorPickerInput = this.popupElement.querySelector('.color-picker-input') as HTMLInputElement;
+        const colorPickerHex = this.popupElement.querySelector('.color-picker-hex') as HTMLInputElement;
+
+        colorPickerInput?.addEventListener('input', () => {
+            const hex = colorPickerInput.value;
+            if (colorPickerHex) colorPickerHex.value = hex;
+            const color = hexToRgb(hex);
+            if (color && this.canvasManager) {
+                this.canvasManager.getBrushEngine().updateSettings({ color });
+            }
+            if (color && this.inputEngine) {
+                this.inputEngine.updateCursorColor(color);
+            }
+        });
+
+        colorPickerHex?.addEventListener('input', () => {
+            const hex = colorPickerHex.value;
+            if (/^#[0-9a-fA-F]{6}$/.test(hex)) {
+                if (colorPickerInput) colorPickerInput.value = hex;
+                const color = hexToRgb(hex);
+                if (color && this.canvasManager) {
+                    this.canvasManager.getBrushEngine().updateSettings({ color });
+                }
+                if (color && this.inputEngine) {
+                    this.inputEngine.updateCursorColor(color);
+                }
+            }
+        });
+
         // Brush size control
         brushSizeSlider?.addEventListener('input', (e) => {
             const size = (e.target as HTMLInputElement).value;
@@ -612,6 +706,57 @@ export class InpaintingMaskCanvas {
         if (this.inputEngine) {
             this.inputEngine.updateCursorMode(tool);
         }
+    }
+
+    private setMode(mode: 'mask' | 'color'): void {
+        if (!this.popupElement) return;
+
+        this.currentPaintMode = mode;
+
+        // Update mode button active states
+        const colorModeBtn = this.popupElement.querySelector('.color-mode-btn');
+        const maskModeBtn = this.popupElement.querySelector('.mask-mode-btn');
+        colorModeBtn?.classList.toggle('active', mode === 'color');
+        maskModeBtn?.classList.toggle('active', mode === 'mask');
+
+        // Update canvas manager mode and brush engine
+        this.setPaintMode(mode);
+
+        // Show/hide color picker
+        this.setColorPickerVisibility(mode === 'color');
+
+        // Update cursor appearance
+        if (this.inputEngine) {
+            if (mode === 'color') {
+                const color = this.getCurrentColor();
+                this.inputEngine.updateCursorColor(color);
+            } else {
+                this.inputEngine.updateCursorColor(null);
+                this.inputEngine.updateCursorMode('paint');
+            }
+        }
+    }
+
+    private setColorPickerVisibility(visible: boolean): void {
+        if (!this.popupElement) return;
+        const colorPicker = this.popupElement.querySelector('.color-picker-container') as HTMLElement | null;
+        if (colorPicker) {
+            colorPicker.style.display = visible ? 'flex' : 'none';
+        }
+    }
+
+    private setPaintMode(mode: 'mask' | 'color'): void {
+        if (this.canvasManager) {
+            this.canvasManager.setMode(mode);
+            this.canvasManager.getBrushEngine().updateSettings({ paintMode: mode });
+        }
+    }
+
+    private getCurrentColor(): { r: number; g: number; b: number } {
+        if (!this.popupElement) return { r: 255, g: 0, b: 0 };
+        const colorInput = this.popupElement.querySelector('.color-picker-input') as HTMLInputElement;
+        if (!colorInput) return { r: 255, g: 0, b: 0 };
+        return hexToRgb(colorInput.value) ?? { r: 255, g: 0, b: 0 };
     }
 
     private setBrushSize(size: number): void {
@@ -787,13 +932,28 @@ export class InpaintingMaskCanvas {
 
     private async completeMask(): Promise<void> {
         try {
-            // Export mask with file management
-            const { dataUrl, fileId } = await this.exportMaskAsTemporaryFileAsync();
-            this.config.onMaskComplete(dataUrl, fileId);
+            if (!this.canvasManager) throw new Error('Canvas not initialized');
+
+            const { paintedImage, mask } = this.canvasManager.exportBothLayers();
+
+            if (paintedImage && mask) {
+                // Combined operation: both color painting and mask
+                this.config.onMaskComplete(mask, null, paintedImage);
+            } else if (paintedImage) {
+                // Color-only: img2img operation
+                this.config.onMaskComplete('', null, paintedImage);
+            } else if (mask) {
+                // Mask-only: inpainting operation (existing behavior)
+                const { dataUrl, fileId } = await this.exportMaskAsTemporaryFileAsync();
+                this.config.onMaskComplete(dataUrl, fileId);
+            } else {
+                // Nothing painted - just close
+                this.config.onCancel();
+            }
             this.hide();
         } catch (error) {
             console.error('Failed to complete mask:', error);
-            this.showError('Failed to export mask. Please try again.');
+            this.showError('Failed to export. Please try again.');
         }
     }
 
@@ -902,30 +1062,59 @@ export class InpaintingMaskCanvas {
       
         const brush = this.canvasManager.getBrushEngine();
         const settings = brush.getSettings();
+        const mode = this.canvasManager.getMode();
       
         if (evt.type === 'start') {
-          this.currentStroke = this.canvasManager.startBrushStroke(img.x, img.y, this.currentBrushSize, settings.mode);
+            if (mode === 'color') {
+                this.canvasManager.initializeColorLayer();
+                const color = settings.color ?? { r: 255, g: 0, b: 0 };
+                const state = this.canvasManager.getState();
+                if (state?.colorData) {
+                    brush.applyColorStamp(state.colorData, state.imageWidth, state.imageHeight, img.x, img.y, this.currentBrushSize, color);
+                    this.canvasManager.updateColorLayerDisplay();
+                }
+                this.currentStroke = { points: [img], brushSize: this.currentBrushSize, mode: 'paint', timestamp: Date.now() };
+            } else {
+                this.currentStroke = this.canvasManager.startBrushStroke(img.x, img.y, this.currentBrushSize, settings.mode);
+            }
         } else if (evt.type === 'move') {
-          // Only continue stroke if we have an active stroke
-          // This prevents the race condition where move events are processed before start events
-          if (this.currentStroke && brush.getCurrentStroke()) {
-            this.canvasManager.continueBrushStroke(img.x, img.y);
-          }
+            if (mode === 'color' && this.currentStroke) {
+                const color = settings.color ?? { r: 255, g: 0, b: 0 };
+                const state = this.canvasManager.getState();
+                if (state?.colorData) {
+                    brush.applyColorStamp(state.colorData, state.imageWidth, state.imageHeight, img.x, img.y, this.currentBrushSize, color);
+                    this.currentStroke.points.push(img);
+                    this.canvasManager.updateColorLayerDisplay();
+                }
+            } else if (mode === 'mask') {
+                // Only continue stroke if we have an active stroke
+                if (this.currentStroke && brush.getCurrentStroke()) {
+                    this.canvasManager.continueBrushStroke(img.x, img.y);
+                }
+            }
         } else if (evt.type === 'end') {
-          const completedStroke = this.canvasManager.endBrushStroke();
-          if (completedStroke && this.historyManager) {
-            // Process stroke asynchronously using WebWorker (with fallback)
-            this.processStrokeAsync(completedStroke);
-          }
-          this.currentStroke = null;
-        } else if (evt.type === 'cancel') {
-          // Handle pointer cancellation (important for robust input handling)
-          if (this.currentStroke) {
-            this.canvasManager.endBrushStroke();
+            if (mode === 'color' && this.currentStroke) {
+                this.canvasManager.updateColorLayerDisplay();
+                if (this.historyManager) {
+                    this.historyManager.addStroke(this.currentStroke);
+                    this.updateHistoryButtons();
+                }
+            } else {
+                const completedStroke = this.canvasManager.endBrushStroke();
+                if (completedStroke && this.historyManager) {
+                    this.processStrokeAsync(completedStroke);
+                }
+            }
             this.currentStroke = null;
-          }
+        } else if (evt.type === 'cancel') {
+            if (mode === 'color') {
+                this.currentStroke = null;
+            } else if (this.currentStroke) {
+                this.canvasManager.endBrushStroke();
+                this.currentStroke = null;
+            }
         }
-      };
+    };
 
     /**
      * Process a completed stroke asynchronously using WebWorker

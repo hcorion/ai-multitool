@@ -8,6 +8,13 @@ import { RenderScheduler, DirtyRect } from './render-scheduler.js';
 import { PerformanceMonitor } from './performance-monitor.js';
 import { WorkerManager } from './worker-manager.js';
 
+export class CanvasValidationError extends Error {
+    constructor(message: string, public code: string) {
+        super(message);
+        this.name = 'CanvasValidationError';
+    }
+}
+
 export interface CanvasState {
     imageWidth: number;
     imageHeight: number;
@@ -18,6 +25,9 @@ export interface CanvasState {
     offsetX: number;
     offsetY: number;
     scale: number;
+    colorData: Uint8Array | null;
+    colorLayerDirty: boolean;
+    currentMode: 'mask' | 'color';
 }
 
 export interface CoordinateTransform {
@@ -29,6 +39,7 @@ export class CanvasManager implements CoordinateTransform {
     private imageCanvas: HTMLCanvasElement;
     private overlayCanvas: HTMLCanvasElement;
     private maskAlphaCanvas: OffscreenCanvas | HTMLCanvasElement;
+    private colorCanvas: HTMLCanvasElement | null = null;
     private state: CanvasState | null = null;
     private loadedImage: HTMLImageElement | null = null;
     private brushEngine: BrushEngine;
@@ -141,7 +152,10 @@ export class CanvasManager implements CoordinateTransform {
             displayHeight,
             offsetX: 0, // Not used with CSS centering
             offsetY: 0, // Not used with CSS centering
-            scale
+            scale,
+            colorData: null,
+            colorLayerDirty: false,
+            currentMode: 'mask'
         };
 
         // Initialize mask data to all zeros (transparent)
@@ -237,6 +251,170 @@ export class CanvasManager implements CoordinateTransform {
         ctx.drawImage(img, 0, 0);
         this.updateCanvasDisplay();
         this.resetTransform(); // ensure we start from centered state
+    }
+
+    /**
+     * Render color data to the hidden colorCanvas, then composite it over imageCanvas.
+     * Only pixels with non-zero RGB values are drawn (original image shows through elsewhere).
+     */
+    private renderColorLayer(dirtyRect?: { x: number; y: number; width: number; height: number }): void {
+        if (!this.state || !this.state.colorData) return;
+
+        // Create/reuse the hidden color canvas at image dimensions
+        if (!this.colorCanvas) {
+            this.colorCanvas = document.createElement('canvas');
+            this.colorCanvas.width = this.state.imageWidth;
+            this.colorCanvas.height = this.state.imageHeight;
+        }
+
+        const colorCtx = this.colorCanvas.getContext('2d');
+        if (!colorCtx) return;
+
+        const rect = dirtyRect || {
+            x: 0,
+            y: 0,
+            width: this.state.imageWidth,
+            height: this.state.imageHeight
+        };
+
+        // Build ImageData for the dirty region - only paint non-zero pixels
+        const imageData = colorCtx.createImageData(rect.width, rect.height);
+        const data = imageData.data;
+
+        for (let y = 0; y < rect.height; y++) {
+            for (let x = 0; x < rect.width; x++) {
+                const imgX = rect.x + x;
+                const imgY = rect.y + y;
+                if (imgX < 0 || imgX >= this.state.imageWidth || imgY < 0 || imgY >= this.state.imageHeight) continue;
+
+                const srcIdx = (imgY * this.state.imageWidth + imgX) * 3;
+                const r = this.state.colorData[srcIdx];
+                const g = this.state.colorData[srcIdx + 1];
+                const b = this.state.colorData[srcIdx + 2];
+
+                const dstIdx = (y * rect.width + x) * 4;
+                if (r !== 0 || g !== 0 || b !== 0) {
+                    data[dstIdx] = r;
+                    data[dstIdx + 1] = g;
+                    data[dstIdx + 2] = b;
+                    data[dstIdx + 3] = 255; // fully opaque where painted
+                } else {
+                    data[dstIdx + 3] = 0; // transparent where unpainted
+                }
+            }
+        }
+
+        colorCtx.putImageData(imageData, rect.x, rect.y);
+    }
+
+    /**
+     * Composite the color layer over the original image on imageCanvas.
+     * Draws: original image first, then color layer on top (source-over, only painted pixels).
+     */
+    private compositeColorOverImage(): void {
+        if (!this.state || !this.loadedImage) return;
+
+        const ctx = this.imageCanvas.getContext('2d');
+        if (!ctx) return;
+
+        // Redraw original image as base
+        ctx.clearRect(0, 0, this.state.imageWidth, this.state.imageHeight);
+        ctx.drawImage(this.loadedImage, 0, 0);
+
+        // Composite color layer on top if it has data
+        if (this.state.colorData && this.colorCanvas) {
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.drawImage(this.colorCanvas, 0, 0);
+            ctx.globalCompositeOperation = 'source-over'; // reset
+        }
+    }
+
+    /**
+     * Public method to trigger re-rendering of the color layer on imageCanvas.
+     * Call this after color strokes to update the display.
+     */
+    public updateColorLayerDisplay(dirtyRect?: { x: number; y: number; width: number; height: number }): void {
+        if (!this.state) return;
+        this.renderColorLayer(dirtyRect);
+        this.compositeColorOverImage();
+        this.state.colorLayerDirty = false;
+    }
+
+    /**
+     * Export the painted image (original image composited with color layer) as a PNG data URL.
+     * Returns the original image data URL if no color data has been painted.
+     */
+    public exportPaintedImage(): string {
+        if (!this.state) {
+            throw new Error('No image loaded');
+        }
+
+        this.validateExport();
+
+        const exportCanvas = document.createElement('canvas');
+        exportCanvas.width = this.state.imageWidth;
+        exportCanvas.height = this.state.imageHeight;
+        const ctx = exportCanvas.getContext('2d');
+        if (!ctx) {
+            throw new Error('Failed to get export canvas context');
+        }
+
+        ctx.imageSmoothingEnabled = false;
+
+        // Draw original image as base
+        if (this.loadedImage) {
+            ctx.drawImage(this.loadedImage, 0, 0);
+        }
+
+        // Composite color layer on top if it has data
+        if (this.state.colorData && this.hasColorData()) {
+            // Ensure colorCanvas is up to date
+            this.renderColorLayer();
+            if (this.colorCanvas) {
+                ctx.globalCompositeOperation = 'source-over';
+                ctx.drawImage(this.colorCanvas, 0, 0);
+                ctx.globalCompositeOperation = 'source-over'; // reset
+            }
+        }
+
+        return exportCanvas.toDataURL('image/png');
+    }
+
+    /**
+     * Validate the canvas state before export.
+     * Throws CanvasValidationError for invalid states.
+     */
+    public validateExport(): void {
+        if (!this.state) throw new CanvasValidationError('No image loaded', 'NO_IMAGE');
+
+        if (this.state.colorData) {
+            if (this.state.colorData.length !== this.state.imageWidth * this.state.imageHeight * 3) {
+                throw new CanvasValidationError('Color layer dimensions mismatch', 'DIMENSION_MISMATCH');
+            }
+            for (let i = 0; i < this.state.colorData.length; i++) {
+                if (this.state.colorData[i] < 0 || this.state.colorData[i] > 255) {
+                    throw new CanvasValidationError('Color values out of range', 'INVALID_COLOR');
+                }
+            }
+        }
+    }
+
+    /**
+     * Export both the painted image and mask as separate data URLs.
+     * Returns null for each layer that has no data.
+     */
+    public exportBothLayers(): { paintedImage: string | null; mask: string | null } {
+        if (!this.state) throw new Error('No image loaded');
+
+        this.validateExport();
+
+        const hasMask = this.state.maskData.some(v => v !== 0);
+        const hasColor = this.hasColorData();
+
+        return {
+            paintedImage: hasColor ? this.exportPaintedImage() : null,
+            mask: hasMask ? this.exportMaskAsPNG() : null
+        };
     }
 
     /**
@@ -529,6 +707,68 @@ export class CanvasManager implements CoordinateTransform {
     }
 
     /**
+     * Initialize the color layer, allocating RGB data (3 bytes per pixel).
+     * No-op if already initialized.
+     */
+    public initializeColorLayer(): void {
+        if (!this.state) return;
+        if (!this.state.colorData) {
+            this.state.colorData = new Uint8Array(this.state.imageWidth * this.state.imageHeight * 3);
+            this.state.colorData.fill(0);
+        }
+    }
+
+    /**
+     * Write RGB color values at the given image coordinates.
+     * Returns false if coordinates are out of bounds or no state exists.
+     */
+    public updateColorData(x: number, y: number, r: number, g: number, b: number): boolean {
+        if (!this.state) return false;
+        if (x < 0 || x >= this.state.imageWidth || y < 0 || y >= this.state.imageHeight) return false;
+        if (!this.state.colorData) this.initializeColorLayer();
+        const index = (y * this.state.imageWidth + x) * 3;
+        this.state.colorData![index] = r;
+        this.state.colorData![index + 1] = g;
+        this.state.colorData![index + 2] = b;
+        this.state.colorLayerDirty = true;
+        return true;
+    }
+
+    /**
+     * Read RGB color values at the given image coordinates.
+     * Returns { r: 0, g: 0, b: 0 } for out-of-bounds or uninitialized layer.
+     */
+    public getColorValue(x: number, y: number): { r: number; g: number; b: number } {
+        if (!this.state || !this.state.colorData) return { r: 0, g: 0, b: 0 };
+        if (x < 0 || x >= this.state.imageWidth || y < 0 || y >= this.state.imageHeight) return { r: 0, g: 0, b: 0 };
+        const index = (y * this.state.imageWidth + x) * 3;
+        return {
+            r: this.state.colorData[index],
+            g: this.state.colorData[index + 1],
+            b: this.state.colorData[index + 2]
+        };
+    }
+
+    /**
+     * Reset all color data to zero (no paint).
+     */
+    public clearColorLayer(): void {
+        if (!this.state) return;
+        if (this.state.colorData) {
+            this.state.colorData.fill(0);
+            this.state.colorLayerDirty = true;
+        }
+    }
+
+    /**
+     * Returns true if the color layer has been initialized and contains any non-zero values.
+     */
+    public hasColorData(): boolean {
+        if (!this.state || !this.state.colorData) return false;
+        return this.state.colorData.some(v => v !== 0);
+    }
+
+    /**
      * Check if mask data is dirty and needs redraw
      */
     public isDirty(): boolean {
@@ -542,6 +782,22 @@ export class CanvasManager implements CoordinateTransform {
         if (this.state) {
             this.state.isDirty = false;
         }
+    }
+
+    /**
+     * Switch between mask and color painting modes.
+     * Both layer data are preserved on mode switch.
+     */
+    public setMode(mode: 'mask' | 'color'): void {
+        if (!this.state) return;
+        this.state.currentMode = mode;
+    }
+
+    /**
+     * Get the current painting mode.
+     */
+    public getMode(): 'mask' | 'color' {
+        return this.state?.currentMode ?? 'mask';
     }
 
     /**

@@ -341,6 +341,24 @@ export class InputEngine {
         }
     }
     /**
+     * Update cursor preview color for color painting mode.
+     * Pass null to reset to mask mode colors (white).
+     */
+    updateCursorColor(color) {
+        if (this.cursorElement) {
+            if (color) {
+                const rgb = `rgb(${color.r}, ${color.g}, ${color.b})`;
+                this.cursorElement.style.borderColor = rgb;
+                this.cursorElement.style.backgroundColor = `rgba(${color.r}, ${color.g}, ${color.b}, 0.3)`;
+            }
+            else {
+                // Reset to mask mode colors (white)
+                this.cursorElement.style.borderColor = 'rgba(255, 255, 255, 0.8)';
+                this.cursorElement.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+            }
+        }
+    }
+    /**
      * Set the input event handler
      */
     setEventHandler(handler) {

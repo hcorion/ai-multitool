@@ -24,6 +24,7 @@ class Operation(str, Enum):
     GENERATE = "generate"
     INPAINT = "inpaint"
     IMG2IMG = "img2img"
+    COMBINED = "combined"
 
 
 class Quality(str, Enum):
@@ -136,6 +137,22 @@ class Img2ImgRequest(ImageGenerationRequest):
 
 
 @dataclass
+class CombinedRequest(ImageGenerationRequest):
+    """Request model for combined img2img + inpainting operations."""
+
+    base_image_path: str = ""
+    mask_path: str = ""
+    operation: Operation = Operation.COMBINED
+
+    def __post_init__(self):
+        super().__post_init__()
+        if not self.base_image_path or not self.base_image_path.strip():
+            raise ValueError("Base image path is required for combined operation")
+        if not self.mask_path or not self.mask_path.strip():
+            raise ValueError("Mask path is required for combined operation")
+
+
+@dataclass
 class ImageOperationResponse:
     """Unified response model for all image operations."""
 
@@ -165,6 +182,7 @@ class ImageRequestValidator:
                 Operation.GENERATE,
                 Operation.INPAINT,
                 Operation.IMG2IMG,
+                Operation.COMBINED,
             ],
             Provider.STABILITY: [Operation.GENERATE],
         }
@@ -197,6 +215,7 @@ class ImageRequestValidator:
                 Operation.GENERATE: NovelAIModel.DIFFUSION_4_5_FULL.value,
                 Operation.INPAINT: NovelAIModel.DIFFUSION_4_5_FULL_INPAINTING.value,
                 Operation.IMG2IMG: NovelAIModel.DIFFUSION_4_5_FULL.value,
+                Operation.COMBINED: NovelAIModel.DIFFUSION_4_5_FULL_INPAINTING.value,
             },
         }
 
@@ -205,7 +224,7 @@ class ImageRequestValidator:
 
 def create_request_from_form_data(
     form_data: dict[str, Any],
-) -> ImageGenerationRequest | InpaintingRequest | Img2ImgRequest:
+) -> ImageGenerationRequest | InpaintingRequest | Img2ImgRequest | CombinedRequest:
     """Create typed request object from HTML form data with validation."""
     # Handle empty operation field - default to GENERATE for regular image generation
     operation_value = form_data.get("operation", Operation.GENERATE.value)
@@ -338,6 +357,22 @@ def create_request_from_form_data(
             seed=seed,
             base_image_path=form_data.get("base_image_path", ""),
             strength=float(form_data.get("strength", 0.7)),
+        )
+    elif operation == Operation.COMBINED:
+        return CombinedRequest(
+            prompt=prompt,
+            provider=provider,
+            operation=operation,
+            negative_prompt=negative_prompt,
+            width=width,
+            height=height,
+            quality=quality,
+            model=model,
+            character_prompts=character_prompts_final,
+            variety=variety,
+            seed=seed,
+            base_image_path=form_data.get("base_image_path", ""),
+            mask_path=form_data.get("mask_path", ""),
         )
     else:
         return ImageGenerationRequest(

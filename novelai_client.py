@@ -639,12 +639,13 @@ class NovelAIClient:
             # Add vibe parameters to the request
             parameters["reference_image_multiple"] = reference_image_multiple
             parameters["reference_strength_multiple"] = reference_strength_multiple
+        
+        parameters["image"] = base_image_b64
 
         payload = {
             "action": NovelAIAction.IMG2IMG.value,
             "model": NovelAIModel.DIFFUSION_4_5_FULL.value,
-            "parameters": parameters,
-            "image": base_image_b64,
+            "parameters": parameters
         }
 
         response = self._make_request("ai/generate-image", payload)

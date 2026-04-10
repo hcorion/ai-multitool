@@ -201,6 +201,37 @@ export class HistoryManager {
         return checkpoint;
     }
     /**
+     * Create a dual-layer checkpoint storing both mask tiles and color data
+     */
+    createDualLayerCheckpoint(maskData, colorData) {
+        if (this.imageWidth === 0 || this.imageHeight === 0) {
+            throw new Error('Image dimensions must be set before creating checkpoints');
+        }
+        const tiles = this.extractTiles(maskData);
+        const checkpoint = {
+            tiles,
+            colorData: colorData ? new Uint8Array(colorData) : null,
+            timestamp: Date.now(),
+            strokeIndex: this.currentIndex,
+            id: `checkpoint_${this.nextCheckpointId++}`,
+            imageWidth: this.imageWidth,
+            imageHeight: this.imageHeight,
+            tileSize: this.tileSize
+        };
+        this.checkpoints.push(checkpoint);
+        this.checkpoints.sort((a, b) => a.strokeIndex - b.strokeIndex);
+        this.manageMemory();
+        return checkpoint;
+    }
+    /**
+     * Reconstruct both mask and color layer data from a dual-layer checkpoint
+     */
+    reconstructDualLayerFromCheckpoint(checkpoint) {
+        const maskData = this.reconstructMaskFromCheckpoint(checkpoint);
+        const colorData = checkpoint.colorData ? new Uint8Array(checkpoint.colorData) : null;
+        return { maskData, colorData };
+    }
+    /**
      * Get the most recent checkpoint at or before the given stroke index
      */
     getNearestCheckpoint(strokeIndex) {
@@ -441,6 +472,16 @@ export class HistoryManager {
             replayCallback(stroke);
         }
         return maskData;
+    }
+    /**
+     * Replay color strokes to the provided colorData buffer using the brush engine
+     */
+    replayColorStrokes(strokes, colorData, imageWidth, imageHeight, brushEngine) {
+        for (const stroke of strokes) {
+            if (stroke.layerType === 'color' && stroke.color) {
+                brushEngine.applyColorStrokePath(colorData, imageWidth, imageHeight, stroke.points, stroke.brushSize, stroke.color);
+            }
+        }
     }
     /**
      * Export history state for debugging
