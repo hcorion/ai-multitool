@@ -259,14 +259,16 @@ function handleTabClick(evt) {
  * Strength / noise value labels next to inpainting sliders (NovelAI).
  */
 function updateInpaintingStrengthNoiseLabels() {
-    const s = document.getElementById("inpainting-strength");
-    const n = document.getElementById("inpainting-noise");
-    const sv = document.getElementById("inpainting-strength-value");
-    const nv = document.getElementById("inpainting-noise-value");
-    if (s && sv)
-        sv.textContent = parseFloat(s.value).toFixed(2);
-    if (n && nv)
-        nv.textContent = parseFloat(n.value).toFixed(2);
+    const strengthSlider = document.getElementById("inpainting-strength");
+    const noiseSlider = document.getElementById("inpainting-noise");
+    const strengthValue = document.getElementById("inpainting-strength-value");
+    const noiseValue = document.getElementById("inpainting-noise-value");
+    if (strengthSlider && strengthValue) {
+        strengthValue.textContent = parseFloat(strengthSlider.value).toFixed(2);
+    }
+    if (noiseSlider && noiseValue) {
+        noiseValue.textContent = parseFloat(noiseSlider.value).toFixed(2);
+    }
 }
 /**
  * Only submit strength/noise when inpainting UI is open and NovelAI is selected.
@@ -275,11 +277,12 @@ function syncInpaintingNovelaiStrengthNoiseEnabled() {
     const section = document.getElementById("inpainting-section");
     const strengthEl = document.getElementById("inpainting-strength");
     const noiseEl = document.getElementById("inpainting-noise");
-    if (!strengthEl || !noiseEl)
+    if (!strengthEl || !noiseEl) {
         return;
+    }
     const provider = document.getElementById("provider");
-    const sectionVisible = section && section.style.display !== "none";
-    const novelaiSelected = provider && provider.value === "novelai";
+    const sectionVisible = !!section && section.style.display !== "none";
+    const novelaiSelected = !!provider && provider.value === "novelai";
     const active = sectionVisible && novelaiSelected;
     strengthEl.disabled = !active;
     noiseEl.disabled = !active;

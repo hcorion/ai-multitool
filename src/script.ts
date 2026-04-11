@@ -86,6 +86,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Inpainting buttons
     addEventListenerToElement("clear-inpainting-btn", "click", clearInpaintingMode);
+    addEventListenerToElement("inpainting-strength", "input", updateInpaintingStrengthNoiseLabels);
+    addEventListenerToElement("inpainting-noise", "input", updateInpaintingStrengthNoiseLabels);
     addEventListenerToElement("create-blank-canvas-btn", "click", createBlankCanvas);
     addEventListenerToElement("grid-prev", "click", previousGridImage);
     addEventListenerToElement("grid-next", "click", nextGridImage);
@@ -140,6 +142,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Just refresh the image gen provider
     providerChanged();
+    updateInpaintingStrengthNoiseLabels();
 
     // NovelAI tag suggestions on prompt textareas
     initTagSuggestions();
@@ -308,6 +311,42 @@ function handleTabClick(evt: Event) {
 }
 
 /**
+ * Strength / noise value labels next to inpainting sliders (NovelAI).
+ */
+function updateInpaintingStrengthNoiseLabels() {
+    const strengthSlider = document.getElementById("inpainting-strength") as HTMLInputElement | null;
+    const noiseSlider = document.getElementById("inpainting-noise") as HTMLInputElement | null;
+    const strengthValue = document.getElementById("inpainting-strength-value");
+    const noiseValue = document.getElementById("inpainting-noise-value");
+
+    if (strengthSlider && strengthValue) {
+        strengthValue.textContent = parseFloat(strengthSlider.value).toFixed(2);
+    }
+    if (noiseSlider && noiseValue) {
+        noiseValue.textContent = parseFloat(noiseSlider.value).toFixed(2);
+    }
+}
+
+/**
+ * Only submit strength/noise when inpainting UI is open and NovelAI is selected.
+ */
+function syncInpaintingNovelaiStrengthNoiseEnabled() {
+    const section = document.getElementById("inpainting-section");
+    const strengthEl = document.getElementById("inpainting-strength") as HTMLInputElement | null;
+    const noiseEl = document.getElementById("inpainting-noise") as HTMLInputElement | null;
+    if (!strengthEl || !noiseEl) {
+        return;
+    }
+
+    const provider = document.getElementById("provider") as HTMLSelectElement | null;
+    const sectionVisible = !!section && section.style.display !== "none";
+    const novelaiSelected = !!provider && provider.value === "novelai";
+    const active = sectionVisible && novelaiSelected;
+    strengthEl.disabled = !active;
+    noiseEl.disabled = !active;
+}
+
+/**
  * Update UI when image generation provider is changed
  */
 function providerChanged() {
@@ -342,6 +381,7 @@ function providerChanged() {
     } else {
         throw new Error(`Tried to switch to unsupported provider ${selection.value}`);
     }
+    syncInpaintingNovelaiStrengthNoiseEnabled();
 }
 
 /**
@@ -1490,6 +1530,15 @@ function showInpaintingSection(baseImageUrl: string, maskDataUrl: string, baseIm
         operationInput.value = operation;
     }
 
+    const strengthSlider = document.getElementById("inpainting-strength") as HTMLInputElement | null;
+    const noiseSlider = document.getElementById("inpainting-noise") as HTMLInputElement | null;
+    if (strengthSlider && noiseSlider) {
+        strengthSlider.value = operation === "inpaint" ? "1" : "0.7";
+        noiseSlider.value = "0.2";
+        updateInpaintingStrengthNoiseLabels();
+    }
+    syncInpaintingNovelaiStrengthNoiseEnabled();
+
     if (submitBtn) {
         submitBtn.value = 'Generate Inpainting';
         submitBtn.classList.add('inpainting-mode');
@@ -1629,6 +1678,20 @@ function clearInpaintingMode(): void {
     const maskPathInput = document.getElementById('inpainting-mask-path') as HTMLInputElement;
     const operationInput = document.getElementById('inpainting-operation') as HTMLInputElement;
     const submitBtn = document.getElementById('generate-submit-btn') as HTMLInputElement;
+    const strengthSlider = document.getElementById("inpainting-strength") as HTMLInputElement | null;
+    const noiseSlider = document.getElementById("inpainting-noise") as HTMLInputElement | null;
+
+    if (strengthSlider) {
+        strengthSlider.value = "1";
+        strengthSlider.disabled = true;
+    }
+
+    if (noiseSlider) {
+        noiseSlider.value = "0.2";
+        noiseSlider.disabled = true;
+    }
+
+    updateInpaintingStrengthNoiseLabels();
 
     if (inpaintingSection) {
         inpaintingSection.style.display = 'none';
@@ -1650,6 +1713,8 @@ function clearInpaintingMode(): void {
         submitBtn.value = 'Generate Image';
         submitBtn.classList.remove('inpainting-mode');
     }
+
+    syncInpaintingNovelaiStrengthNoiseEnabled();
 }
 
 // Make the functions globally available
