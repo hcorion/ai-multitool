@@ -111,6 +111,7 @@ class NovelAIClient:
         steps: int = 28,
         scale: float = 6.0,
         strength: float = 0.6,
+        noise: float = 0.2,
         variety: bool = False,
         character_prompts: list[dict[str, str]] | None = None,
         **kwargs,
@@ -126,7 +127,8 @@ class NovelAIClient:
             seed: Random seed for reproducible generation
             steps: Number of diffusion steps
             scale: CFG scale for prompt adherence
-            strength: Strength parameter for img2img/inpainting
+            strength: NovelAI `strength`, `inpaintImg2ImgStrength`, and `img2img.strength` (unified)
+            noise: NovelAI `noise` schedule strength
             variety: Enable variety mode for more diverse outputs
             character_prompts: List of character-specific prompts
             **kwargs: Additional parameters to override defaults
@@ -169,11 +171,15 @@ class NovelAIClient:
             "width": width,
             "height": height,
             "inpaintImg2ImgStrength": strength,
+            "img2img": {
+                "color_correct": True,
+                "strength": strength
+            },
             "legacy": False,
             "legacy_uc": False,
             "legacy_v3_extend": False,
             "n_samples": 1,
-            "noise": 0.2,
+            "noise": noise,
             "noise_schedule": "karras",
             "normalize_reference_strength_multiple": True,
             "params_version": 3,
@@ -339,6 +345,7 @@ class NovelAIClient:
         seed: int = 0,
         steps: int = 28,
         scale: float = 6.0,
+        strength: float = 0.6,
         variety: bool = False,
         character_prompts: list[dict[str, str]] | None = None,
         vibes: list[VibeReference] | None = None,
@@ -355,6 +362,7 @@ class NovelAIClient:
             seed: Random seed for reproducible generation
             steps: Number of diffusion steps (max 28 for free tier)
             scale: CFG scale for prompt adherence
+            strength: NovelAI `strength` (img2img-style denoise; used for T2I payload)
             variety: Enable variety mode for more diverse outputs
             character_prompts: List of character-specific prompts
             vibes: List of vibe references to apply to generation
@@ -367,6 +375,8 @@ class NovelAIClient:
             NovelAIAPIError: If the API returns an error
             NovelAIClientError: If there's a client-side error
         """
+        noise = kwargs.pop("noise", 0.2)
+
         # Build the request parameters using common helper
         parameters = self._build_common_parameters(
             prompt=prompt,
@@ -376,7 +386,8 @@ class NovelAIClient:
             seed=seed,
             steps=steps,
             scale=scale,
-            strength=0.6,  # Default strength for text-to-image
+            strength=strength,
+            noise=noise,
             variety=variety,
             character_prompts=character_prompts,
             **kwargs,
@@ -474,6 +485,8 @@ class NovelAIClient:
         mask: bytes,
         prompt: str,
         negative_prompt: str | None = None,
+        strength: float = 1.0,
+        noise: float = 0.2,
         width: int = 1024,
         height: int = 1024,
         seed: int = 0,
@@ -492,6 +505,8 @@ class NovelAIClient:
             mask: Mask image bytes indicating areas to inpaint (white = inpaint, black = keep)
             prompt: Text prompt for inpainting
             negative_prompt: Negative prompt to avoid certain elements
+            strength: NovelAI unified img2img strength (0.0-1.0)
+            noise: NovelAI `noise` (0.0-1.0)
             width: Image width in pixels
             height: Image height in pixels
             seed: Random seed for reproducible generation
@@ -516,6 +531,8 @@ class NovelAIClient:
         base_image_b64 = base64.b64encode(base_image).decode("ascii")
         mask_b64 = base64.b64encode(processed_mask).decode("ascii")
 
+        kwargs.pop("noise", None)
+
         # Build the request parameters using common helper
         parameters = self._build_common_parameters(
             prompt=prompt,
@@ -525,7 +542,8 @@ class NovelAIClient:
             seed=seed,
             steps=steps,
             scale=scale,
-            strength=1.0,  # Default strength for inpainting
+            strength=strength,
+            noise=noise,
             variety=variety,
             character_prompts=character_prompts,
             **kwargs,
@@ -573,6 +591,7 @@ class NovelAIClient:
         prompt: str,
         negative_prompt: str | None = None,
         strength: float = 0.7,
+        noise: float = 0.2,
         width: int = 1024,
         height: int = 1024,
         seed: int = 0,
@@ -591,6 +610,7 @@ class NovelAIClient:
             prompt: Text prompt for image generation
             negative_prompt: Negative prompt to avoid certain elements
             strength: Strength of the transformation (0.0-1.0, higher = more change)
+            noise: NovelAI `noise` (0.0-1.0)
             width: Image width in pixels
             height: Image height in pixels
             seed: Random seed for reproducible generation
@@ -611,6 +631,8 @@ class NovelAIClient:
         # Encode base image to base64
         base_image_b64 = base64.b64encode(base_image).decode("ascii")
 
+        kwargs.pop("noise", None)
+
         # Build the request parameters using common helper
         parameters = self._build_common_parameters(
             prompt=prompt,
@@ -621,6 +643,7 @@ class NovelAIClient:
             steps=steps,
             scale=scale,
             strength=strength,
+            noise=noise,
             variety=variety,
             character_prompts=character_prompts,
             **kwargs,

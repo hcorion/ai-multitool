@@ -130,6 +130,24 @@ class TestNovelAIClient:
             assert payload["action"] == "generate"
             assert payload["model"] == "nai-diffusion-4-5-full"
             assert payload["parameters"]["v4_prompt"]["caption"]["base_caption"] == "test prompt"
+            assert payload["parameters"]["noise"] == 0.2
+    
+    def test_generate_image_custom_noise(self):
+        """Noise is forwarded into the API parameters dict."""
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w') as zip_file:
+            zip_file.writestr("image.png", b"fake image data")
+        zip_content = zip_buffer.getvalue()
+        
+        with patch.object(NovelAIClient, '_make_request') as mock_request:
+            mock_response = Mock()
+            mock_response.content = zip_content
+            mock_request.return_value = mock_response
+            
+            client = NovelAIClient("test-key")
+            client.generate_image("test prompt", noise=0.37)
+            payload = mock_request.call_args[0][1]
+            assert payload["parameters"]["noise"] == 0.37
     
     def test_generate_image_with_negative_prompt(self):
         """Test image generation with negative prompt."""
@@ -523,6 +541,39 @@ class TestNovelAIClient:
                 
                 assert params["strength"] == 1.0
                 assert params["inpaintImg2ImgStrength"] == 1.0
+                assert params["img2img"]["strength"] == 1.0
+                assert params["noise"] == 0.2
+    
+    def test_generate_inpaint_image_strength_and_noise(self):
+        """Inpaint uses one strength for strength, inpaintImg2ImgStrength, img2img.strength, and noise."""
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w') as zip_file:
+            zip_file.writestr("inpainted.png", b"inpainted image data")
+        zip_content = zip_buffer.getvalue()
+        
+        with patch.object(NovelAIClient, '_make_request') as mock_request:
+            mock_response = Mock()
+            mock_response.content = zip_content
+            mock_request.return_value = mock_response
+            
+            with patch.object(NovelAIClient, '_process_novelai_mask') as mock_process_mask:
+                mock_process_mask.return_value = b"processed mask data"
+                
+                client = NovelAIClient("test-key")
+                result = client.generate_inpaint_image(
+                    base_image=b"base image data",
+                    mask=b"mask image data",
+                    prompt="inpaint this area",
+                    strength=0.35,
+                    noise=0.66,
+                )
+                
+                assert result == b"inpainted image data"
+                params = mock_request.call_args[0][1]["parameters"]
+                assert params["strength"] == 0.35
+                assert params["inpaintImg2ImgStrength"] == 0.35
+                assert params["img2img"]["strength"] == 0.35
+                assert params["noise"] == 0.66
     
     def test_generate_inpaint_image_with_variety(self):
         """Test inpainting with variety enabled."""
@@ -773,6 +824,8 @@ class TestNovelAIClient:
         assert parameters["scale"] == 7.5
         assert parameters["strength"] == 0.8
         assert parameters["inpaintImg2ImgStrength"] == 0.8
+        assert parameters["img2img"]["strength"] == 0.8
+        assert parameters["noise"] == 0.2
         
         # Verify prompt structure
         assert parameters["v4_prompt"]["caption"]["base_caption"] == "test prompt"
@@ -784,6 +837,19 @@ class TestNovelAIClient:
         assert parameters["cfg_rescale"] == 0.4
         assert parameters["n_samples"] == 1
         assert parameters["sampler"] == "k_euler_ancestral"
+    
+    def test_build_common_parameters_unified_strength_and_noise(self):
+        """Strength drives top-level, inpaintImg2ImgStrength, and img2img.strength; noise is explicit."""
+        client = NovelAIClient("test-key")
+        parameters = client._build_common_parameters(
+            prompt="p",
+            strength=0.4,
+            noise=0.55,
+        )
+        assert parameters["strength"] == 0.4
+        assert parameters["inpaintImg2ImgStrength"] == 0.4
+        assert parameters["img2img"]["strength"] == 0.4
+        assert parameters["noise"] == 0.55
     
     def test_build_common_parameters_with_character_prompts(self):
         """Test _build_common_parameters with character prompts."""
@@ -917,6 +983,8 @@ class TestNovelAIClient:
             assert "image" in payload
             assert payload["parameters"]["strength"] == 0.7  # Default strength
             assert payload["parameters"]["inpaintImg2ImgStrength"] == 0.7  # Default strength
+            assert payload["parameters"]["img2img"]["strength"] == 0.7
+            assert payload["parameters"]["noise"] == 0.2
     
     def test_generate_img2img_image_with_negative_prompt(self):
         """Test img2img with negative prompt."""
@@ -960,7 +1028,8 @@ class TestNovelAIClient:
             result = client.generate_img2img_image(
                 base_image=b"base image data",
                 prompt="transform this image",
-                strength=0.5
+                strength=0.5,
+                noise=0.41,
             )
             
             assert result == b"img2img image data"
@@ -970,6 +1039,8 @@ class TestNovelAIClient:
             payload = call_args[0][1]
             assert payload["parameters"]["strength"] == 0.5
             assert payload["parameters"]["inpaintImg2ImgStrength"] == 0.5
+            assert payload["parameters"]["img2img"]["strength"] == 0.5
+            assert payload["parameters"]["noise"] == 0.41
     
     def test_generate_img2img_image_custom_parameters(self):
         """Test img2img with custom parameters."""
@@ -1004,6 +1075,8 @@ class TestNovelAIClient:
             
             assert params["strength"] == 0.8
             assert params["inpaintImg2ImgStrength"] == 0.8
+            assert params["img2img"]["strength"] == 0.8
+            assert params["noise"] == 0.2
             assert params["width"] == 512
             assert params["height"] == 768
             assert params["seed"] == 12345

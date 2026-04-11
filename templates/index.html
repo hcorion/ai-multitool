@@ -161,6 +161,21 @@
                     </div>
                 </div>
 
+                <div class="inpainting-novelai-tuning novelai" id="inpainting-novelai-tuning">
+                    <div class="inpainting-slider-row">
+                        <label for="inpainting-strength">Strength</label>
+                        <input type="range" id="inpainting-strength" name="strength" min="0" max="1" step="0.01"
+                            value="1" disabled />
+                        <span id="inpainting-strength-value" class="inpainting-slider-value" aria-live="polite">1.00</span>
+                    </div>
+                    <div class="inpainting-slider-row">
+                        <label for="inpainting-noise">Noise</label>
+                        <input type="range" id="inpainting-noise" name="noise" min="0" max="1" step="0.01" value="0.2"
+                            disabled />
+                        <span id="inpainting-noise-value" class="inpainting-slider-value" aria-live="polite">0.20</span>
+                    </div>
+                </div>
+
                 <!-- Hidden fields for inpainting data -->
                 <input type="hidden" id="inpainting-base-image" name="base_image_path" value="">
                 <input type="hidden" id="inpainting-mask-path" name="mask_path" value="">

@@ -59,6 +59,8 @@ document.addEventListener("DOMContentLoaded", () => {
     addEventListenerToElement("grid-image-close", "click", closeGridModal);
     // Inpainting buttons
     addEventListenerToElement("clear-inpainting-btn", "click", clearInpaintingMode);
+    addEventListenerToElement("inpainting-strength", "input", updateInpaintingStrengthNoiseLabels);
+    addEventListenerToElement("inpainting-noise", "input", updateInpaintingStrengthNoiseLabels);
     addEventListenerToElement("create-blank-canvas-btn", "click", createBlankCanvas);
     addEventListenerToElement("grid-prev", "click", previousGridImage);
     addEventListenerToElement("grid-next", "click", nextGridImage);
@@ -104,6 +106,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     // Just refresh the image gen provider
     providerChanged();
+    updateInpaintingStrengthNoiseLabels();
     // NovelAI tag suggestions on prompt textareas
     initTagSuggestions();
 });
@@ -253,6 +256,35 @@ function handleTabClick(evt) {
     }
 }
 /**
+ * Strength / noise value labels next to inpainting sliders (NovelAI).
+ */
+function updateInpaintingStrengthNoiseLabels() {
+    const s = document.getElementById("inpainting-strength");
+    const n = document.getElementById("inpainting-noise");
+    const sv = document.getElementById("inpainting-strength-value");
+    const nv = document.getElementById("inpainting-noise-value");
+    if (s && sv)
+        sv.textContent = parseFloat(s.value).toFixed(2);
+    if (n && nv)
+        nv.textContent = parseFloat(n.value).toFixed(2);
+}
+/**
+ * Only submit strength/noise when inpainting UI is open and NovelAI is selected.
+ */
+function syncInpaintingNovelaiStrengthNoiseEnabled() {
+    const section = document.getElementById("inpainting-section");
+    const strengthEl = document.getElementById("inpainting-strength");
+    const noiseEl = document.getElementById("inpainting-noise");
+    if (!strengthEl || !noiseEl)
+        return;
+    const provider = document.getElementById("provider");
+    const sectionVisible = section && section.style.display !== "none";
+    const novelaiSelected = provider && provider.value === "novelai";
+    const active = sectionVisible && novelaiSelected;
+    strengthEl.disabled = !active;
+    noiseEl.disabled = !active;
+}
+/**
  * Update UI when image generation provider is changed
  */
 function providerChanged() {
@@ -292,6 +324,7 @@ function providerChanged() {
     else {
         throw new Error(`Tried to switch to unsupported provider ${selection.value}`);
     }
+    syncInpaintingNovelaiStrengthNoiseEnabled();
 }
 /**
  * Handle model selection changes for current provider
@@ -1297,6 +1330,14 @@ function showInpaintingSection(baseImageUrl, maskDataUrl, baseImagePath, maskPat
     if (operationInput) {
         operationInput.value = operation;
     }
+    const strengthSlider = document.getElementById("inpainting-strength");
+    const noiseSlider = document.getElementById("inpainting-noise");
+    if (strengthSlider && noiseSlider) {
+        strengthSlider.value = operation === "inpaint" ? "1" : "0.7";
+        noiseSlider.value = "0.2";
+        updateInpaintingStrengthNoiseLabels();
+    }
+    syncInpaintingNovelaiStrengthNoiseEnabled();
     if (submitBtn) {
         submitBtn.value = 'Generate Inpainting';
         submitBtn.classList.add('inpainting-mode');
@@ -1420,6 +1461,17 @@ function clearInpaintingMode() {
     const maskPathInput = document.getElementById('inpainting-mask-path');
     const operationInput = document.getElementById('inpainting-operation');
     const submitBtn = document.getElementById('generate-submit-btn');
+    const strengthSlider = document.getElementById("inpainting-strength");
+    const noiseSlider = document.getElementById("inpainting-noise");
+    if (strengthSlider) {
+        strengthSlider.value = "1";
+        strengthSlider.disabled = true;
+    }
+    if (noiseSlider) {
+        noiseSlider.value = "0.2";
+        noiseSlider.disabled = true;
+    }
+    updateInpaintingStrengthNoiseLabels();
     if (inpaintingSection) {
         inpaintingSection.style.display = 'none';
     }
@@ -1436,6 +1488,7 @@ function clearInpaintingMode() {
         submitBtn.value = 'Generate Image';
         submitBtn.classList.remove('inpainting-mode');
     }
+    syncInpaintingNovelaiStrengthNoiseEnabled();
 }
 // Make the functions globally available
 window.openInpaintingMaskCanvas = openInpaintingMaskCanvas;

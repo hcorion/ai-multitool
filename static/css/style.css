@@ -2484,8 +2484,7 @@ button#send-chat:hover {
   background-color: rgba(102, 102, 102, 0.5);
 }
 
-/* In
-painting Section Styles */
+/* Inpainting Section Styles */
 .inpainting-section {
   background-color: rgba(0, 123, 255, 0.1);
   border: 2px solid #007bff;
@@ -2537,6 +2536,37 @@ painting Section Styles */
   border: 2px solid #666;
   border-radius: 6px;
   object-fit: contain;
+}
+
+.inpainting-section .inpainting-novelai-tuning {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(0, 123, 255, 0.35);
+}
+.inpainting-section .inpainting-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.inpainting-section .inpainting-slider-row:last-child {
+  margin-bottom: 0;
+}
+.inpainting-section .inpainting-slider-row label {
+  flex: 0 0 72px;
+  color: #ccc;
+  font-size: 0.95em;
+}
+.inpainting-section .inpainting-slider-row input[type="range"] {
+  flex: 1;
+  min-width: 0;
+}
+.inpainting-section .inpainting-slider-value {
+  flex: 0 0 44px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+  font-size: 0.95em;
 }
 
 .secondary-button {

@@ -26,6 +26,7 @@ def test_combined_request_creation():
     assert req.operation == Operation.COMBINED
     assert req.base_image_path == "static/images/user/base.png"
     assert req.mask_path == "static/images/user/mask.png"
+    assert req.strength == 0.7
 
 
 def test_combined_request_requires_base_image():
@@ -75,12 +76,33 @@ def test_create_request_from_form_data_combined():
         "seed": "42",
         "base_image_path": "static/images/user/base.png",
         "mask_path": "static/images/user/mask.png",
+        "strength": "0.55",
     }
     req = create_request_from_form_data(form_data)
     assert isinstance(req, CombinedRequest)
     assert req.operation == Operation.COMBINED
     assert req.base_image_path == "static/images/user/base.png"
     assert req.mask_path == "static/images/user/mask.png"
+    assert req.strength == 0.55
+
+
+def test_create_request_from_form_data_inpaint_strength_and_noise():
+    """Inpaint uses a single strength plus noise from the form."""
+    form_data = {
+        "prompt": "p",
+        "provider": "novelai",
+        "operation": "inpaint",
+        "size": "1024x1024",
+        "quality": "high",
+        "seed": "1",
+        "base_image_path": "static/images/user/base.png",
+        "mask_path": "static/images/user/mask.png",
+        "strength": "0.4",
+        "noise": "0.33",
+    }
+    req = create_request_from_form_data(form_data)
+    assert req.strength == 0.4
+    assert req.noise == 0.33
 
 
 def test_backward_compatibility_inpaint():
@@ -99,6 +121,7 @@ def test_backward_compatibility_inpaint():
     req = create_request_from_form_data(form_data)
     assert isinstance(req, InpaintingRequest)
     assert req.operation == Operation.INPAINT
+    assert req.strength == 1.0
 
 
 def test_backward_compatibility_img2img():
