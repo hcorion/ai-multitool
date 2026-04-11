@@ -185,9 +185,10 @@ def save_mask():
         user_dir = os.path.join(app.static_folder, "images", username)
         os.makedirs(user_dir, exist_ok=True)
 
-        # Generate unique filename for the mask
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        mask_filename = f"mask_{timestamp}.png"
+        # Generate a collision-resistant filename. Combined operations can upload
+        # painted image + mask back-to-back within the same second.
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        mask_filename = f"mask_{timestamp}_{secrets.token_hex(4)}.png"
         mask_path = os.path.join(user_dir, mask_filename)
 
         # Save the mask file
@@ -1875,6 +1876,8 @@ def generate_novelai_image(
     username: str,
     size: tuple[int, int],
     seed: int = 0,
+    strength: float = 0.6,
+    noise: float = 0.2,
     upscale: bool = False,
     variety: bool = False,
     grid_dynamic_prompt: GridDynamicPromptInfo | None = None,
@@ -1925,6 +1928,8 @@ def generate_novelai_image(
             width=width,
             height=height,
             seed=seed,
+            strength=strength,
+            noise=noise,
             variety=variety,
             character_prompts=processed_character_prompts,
             vibes=vibes,
@@ -1940,6 +1945,8 @@ def generate_novelai_image(
             "Prompt": prompt,
             "Revised Prompt": revised_prompt,
             "seed": str(seed),
+            "strength": str(strength),
+            "noise": str(noise),
         }
         if negative_prompt:
             image_metadata["Negative Prompt"] = negative_prompt
@@ -1978,6 +1985,8 @@ def generate_novelai_inpaint_image(
     username: str,
     size: tuple[int, int],
     seed: int = 0,
+    strength: float = 1.0,
+    noise: float = 0.2,
     variety: bool = False,
     grid_dynamic_prompt: GridDynamicPromptInfo | None = None,
     character_prompts: list[dict[str, str]] | None = None,
@@ -2025,6 +2034,8 @@ def generate_novelai_inpaint_image(
             mask=mask,
             prompt=revised_prompt,
             negative_prompt=negative_prompt,
+            strength=strength,
+            noise=noise,
             width=width,
             height=height,
             seed=seed,
@@ -2041,6 +2052,8 @@ def generate_novelai_inpaint_image(
             "Operation": "inpaint",
             "Provider": "novelai",
             "seed": str(seed),
+            "strength": str(strength),
+            "noise": str(noise),
         }
         if negative_prompt:
             image_metadata["Negative Prompt"] = negative_prompt
@@ -2079,6 +2092,7 @@ def generate_novelai_img2img_image(
     size: tuple[int, int],
     seed: int = 0,
     strength: float = 0.7,
+    noise: float = 0.2,
     variety: bool = False,
     followup_state: dict[str, FollowUpState] | None = None,
 ) -> GeneratedImageData:
@@ -2109,6 +2123,7 @@ def generate_novelai_img2img_image(
             prompt=revised_prompt,
             negative_prompt=negative_prompt,
             strength=strength,
+            noise=noise,
             width=width,
             height=height,
             seed=seed,
@@ -2125,6 +2140,7 @@ def generate_novelai_img2img_image(
             "Provider": "novelai",
             "seed": str(seed),
             "strength": str(strength),
+            "noise": str(noise),
         }
         if negative_prompt:
             image_metadata["Negative Prompt"] = negative_prompt
@@ -2706,6 +2722,14 @@ def generate_image(
         upscale = upscale_str.lower() == "true"
         variety_str = request.form.get("variety", "false")
         variety = variety_str.lower() == "true"
+        try:
+            strength = float(request.form.get("strength", "0.6"))
+        except (TypeError, ValueError):
+            strength = 0.6
+        try:
+            noise = float(request.form.get("noise", "0.2"))
+        except (TypeError, ValueError):
+            noise = 0.2
 
         if not size:
             raise ValueError("Unable to get 'size' field.")
@@ -2721,6 +2745,8 @@ def generate_image(
             username=session["username"],
             size=(int(split_size[0]), int(split_size[1])),
             seed=seed,
+            strength=strength,
+            noise=noise,
             upscale=upscale,
             variety=variety,
             grid_dynamic_prompt=grid_dynamic_prompt,
@@ -3235,6 +3261,8 @@ def _handle_generation_request(
                 username=session["username"],
                 size=(image_request.width, image_request.height),
                 seed=seed,
+                strength=image_request.strength,
+                noise=image_request.noise,
                 upscale=False,  # Default to False for new endpoint
                 variety=image_request.variety,
                 grid_dynamic_prompt=image_request.grid_dynamic_prompt,
@@ -3323,6 +3351,8 @@ def _handle_inpainting_request(
                 username=session["username"],
                 size=(image_request.width, image_request.height),
                 seed=seed,
+                strength=image_request.strength,
+                noise=image_request.noise,
                 variety=image_request.variety,
                 character_prompts=image_request.character_prompts,
                 grid_dynamic_prompt=image_request.grid_dynamic_prompt,
@@ -3394,6 +3424,7 @@ def _handle_img2img_request(image_request: Img2ImgRequest) -> ImageOperationResp
             prompt=image_request.prompt,
             negative_prompt=image_request.negative_prompt,
             strength=image_request.strength,
+            noise=image_request.noise,
             username=session["username"],
             size=(image_request.width, image_request.height),
             seed=seed,
@@ -3468,6 +3499,8 @@ def _handle_combined_request(image_request) -> ImageOperationResponse:
             username=session["username"],
             size=(image_request.width, image_request.height),
             seed=seed,
+            strength=image_request.strength,
+            noise=image_request.noise,
             variety=image_request.variety,
             character_prompts=image_request.character_prompts,
             grid_dynamic_prompt=image_request.grid_dynamic_prompt,

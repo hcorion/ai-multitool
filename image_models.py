@@ -78,6 +78,8 @@ class ImageGenerationRequest:
     character_prompts: list[dict[str, str]] | None = None
     variety: bool = False
     seed: int = (0,)
+    strength: float = 0.6
+    noise: float = 0.2
     grid_dynamic_prompt: GridDynamicPromptInfo | None = None
     vibe_params: list[dict[str, Any]] | None = None  # List of {guid, encoding_strength, reference_strength}
 
@@ -88,6 +90,10 @@ class ImageGenerationRequest:
 
         if self.width <= 0 or self.height <= 0:
             raise ValueError("Width and height must be positive integers")
+        if not 0.0 <= self.strength <= 1.0:
+            raise ValueError("Strength must be between 0.0 and 1.0")
+        if not 0.0 <= self.noise <= 1.0:
+            raise ValueError("Noise must be between 0.0 and 1.0")
 
         # Validate dimensions for specific providers
         if self.provider == Provider.OPENAI:
@@ -104,6 +110,7 @@ class InpaintingRequest(ImageGenerationRequest):
 
     base_image_path: str = ""
     mask_path: str = ""
+    strength: float = 1.0
     operation: Operation = Operation.INPAINT
 
     def __post_init__(self):
@@ -142,6 +149,7 @@ class CombinedRequest(ImageGenerationRequest):
 
     base_image_path: str = ""
     mask_path: str = ""
+    strength: float = 0.7
     operation: Operation = Operation.COMBINED
 
     def __post_init__(self):
@@ -150,6 +158,8 @@ class CombinedRequest(ImageGenerationRequest):
             raise ValueError("Base image path is required for combined operation")
         if not self.mask_path or not self.mask_path.strip():
             raise ValueError("Mask path is required for combined operation")
+        if not 0.0 <= self.strength <= 1.0:
+            raise ValueError("Strength must be between 0.0 and 1.0")
 
 
 @dataclass
@@ -288,6 +298,20 @@ def create_request_from_form_data(
 
     # Extract variety flag from form data
     variety = form_data.get("variety", "false").lower() == "on"
+    # Extract generation tuning parameters
+    strength_default = 0.6
+    if operation == Operation.INPAINT:
+        strength_default = 1.0
+    elif operation in (Operation.IMG2IMG, Operation.COMBINED):
+        strength_default = 0.7
+    try:
+        strength = float(form_data.get("strength", str(strength_default)))
+    except (ValueError, TypeError):
+        strength = strength_default
+    try:
+        noise = float(form_data.get("noise", "0.2"))
+    except (ValueError, TypeError):
+        noise = 0.2
 
     # Extract vibe parameters from form data (NovelAI only)
     vibe_params: list[dict[str, Any]] | None = None
@@ -339,6 +363,8 @@ def create_request_from_form_data(
             character_prompts=character_prompts_final,
             variety=variety,
             seed=seed,
+            strength=strength,
+            noise=noise,
             base_image_path=form_data.get("base_image_path", ""),
             mask_path=form_data.get("mask_path", ""),
         )
@@ -356,7 +382,8 @@ def create_request_from_form_data(
             variety=variety,
             seed=seed,
             base_image_path=form_data.get("base_image_path", ""),
-            strength=float(form_data.get("strength", 0.7)),
+            strength=strength,
+            noise=noise,
         )
     elif operation == Operation.COMBINED:
         return CombinedRequest(
@@ -373,6 +400,8 @@ def create_request_from_form_data(
             seed=seed,
             base_image_path=form_data.get("base_image_path", ""),
             mask_path=form_data.get("mask_path", ""),
+            strength=strength,
+            noise=noise,
         )
     else:
         return ImageGenerationRequest(
@@ -387,6 +416,8 @@ def create_request_from_form_data(
             character_prompts=character_prompts_final,
             variety=variety,
             seed=seed,
+            strength=strength,
+            noise=noise,
             vibe_params=vibe_params,
         )
 
