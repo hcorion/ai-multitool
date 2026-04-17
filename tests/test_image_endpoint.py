@@ -123,7 +123,9 @@ class TestImageEndpoint:
             'provider': 'novelai',
             'operation': 'img2img',
             'base_image_path': '/path/to/base.png',
-            'strength': '0.8'
+            'strength': '0.8',
+            'character_prompts[0][positive]': 'character 1 positive',
+            'character_prompts[0][negative]': 'character 1 negative',
         })
         
         assert response.status_code == 200
@@ -133,6 +135,12 @@ class TestImageEndpoint:
         assert data['image_name'] == 'img2img.png'
         assert data['provider'] == 'novelai'
         assert data['operation'] == 'img2img'
+
+        mock_img2img.assert_called_once()
+        call_kwargs = mock_img2img.call_args.kwargs
+        assert call_kwargs['character_prompts'] == [
+            {'positive': 'character 1 positive', 'negative': 'character 1 negative'}
+        ]
     
     def test_invalid_operation(self, client, authenticated_session):
         """Test request with invalid operation."""

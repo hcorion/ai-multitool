@@ -8,7 +8,11 @@ maintaining backward compatibility with the existing function signature.
 import pytest
 from unittest.mock import Mock, patch
 
-from app import generate_novelai_image, GeneratedImageData
+from app import (
+    generate_novelai_image,
+    generate_novelai_img2img_image,
+    GeneratedImageData,
+)
 from novelai_client import NovelAIAPIError, NovelAIClientError
 
 
@@ -288,6 +292,117 @@ class TestGenerateNovelAIImageRefactored:
                 match="Error processing character prompts: Invalid character prompt",
             ):
                 generate_novelai_image(
+                    prompt="test prompt",
+                    negative_prompt=None,
+                    username="testuser",
+                    size=(512, 512),
+                    character_prompts=character_prompts,
+                )
+
+
+class TestGenerateNovelAIImg2ImgRefactored:
+    """Test cases for img2img prompt processing and client wiring."""
+
+    @patch("app.NOVELAI_API_KEY", "test-api-key")
+    @patch("app.make_prompt_dynamic")
+    @patch("app.make_character_prompts_dynamic")
+    @patch("app.process_image_response")
+    @patch("app.NovelAIClient")
+    def test_generate_novelai_img2img_with_character_prompts(
+        self,
+        mock_client_class,
+        mock_process_image,
+        mock_make_char_prompts,
+        mock_make_prompt,
+    ):
+        """img2img includes processed character prompts in NovelAI payload."""
+        mock_make_prompt.return_value = "processed base prompt"
+        mock_make_char_prompts.return_value = [
+            {"positive": "processed char 1", "negative": "processed neg 1"},
+            {"positive": "processed char 2", "negative": ""},
+        ]
+
+        mock_client = Mock()
+        mock_client_class.return_value = mock_client
+        mock_client.generate_img2img_image.return_value = b"fake image data"
+
+        mock_saved_data = Mock()
+        mock_saved_data.local_image_path = "/path/to/img2img.png"
+        mock_saved_data.image_name = "img2img.png"
+        mock_process_image.return_value = mock_saved_data
+
+        character_prompts = [
+            {"positive": "char 1 prompt", "negative": "char 1 negative"},
+            {"positive": "char 2 prompt", "negative": ""},
+        ]
+
+        with patch("app.app") as mock_app:
+            mock_app.static_folder = "/test/static"
+
+            _ = generate_novelai_img2img_image(
+                base_image=b"base image data",
+                prompt="test prompt",
+                negative_prompt="avoid this",
+                username="testuser",
+                size=(768, 512),
+                seed=123,
+                strength=0.85,
+                noise=0.3,
+                variety=True,
+                character_prompts=character_prompts,
+            )
+
+        mock_make_char_prompts.assert_called_once_with(
+            character_prompts, "testuser", "/test/static", 123, None, {}
+        )
+
+        mock_client.generate_img2img_image.assert_called_once_with(
+            base_image=b"base image data",
+            prompt="processed base prompt",
+            negative_prompt="avoid this",
+            strength=0.85,
+            noise=0.3,
+            width=768,
+            height=512,
+            seed=123,
+            variety=True,
+            character_prompts=[
+                {"positive": "processed char 1", "negative": "processed neg 1"},
+                {"positive": "processed char 2", "negative": ""},
+            ],
+        )
+
+        call_args = mock_process_image.call_args
+        metadata = call_args[0][4]
+
+        assert "Character 1 Prompt" in metadata
+        assert metadata["Character 1 Prompt"] == "char 1 prompt"
+        assert "Character 1 Processed Prompt" in metadata
+        assert metadata["Character 1 Processed Prompt"] == "processed char 1"
+        assert "Character 2 Prompt" in metadata
+        assert metadata["Character 2 Prompt"] == "char 2 prompt"
+
+    @patch("app.NOVELAI_API_KEY", "test-api-key")
+    @patch("app.make_prompt_dynamic")
+    @patch("app.make_character_prompts_dynamic")
+    def test_generate_novelai_img2img_character_prompt_error(
+        self, mock_make_char_prompts, mock_make_prompt
+    ):
+        """img2img surfaces character prompt preprocessing errors."""
+        mock_make_prompt.return_value = "processed prompt"
+        mock_make_char_prompts.side_effect = ValueError("Invalid character prompt")
+
+        character_prompts = [{"positive": "test", "negative": ""}]
+
+        with patch("app.app") as mock_app:
+            mock_app.static_folder = "/test/static"
+
+            with pytest.raises(
+                ValueError,
+                match="Error processing character prompts: Invalid character prompt",
+            ):
+                generate_novelai_img2img_image(
+                    base_image=b"base image data",
                     prompt="test prompt",
                     negative_prompt=None,
                     username="testuser",

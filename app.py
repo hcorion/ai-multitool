@@ -2094,6 +2094,8 @@ def generate_novelai_img2img_image(
     strength: float = 0.7,
     noise: float = 0.2,
     variety: bool = False,
+    grid_dynamic_prompt: GridDynamicPromptInfo | None = None,
+    character_prompts: list[dict[str, str]] | None = None,
     followup_state: dict[str, FollowUpState] | None = None,
 ) -> GeneratedImageData:
     """Generate an img2img image using NovelAI and return processed data."""
@@ -2108,8 +2110,28 @@ def generate_novelai_img2img_image(
         followup_state = init_followup_state()
 
     revised_prompt = make_prompt_dynamic(
-        prompt, username, app.static_folder, seed, None, followup_state
+        prompt,
+        username,
+        app.static_folder,
+        seed,
+        grid_dynamic_prompt,
+        followup_state,
     )
+
+    # Process character prompts if provided
+    processed_character_prompts = []
+    if character_prompts:
+        try:
+            processed_character_prompts = make_character_prompts_dynamic(
+                character_prompts,
+                username,
+                app.static_folder,
+                seed,
+                grid_dynamic_prompt,
+                followup_state,  # Pass the same follow-up state used by base prompt
+            )
+        except (ValueError, LookupError) as e:
+            raise ValueError(f"Error processing character prompts: {str(e)}")
 
     width, height = size
 
@@ -2128,6 +2150,7 @@ def generate_novelai_img2img_image(
             height=height,
             seed=seed,
             variety=variety,
+            character_prompts=processed_character_prompts,
         )
 
         file_bytes = io.BytesIO(image_bytes)
@@ -2144,6 +2167,13 @@ def generate_novelai_img2img_image(
         }
         if negative_prompt:
             image_metadata["Negative Prompt"] = negative_prompt
+
+        # Add character prompt metadata using shared utility
+        if character_prompts and processed_character_prompts:
+            char_metadata = build_character_prompt_metadata(
+                character_prompts, processed_character_prompts
+            )
+            image_metadata.update(char_metadata)
 
         saved_data = process_image_response(
             file_bytes, prompt, revised_prompt, username, image_metadata
@@ -2414,7 +2444,7 @@ def generate_openai_image(
     try:
         # Call OpenAI Image Generation API
         response = client.images.generate(
-            model="gpt-image-1",
+            model="gpt-image-1.5",
             prompt=revised_prompt,
             moderation="low",
             size=size,  # type: ignore
@@ -3429,6 +3459,8 @@ def _handle_img2img_request(image_request: Img2ImgRequest) -> ImageOperationResp
             size=(image_request.width, image_request.height),
             seed=seed,
             variety=image_request.variety,
+            grid_dynamic_prompt=image_request.grid_dynamic_prompt,
+            character_prompts=image_request.character_prompts,
             followup_state=followup_state,
         )
 
