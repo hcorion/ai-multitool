@@ -204,6 +204,8 @@ function formatReasoningLevel(level) {
  */
 function formatModelName(model) {
     switch (model) {
+        case 'gpt-5.5':
+            return 'GPT-5.5';
         case 'gpt-5.4':
             return 'GPT-5.4';
         case 'gpt-5.3-codex':

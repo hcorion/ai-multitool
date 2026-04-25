@@ -218,53 +218,53 @@ This implementation extends the existing inpainting canvas system to support col
     - Add memory usage tracking for color layer
     - _Requirements: 1.1_
 
-  - [~] 13.2 Optimize rendering with dirty rectangles
+  - [ ] 13.2 Optimize rendering with dirty rectangles
     - Implement dirty rectangle tracking for color layer
     - Update only changed regions during rendering
     - Batch updates during active strokes
     - _Requirements: 6.5_
 
-  - [~] 13.3 Optimize export with caching
+  - [ ] 13.3 Optimize export with caching
     - Cache composited painted image until color layer changes
     - Use Web Workers for image compositing on large images
     - Reuse existing worker pool from mask processing
     - _Requirements: 1.4, 9.1_
 
-- [~] 14. Phase 4: Polish & Testing - Error Handling
-  - [~] 14.1 Add frontend validation errors
+- [ ] 14. Phase 4: Polish & Testing - Error Handling
+  - [ ] 14.1 Add frontend validation errors
     - Create CanvasValidationError class with error codes
     - Add validation for dimension mismatches, invalid colors, no layers, mode conflicts
     - Display user-friendly error messages
     - _Requirements: 9.5_
 
-  - [~] 14.2 Add backend validation errors
+  - [ ] 14.2 Add backend validation errors
     - Implement validation for painted image and mask dimension matching
     - Validate mask is grayscale binary
     - Return clear error messages for validation failures
     - _Requirements: 9.5_
 
-  - [~] 14.3 Add error recovery mechanisms
+  - [ ] 14.3 Add error recovery mechanisms
     - Handle export failures gracefully
     - Provide fallback for compositing errors
     - Log errors for debugging
     - _Requirements: 9.5_
 
-- [~] 15. Phase 4: Polish & Testing - Backward Compatibility Verification
-  - [~] 15.1 Write integration tests for backward compatibility
+- [ ] 15. Phase 4: Polish & Testing - Backward Compatibility Verification
+  - [ ] 15.1 Write integration tests for backward compatibility
     - Test existing inpainting buttons work unchanged
     - Test mask-only export format remains the same
     - Test backend accepts mask-only requests as before
     - Verify no breaking changes to existing workflows
     - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5_
 
-  - [~] 15.2 Verify UI backward compatibility
+  - [ ] 15.2 Verify UI backward compatibility
     - Test that color controls are hidden by default
     - Test that mask-only workflows don't require color painting
     - Verify existing inpainting functionality unchanged
     - _Requirements: 7.1, 7.4_
 
-- [~] 16. Phase 4: Polish & Testing - Comprehensive Integration Tests
-  - [~] 16.1 Write frontend integration tests
+- [ ] 16. Phase 4: Polish & Testing - Comprehensive Integration Tests
+  - [ ] 16.1 Write frontend integration tests
     - Test complete painting workflow (color + mask)
     - Test mode switching preserves painted data
     - Test export with both layers
@@ -273,7 +273,7 @@ This implementation extends the existing inpainting canvas system to support col
     - Test blank canvas creation and painting
     - _Requirements: 1.1, 2.4, 4.1, 4.2, 4.4, 4.5, 11.4, 11.5_
 
-  - [~] 16.2 Write end-to-end tests
+  - [ ] 16.2 Write end-to-end tests
     - Test paint button opens canvas from generated image
     - Test paint button opens canvas from grid modal
     - Test canvas extracts and preserves prompt metadata
@@ -281,7 +281,7 @@ This implementation extends the existing inpainting canvas system to support col
     - Test combined operation submission to backend
     - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 4.1, 4.2_
 
-- [~] 17. Final checkpoint - Complete feature verification
+- [ ] 17. Final checkpoint - Complete feature verification
   - Ensure all tests pass, ask the user if questions arise.
 
 ## Notes

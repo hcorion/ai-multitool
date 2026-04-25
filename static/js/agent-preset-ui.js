@@ -512,7 +512,7 @@ function populatePresetForm(preset) {
         if (instructionsField)
             instructionsField.value = '';
         if (modelField)
-            modelField.value = 'gpt-5.4';
+            modelField.value = 'gpt-5.5';
         if (reasoningField)
             reasoningField.value = 'medium';
         // Set default tools for new presets
@@ -651,7 +651,7 @@ function getFormData() {
     return {
         name: nameField?.value?.trim() || '',
         instructions: instructionsField?.value?.trim() || '',
-        model: modelField?.value || 'gpt-5.4',
+        model: modelField?.value || 'gpt-5.5',
         default_reasoning_level: reasoningField?.value || 'medium',
         enabled_tools: enabledTools
     };
